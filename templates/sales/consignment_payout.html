@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block header_title %}{% trans "Record payout" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-2">
+  <div class="text-sm text-gray-600">
+    <strong>{{ product.brand.name }} {{ product.model.name }}</strong> — IMEI {{ product.imei_full }}
+  </div>
+
+  <form method="post" class="bg-white border rounded-xl p-4 space-y-3 mt-2">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm mb-1">{% trans "Amount" %}</label>
+      {{ form.amount }}
+    </div>
+    <div>
+      <label class="block text-sm mb-1">{% trans "Note" %}</label>
+      {{ form.note }}
+    </div>
+    <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Save payout" %}</button>
+  </form>
+</div>
+{% endblock %}

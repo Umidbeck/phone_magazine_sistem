@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Brands" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-3">
+  <a href="{% url 'brand_new' %}" class="bg-black text-white px-3 py-2 rounded-lg">{% trans "New brand" %}</a>
+  <div class="bg-white border rounded-xl mt-3">
+    <table class="w-full text-sm">
+      <thead><tr class="border-b">
+        <th class="p-2 text-left">{% trans "Name" %}</th>
+        <th class="p-2">{% trans "Active" %}</th>
+        <th class="p-2"></th>
+      </tr></thead>
+      <tbody>
+      {% for x in items %}
+        <tr class="border-b last:border-0">
+          <td class="p-2">{{ x.name }}</td>
+          <td class="p-2 text-center">{{ x.is_active|yesno:_("Yes,No") }}</td>
+          <td class="p-2 text-right">
+            <a class="text-blue-600" href="{% url 'brand_edit' x.id %}">{% trans "Edit" %}</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td class="p-2 text-gray-500" colspan="3">{% trans "No data" %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

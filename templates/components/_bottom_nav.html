@@ -1,0 +1,27 @@
+{% load i18n %}
+<nav class="bottom-nav fixed bottom-0 inset-x-0 bg-white border-t">
+  <div class="mx-auto max-w-md h-full grid grid-cols-5">
+    <a href="{% url 'home' %}" class="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+      <i data-feather="home"></i>
+      <span class="text-xs">{% trans "Home" %}</span>
+    </a>
+    <a href="{% url 'product_list' %}" class="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+      <i data-feather="search"></i>
+      <span class="text-xs">{% trans "Search" %}</span>
+    </a>
+    <a href="#" class="flex flex-col items-center justify-center text-gray-600 hover:text-black"
+       onclick="alert('{% trans 'Add flow will be in next steps' %}')">
+      <i data-feather="plus-square"></i>
+      <span class="text-xs">{% trans "Add" %}</span>
+    </a>
+    <a href="{% url 'product_list' %}" class="flex flex-col items-center justify-center text-gray-600 hover:text-black">
+      <i data-feather="grid"></i>
+      <span class="text-xs">{% trans "Inventory" %}</span>
+    </a>
+    <a href="#" class="flex flex-col items-center justify-center text-gray-600 hover:text-black"
+       onclick="alert('{% trans 'Profile will be added' %}')">
+      <i data-feather="user"></i>
+      <span class="text-xs">{% trans "Profile" %}</span>
+    </a>
+  </div>
+</nav>

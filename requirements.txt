@@ -1,0 +1,10 @@
+Django>=4.2,<5.0
+gunicorn
+psycopg[binary]
+django-redis
+django-storages
+google-cloud-storage
+sentry-sdk
+weasyprint
+pandas
+openpyxl

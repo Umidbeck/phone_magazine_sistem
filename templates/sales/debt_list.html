@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block header_title %}{% trans "Debts" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-4">
+
+  <a href="{% url 'debt_new' %}" class="bg-black text-white rounded-lg px-3 py-2">{% trans "New debt" %}</a>
+
+  <div class="bg-white border rounded-xl">
+    <div class="p-3 text-sm font-medium">{% trans "Open balances" %}</div>
+    <ul class="divide-y">
+      {% for r in rows %}
+        <li class="p-3 flex items-center justify-between">
+          <div class="text-sm">{{ r.debtor_note }}</div>
+          <div class="text-right">
+            <div class="text-sm font-semibold">{{ r.balance }}</div>
+            <a class="text-xs text-blue-600" href="{% url 'debt_pay' forloop.counter0 %}">{% trans "Pay" %}</a>
+          </div>
+        </li>
+      {% empty %}
+        <li class="p-3 text-sm text-gray-500">{% trans "No open debts." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="h-24"></div>
+</div>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Owner Dashboard" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-4">
+
+  <form method="get" class="bg-white border rounded-xl p-3">
+    <div class="flex items-center gap-2">
+      <label class="text-sm">{% trans "Period" %}</label>
+      <select name="days" class="border rounded-lg px-3 py-2">
+        <option value="7" {% if days == 7 %}selected{% endif %}>7</option>
+        <option value="30" {% if days == 30 %}selected{% endif %}>30</option>
+        <option value="90" {% if days == 90 %}selected{% endif %}>90</option>
+      </select>
+      <button class="px-3 py-2 bg-black text-white rounded-lg">{% trans "Apply" %}</button>
+    </div>
+  </form>
+
+  <!-- Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Period" %}</div>
+      <div class="text-sm font-semibold">{{ date_from }} — {{ date_to }}</div>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Top store (sales)" %}</div>
+      <div class="text-sm font-semibold">
+        {% if top_stores %}{{ top_stores.0.store__name }} — {{ top_stores.0.s }}{% else %}-{% endif %}
+      </div>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Top brand (sales)" %}</div>
+      <div class="text-sm font-semibold">
+        {% if top_brands %}{{ top_brands.0.product__brand__name }} — {{ top_brands.0.s }}{% else %}-{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Line chart -->
+  <div class="bg-white border rounded-xl p-4">
+    <div class="text-sm font-semibold mb-2">{% trans "Daily sales (amount)" %}</div>
+    <canvas id="salesLine"></canvas>
+  </div>
+
+  <!-- TOP tables -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-sm font-semibold mb-2">{% trans "Top stores" %}</div>
+      <ul class="text-sm space-y-1">
+        {% for r in top_stores %}
+          <li class="flex justify-between"><span>{{ r.store__name }}</span><span>{{ r.s }}</span></li>
+        {% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
+      </ul>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-sm font-semibold mb-2">{% trans "Top brands" %}</div>
+      <ul class="text-sm space-y-1">
+        {% for r in top_brands %}
+          <li class="flex justify-between"><span>{{ r.product__brand__name }}</span><span>{{ r.s }}</span></li>
+        {% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
+      </ul>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-sm font-semibold mb-2">{% trans "Top models" %}</div>
+      <ul class="text-sm space-y-1">
+        {% for r in top_models %}
+          <li class="flex justify-between">
+            <span>{{ r.product__brand__name }} {{ r.product__model__name }}</span><span>{{ r.s }}</span>
+          </li>
+        {% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="h-24"></div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const labels = {{ labels|safe }};
+  const series = {{ series|safe }};
+  const ctx = document.getElementById('salesLine').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels: labels, datasets: [{ label: 'Sales', data: series, fill:false, tension:0.3 }] },
+    options: { responsive:true, scales:{ y:{ beginAtZero:true } } }
+  });
+</script>
+{% endblock %}

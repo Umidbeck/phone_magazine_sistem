@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Import from Excel" %}{% endblock %}
+{% block content %}
+<div class="p-4">
+  <form method="post" enctype="multipart/form-data" class="bg-white border rounded-xl p-4 space-y-3">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm mb-1">{% trans "File (.xlsx)" %}</label>
+      {{ form.file }}
+    </div>
+    <div>
+      <label class="block text-sm mb-1">{% trans "Store" %}</label>
+      {{ form.store }}
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div>
+        <label class="block text-xs mb-1">{% trans "Brand column" %}</label>
+        {{ form.brand_col }}
+      </div>
+      <div>
+        <label class="block text-xs mb-1">{% trans "Model column" %}</label>
+        {{ form.model_col }}
+      </div>
+      <div>
+        <label class="block text-xs mb-1">{% trans "Color column" %}</label>
+        {{ form.color_col }}
+      </div>
+      <div>
+        <label class="block text-xs mb-1">{% trans "IMEI column" %}</label>
+        {{ form.imei_col }}
+      </div>
+      <div>
+        <label class="block text-xs mb-1">{% trans "Price column" %}</label>
+        {{ form.price_col }}
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm mb-1">{% trans "Ownership" %}</label>
+      {{ form.ownership }}
+    </div>
+    <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Start import" %}</button>
+  </form>
+</div>
+{% endblock %}

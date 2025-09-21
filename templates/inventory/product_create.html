@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block header_title %}{% trans "Add phone" %}{% endblock %}
+
+{% block content %}
+<div class="p-4">
+  <form method="post" enctype="multipart/form-data"
+        class="bg-white border rounded-xl p-4 space-y-4">
+    {% csrf_token %}
+
+    <!-- Store (seller uchun readonly) -->
+    <div>
+      <label class="block text-sm mb-1">{% trans "Store" %}</label>
+      {{ form.store|add_class:"w-full border rounded-lg px-3 py-2 bg-gray-50" }}
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">{% trans "Brand" %}</label>
+        {{ form.brand|add_class:"w-full border rounded-lg px-3 py-2" }}
+      </div>
+      <div>
+        <label class="block text-sm mb-1">{% trans "Model" %}</label>
+        {{ form.model|add_class:"w-full border rounded-lg px-3 py-2" }}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">{% trans "Color" %}</label>
+        {{ form.color|add_class:"w-full border rounded-lg px-3 py-2" }}
+      </div>
+      <div>
+        <label class="block text-sm mb-1">{% trans "Year" %}</label>
+        {{ form.year|add_class:"w-full border rounded-lg px-3 py-2" }}
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1">{% trans "IMEI (full)" %}</label>
+      {{ form.imei_full|add_class:"w-full border rounded-lg px-3 py-2" }}
+      <p class="text-xs text-gray-500 mt-1">{% trans "Last 4 digits will be derived automatically." %}</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <label class="inline-flex items-center gap-2">
+        {{ form.has_documents }} <span class="text-sm">{% trans "Has documents (box/papers)" %}</span>
+      </label>
+      <label class="inline-flex items-center gap-2">
+        {{ form.is_new }} <span class="text-sm">{% trans "New phone" %}</span>
+      </label>
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1">{% trans "Defect / notes" %}</label>
+      {{ form.defect|add_class:"w-full border rounded-lg px-3 py-2" }}
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1">{% trans "Battery (%)" %}</label>
+      {{ form.battery_pct|add_class:"w-full border rounded-lg px-3 py-2" }}
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1">{% trans "Ownership" %}</label>
+      {{ form.ownership|add_class:"w-full border rounded-lg px-3 py-2" }}
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">{% trans "Purchase price (owned)" %}</label>
+        {{ form.purchase_price|add_class:"w-full border rounded-lg px-3 py-2" }}
+      </div>
+      <div>
+        <label class="block text-sm mb-1">{% trans "Consignment price" %}</label>
+        {{ form.consignment_price|add_class:"w-full border rounded-lg px-3 py-2" }}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm mb-1">{% trans "Previous owner name" %}</label>
+        {{ form.owner_name|add_class:"w-full border rounded-lg px-3 py-2" }}
+      </div>
+      <div>
+        <label class="block text-sm mb-1">{% trans "Previous owner phone" %}</label>
+        {{ form.owner_phone|add_class:"w-full border rounded-lg px-3 py-2" }}
+      </div>
+    </div>
+
+    <!-- Images -->
+    <div class="grid grid-cols-1 gap-3">
+      <div>
+        <label class="block text-sm mb-1">{% trans "Document photos" %}</label>
+        {{ form.doc_images }}
+      </div>
+      <div>
+        <label class="block text-sm mb-1">{% trans "Condition photos" %}</label>
+        {{ form.cond_images }}
+      </div>
+      <div>
+        <label class="block text-sm mb-1">{% trans "Other photos" %}</label>
+        {{ form.images }}
+      </div>
+    </div>
+
+    <button class="w-full bg-black text-white rounded-lg py-2">
+      {% trans "Save and add next" %}
+    </button>
+  </form>
+</div>
+
+<script>
+  // Dependent select: Brand -> Model
+  (function() {
+    const brandSel = document.getElementById("id_brand");
+    const modelSel = document.getElementById("id_model");
+
+    function getCookie(name) { // CSRF uchun kerak bo'lishi mumkin (GET emasda)
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    function loadModels(brandId, preselect=null) {
+      if (!brandId) return;
+      fetch(`/reference/brands/${brandId}/models-json/`, {headers: {"X-Requested-With":"XMLHttpRequest"}})
+        .then(r => r.json())
+        .then(data => {
+          modelSel.innerHTML = "";
+          data.results.forEach(it => {
+            const opt = document.createElement("option");
+            opt.value = it.id; opt.textContent = it.name;
+            if (preselect && preselect == it.id) opt.selected = true;
+            modelSel.appendChild(opt);
+          });
+        });
+    }
+
+    if (brandSel) {
+      brandSel.addEventListener("change", e => loadModels(e.target.value));
+      if (brandSel.value) {
+        loadModels(brandSel.value, modelSel.value || null);
+      }
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,137 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-09-21 23:27+0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+#: accounts/views.py:13
+#, python-format
+msgid "Welcome, %(name)s!"
+msgstr ""
+
+#: accounts/views.py:15
+msgid "Invalid username or password."
+msgstr ""
+
+#: accounts/views.py:20
+msgid "You have been logged out."
+msgstr ""
+
+#: templates/accounts/home.html:3
+msgid "Dashboard"
+msgstr ""
+
+#: templates/accounts/home.html:7
+msgid "Quick actions"
+msgstr ""
+
+#: templates/accounts/home.html:10 templates/components/_bottom_nav.html:19
+#: templates/inventory/product_list.html:3
+msgid "Inventory"
+msgstr ""
+
+#: templates/accounts/home.html:13
+msgid "Available phones"
+msgstr ""
+
+#: templates/accounts/home.html:18
+msgid "You are signed in as"
+msgstr ""
+
+#: templates/accounts/login.html:3 templates/accounts/login.html:4
+msgid "Sign in"
+msgstr ""
+
+#: templates/accounts/login.html:12
+msgid "Username"
+msgstr ""
+
+#: templates/accounts/login.html:16
+msgid "Password"
+msgstr ""
+
+#: templates/accounts/login.html:19
+msgid "Login"
+msgstr ""
+
+#: templates/base.html:27
+msgid "Phone Network"
+msgstr ""
+
+#: templates/base.html:31
+msgid "Logout"
+msgstr ""
+
+#: templates/components/_bottom_nav.html:6
+msgid "Home"
+msgstr ""
+
+#: templates/components/_bottom_nav.html:10
+#: templates/inventory/product_list.html:18
+msgid "Search"
+msgstr ""
+
+#: templates/components/_bottom_nav.html:13
+msgid "Add flow will be in next steps"
+msgstr ""
+
+#: templates/components/_bottom_nav.html:15
+msgid "Add"
+msgstr ""
+
+#: templates/components/_bottom_nav.html:22
+msgid "Profile will be added"
+msgstr ""
+
+#: templates/components/_bottom_nav.html:24
+msgid "Profile"
+msgstr ""
+
+#: templates/inventory/product_list.html:10
+msgid "IMEI or last 4"
+msgstr ""
+
+#: templates/inventory/product_list.html:13
+msgid "All"
+msgstr ""
+
+#: templates/inventory/product_list.html:14
+#: templates/inventory/product_list.html:34
+msgid "Available"
+msgstr ""
+
+#: templates/inventory/product_list.html:15
+#: templates/inventory/product_list.html:35
+msgid "On repair"
+msgstr ""
+
+#: templates/inventory/product_list.html:16
+#: templates/inventory/product_list.html:36
+#: templates/inventory/product_list.html:45
+msgid "Sold"
+msgstr ""
+
+#: templates/inventory/product_list.html:41
+msgid "In stock"
+msgstr ""
+
+#: templates/inventory/product_list.html:43
+msgid "Repair"
+msgstr ""
+
+#: templates/inventory/product_list.html:50
+msgid "No products found."
+msgstr ""

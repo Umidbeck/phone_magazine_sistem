@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block header_title %}{% trans "Add expense" %}{% endblock %}
+
+{% block content %}
+<div class="p-4 space-y-4">
+
+  <!-- Ixtiyoriy: product qidirish -->
+  <form method="get" class="bg-white border rounded-xl p-3">
+    <div class="flex gap-2">
+      <input name="q" value="{{ q }}" placeholder="{% trans 'IMEI (full/last 4), brand or model' %}"
+             class="flex-1 border rounded-lg px-3 py-2">
+      <button class="px-4 py-2 bg-black text-white rounded-lg">{% trans "Search" %}</button>
+    </div>
+  </form>
+
+  {% if products %}
+    <div class="bg-white border rounded-xl">
+      <div class="p-3 text-sm font-medium">{% trans "Pick a product (optional)" %}</div>
+      <ul class="divide-y">
+        {% for p in products %}
+          <li>
+            <a class="flex items-center justify-between p-3 hover:bg-gray-50"
+               href="?product_id={{ p.id }}">
+              <div>
+                <div class="text-sm font-semibold">{{ p.brand.name }} {{ p.model.name }}</div>
+                <div class="text-xs text-gray-500">IMEI: {{ p.imei_full }} · {{ p.store.name }}</div>
+              </div>
+              <div class="text-xs text-gray-600">{{ p.status }}</div>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="bg-white border rounded-xl p-4">
+    <form method="post" class="space-y-3">
+      {% csrf_token %}
+      {% if picked %}
+        <input type="hidden" name="product_id" value="{{ picked.id }}">
+        <div class="text-xs text-gray-600">
+          {% trans "Product" %}: <strong>{{ picked.brand.name }} {{ picked.model.name }}</strong> — IMEI {{ picked.imei_full }}
+        </div>
+      {% endif %}
+
+      <div>
+        <label class="block text-sm mb-1">{% trans "Expense type" %}</label>
+        {{ form.expense_type }}
+      </div>
+      <div>
+        <label class="block text-sm mb-1">{% trans "Amount" %}</label>
+        <input name="amount" type="number" step="0.01" required class="w-full border rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm mb-1">{% trans "Note" %}</label>
+        <input name="note" class="w-full border rounded-lg px-3 py-2">
+      </div>
+
+      <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Save expense" %}</button>
+    </form>
+  </div>
+
+  <div class="h-24"></div>
+</div>
+{% endblock %}
