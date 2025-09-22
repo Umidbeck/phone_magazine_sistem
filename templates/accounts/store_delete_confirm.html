@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Delete store" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-3">
+  <div class="bg-white border rounded-xl p-4">
+    {% trans "Delete store" %}: <strong>{{ obj.name }}</strong>?
+  </div>
+  <form method="post">
+    {% csrf_token %}
+    <button class="px-3 py-2 bg-black text-white rounded-lg">{% trans "Confirm" %}</button>
+  </form>
+</div>
+{% endblock %}

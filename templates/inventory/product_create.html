@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% load widget_tweaks %}
 {% block header_title %}{% trans "Add phone" %}{% endblock %}
 
 {% block content %}
@@ -8,10 +9,14 @@
         class="bg-white border rounded-xl p-4 space-y-4">
     {% csrf_token %}
 
-    <!-- Store (seller uchun readonly) -->
+    <!-- Store -->
     <div>
       <label class="block text-sm mb-1">{% trans "Store" %}</label>
-      {{ form.store|add_class:"w-full border rounded-lg px-3 py-2 bg-gray-50" }}
+      {{ form.store|add_class:"w-full border rounded-lg px-3 py-2 bg-white" }}
+      <p class="text-xs text-gray-500 mt-1">
+        {% if request.user.is_owner %}{% trans "Choose a store (owner)." %}
+        {% else %}{% trans "Your store will be used on save (if assigned)." %}{% endif %}
+      </p>
     </div>
 
     <div class="grid grid-cols-2 gap-3">
@@ -39,7 +44,7 @@
     <div>
       <label class="block text-sm mb-1">{% trans "IMEI (full)" %}</label>
       {{ form.imei_full|add_class:"w-full border rounded-lg px-3 py-2" }}
-      <p class="text-xs text-gray-500 mt-1">{% trans "Last 4 digits will be derived automatically." %}</p>
+      <p class="text-xs text-gray-500 mt-1">{% trans "Only digits are stored. Last 4 digits are derived automatically." %}</p>
     </div>
 
     <div class="grid grid-cols-2 gap-3">
@@ -116,32 +121,25 @@
     const brandSel = document.getElementById("id_brand");
     const modelSel = document.getElementById("id_model");
 
-    function getCookie(name) { // CSRF uchun kerak bo'lishi mumkin (GET emasda)
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-    }
-
     function loadModels(brandId, preselect=null) {
       if (!brandId) return;
       fetch(`/reference/brands/${brandId}/models-json/`, {headers: {"X-Requested-With":"XMLHttpRequest"}})
         .then(r => r.json())
         .then(data => {
           modelSel.innerHTML = "";
-          data.results.forEach(it => {
+          (data.results || []).forEach(it => {
             const opt = document.createElement("option");
             opt.value = it.id; opt.textContent = it.name;
-            if (preselect && preselect == it.id) opt.selected = true;
+            if (preselect && String(preselect) === String(it.id)) opt.selected = true;
             modelSel.appendChild(opt);
           });
-        });
+        })
+        .catch(()=>{});
     }
 
-    if (brandSel) {
+    if (brandSel && modelSel) {
       brandSel.addEventListener("change", e => loadModels(e.target.value));
-      if (brandSel.value) {
-        loadModels(brandSel.value, modelSel.value || null);
-      }
+      if (brandSel.value) loadModels(brandSel.value, modelSel.value || null);
     }
   })();
 </script>

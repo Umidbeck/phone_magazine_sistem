@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 
 from accounts.models import Store
@@ -5,57 +7,80 @@ from .models import Product, ProductImage, BatchIntake
 from reference.models import Brand, ModelName, Color
 
 # --- YANGI: ko‘p faylga ruxsat beradigan widget ---
-class MultiFileInput(forms.ClearableFileInput):
+class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
 
+def digits_only(s: str) -> str:
+    return "".join(ch for ch in (s or "") if ch.isdigit())
+
 class ProductCreateForm(forms.ModelForm):
+    # Doim barcha do‘konlar — so‘ngra __init__ da role bo‘yicha majburiylikni sozlaymiz
+    store = forms.ModelChoiceField(
+        queryset=Store.objects.all().order_by("name"),
+        required=False,
+        label="Store"
+    )
+
+    # YANGI: rasmlar
+    doc_images = forms.FileField(
+        required=False, widget=MultipleFileInput, label="Document photos"
+    )
+    cond_images = forms.FileField(
+        required=False, widget=MultipleFileInput, label="Condition photos"
+    )
+    images = forms.FileField(
+        required=False, widget=MultipleFileInput, label="Other photos"
+    )
     class Meta:
         model = Product
         fields = [
-            "store","brand","model","color","year","imei_full",
-            "has_documents","is_new","defect","battery_pct",
-            "ownership","purchase_price","consignment_price",
-            "owner_name","owner_phone",
+            "store", "brand", "model", "color", "year",
+            "imei_full", "has_documents", "is_new", "defect", "battery_pct",
+            "ownership", "purchase_price", "consignment_price",
+            "owner_name", "owner_phone",
         ]
 
-    # --- ESKINI ALMASHTIRING: ClearableFileInput o‘rniga MultiFileInput ---
-    images = forms.FileField(
-        required=False,
-        widget=MultiFileInput(attrs={"multiple": True, "accept": "image/*"})
-    )
-    doc_images = forms.FileField(
-        required=False,
-        widget=MultiFileInput(attrs={"multiple": True, "accept": "image/*"})
-    )
-    cond_images = forms.FileField(
-        required=False,
-        widget=MultiFileInput(attrs={"multiple": True, "accept": "image/*"})
-    )
-
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user", None)
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if user and not user.is_owner():
-            self.fields["store"].initial = user.store
-            self.fields["store"].disabled = True
-        self.fields["brand"].queryset = Brand.objects.filter(is_active=True).order_by("name")
-        self.fields["model"].queryset = ModelName.objects.filter(is_active=True).order_by("name")
-        self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
+        self.user = user
+
+        # Reference querysetlar
+        self.fields["brand"].queryset = Brand.objects.all().order_by("name")
+        self.fields["model"].queryset = ModelName.objects.all().order_by("name")
+        self.fields["color"].queryset = Color.objects.all().order_by("name")
+
+        # STORE majburiyligi — rolega qarab
+        if user and getattr(user, "is_owner", False):
+            # OWNER: majburiy tanlash
+            self.fields["store"].required = True
+        else:
+            # SELLER:
+            if getattr(user, "store_id", None):
+                # Sellerning do‘koni bor: select ko‘rsatiladi (bosilishi mumkin),
+                # lekin saqlashda baribir user.store yoziladi.
+                self.fields["store"].initial = user.store
+                self.fields["store"].required = False
+            else:
+                # Sellerning do‘koni yo‘q: majburiy tanlash kerak (fallback)
+                self.fields["store"].required = True
+
+    def clean_imei_full(self):
+        v = digits_only(self.cleaned_data.get("imei_full") or "")
+        if len(v) < 4:
+            raise forms.ValidationError("IMEI kamida 4 raqam bo‘lishi kerak.")
+        return v
 
     def clean(self):
-        data = super().clean()
-        imei = (data.get("imei_full") or "").strip()
-        data["imei_full"] = imei
-        if len(imei) >= 4:
-            self.instance.imei_last4 = imei[-4:]
-        own = data.get("ownership")
-        if own == "owned" and not data.get("purchase_price"):
-            self.add_error("purchase_price","Owned uchun purchase_price majburiy.")
-        if own == "consignment" and not data.get("consignment_price"):
-            self.add_error("consignment_price","Consignment uchun consignment_price majburiy.")
-        return data
-
+        cleaned = super().clean()
+        ownership = cleaned.get("ownership")
+        pp = cleaned.get("purchase_price") or Decimal("0")
+        cp = cleaned.get("consignment_price") or Decimal("0")
+        if ownership == "owned" and pp <= 0:
+            self.add_error("purchase_price", "Owned uchun purchase_price majburiy.")
+        if ownership == "consignment" and cp <= 0:
+            self.add_error("consignment_price", "Consignment uchun consignment_price majburiy.")
+        return cleaned
 
 
 class BatchIntakeForm(forms.ModelForm):
@@ -68,7 +93,7 @@ class BatchIntakeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        if user and not user.is_owner():
+        if user and not user.is_owner:
             self.fields["store"].initial = user.store
             self.fields["store"].disabled = True
 

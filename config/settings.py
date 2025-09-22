@@ -22,8 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-key")
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
+DEBUG = True
+ALLOWED_HOSTS = ['*']
 # if USE_GCS:
 #     DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
 #     GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     "operations",
     "core",
 
-    "storages"
+    "storages",
+    "widget_tweaks",
 ]
 
 MIDDLEWARE = [

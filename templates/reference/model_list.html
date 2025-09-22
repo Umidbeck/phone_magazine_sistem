@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Models" %}{% endblock %}
+{% block content %}
+<div class="p-3 space-y-3">
+  <a href="{% url 'model_new' %}" class="px-3 py-2 rounded bg-black text-white">{% trans "Add model" %}</a>
+  <div class="bg-white border rounded-xl">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b">
+        <th class="p-2">{% trans "Brand" %}</th><th class="p-2">{% trans "Model" %}</th><th class="p-2">{% trans "Active" %}</th><th class="p-2"></th>
+      </tr></thead>
+      <tbody>
+        {% for m in items %}
+          <tr class="border-b">
+            <td class="p-2">{{ m.brand.name }}</td>
+            <td class="p-2">{{ m.name }}</td>
+            <td class="p-2">{{ m.is_active }}</td>
+            <td class="p-2"><a class="text-xs px-2 py-1 border rounded" href="{% url 'model_edit' m.id %}">{% trans "Edit" %}</a></td>
+          </tr>
+        {% empty %}
+          <tr><td class="p-2 text-sm text-gray-500" colspan="4">{% trans "No items" %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="h-24"></div>
+</div>
+{% endblock %}

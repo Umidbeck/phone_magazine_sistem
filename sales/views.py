@@ -1,50 +1,54 @@
+# sales/views.py
 from decimal import Decimal
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.db import transaction as db_tx
-from django.db.models import Q
+from django.db.models import Q, Sum
+from django.db.models.functions import Right
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
+
 from inventory.models import Product
-from inventory.search_utils import product_search_q
+from inventory.search_utils import digits_only, product_search_queryset
+from .forms import (
+    SaleForm,
+    ExpenseForm,
+    DebtNewForm,
+    DebtPayForm,
+    ConsignmentPayoutForm,
+)
 from .models import Transaction, SellerCommission
-from .forms import SaleForm, ExpenseForm
-from .services import sum_product_expenses, get_commission_amount
+from .services import get_commission_amount, sum_product_expenses
 
-
-def digits_only(s: str) -> str:
-    return "".join(ch for ch in (s or "") if ch.isdigit())
 
 @login_required
 def sell_view(request):
-    base_qs = Product.objects.select_related("brand","model","store")
-    if not request.user.is_owner():
-        base_qs = base_qs.filter(store=request.user.store_id)
-
     q = (request.GET.get("q") or "").strip()
     picked_id = request.GET.get("product_id")
-    products, picked = [], None
+    picked = None
 
+    base_qs = Product.objects.select_related("brand", "model", "store")
+
+    # Picked scope
     if picked_id:
-        picked = get_object_or_404(base_qs, pk=picked_id)
-
-    if q and not picked:
-        q_digits = digits_only(q)
-        if q_digits and len(q_digits) == 4 and q_digits == q:
-            products = list(
-                base_qs.annotate(last4=Right("imei_full", 4))
-                       .filter(last4__iexact=q_digits, status="available")
-                       .order_by("-created_at")[:50]
-            )
+        if request.user.is_owner:
+            picked = get_object_or_404(base_qs, pk=picked_id)
         else:
-            products = list(
-                base_qs.filter(
-                    Q(imei_full__icontains=q_digits) |
-                    Q(brand__name__icontains=q) |
-                    Q(model__name__icontains=q),
-                    status="available"
-                ).order_by("-created_at")[:50]
-            )
+            picked = get_object_or_404(base_qs, pk=picked_id, store_id=request.user.store_id)
+
+    products = []
+    if q and not picked:
+        qs = product_search_queryset(
+            request.user,
+            q,
+            base_qs=base_qs.order_by("-created_at"),
+            for_sale=True,            # faqat available
+            include_archived=False,
+            store_id=None,
+        )
+        products = list(qs[:50])
 
     if request.method == "POST":
         form = SaleForm(request.POST)
@@ -53,16 +57,18 @@ def sell_view(request):
             amount: Decimal = form.cleaned_data["amount"]
             payment_type = form.cleaned_data["payment_type"]
 
-            product = get_object_or_404(base_qs, pk=pid)
+            if request.user.is_owner:
+                product = get_object_or_404(base_qs, pk=pid)
+            else:
+                product = get_object_or_404(base_qs, pk=pid, store_id=request.user.store_id)
 
             if product.status != "available":
                 messages.error(request, _("Product is not available for sale."))
                 return redirect("sell")
 
-            # cost = base price + expenses
-            base = product.purchase_price if product.ownership == "owned" else product.consignment_price
+            base_cost = product.purchase_price if product.ownership == "owned" else product.consignment_price
             expenses = sum_product_expenses(product.id)
-            cost = (base + expenses).quantize(Decimal("0.01"))
+            cost = (base_cost + expenses).quantize(Decimal("0.01"))
             profit = (amount - cost).quantize(Decimal("0.01"))
 
             with db_tx.atomic():
@@ -76,75 +82,70 @@ def sell_view(request):
                     cost=cost,
                     profit=profit,
                 )
-
-                commission_amt = get_commission_amount(amount)
-                SellerCommission.objects.create(transaction=tx, seller=request.user, amount=commission_amt)
-
+                SellerCommission.objects.create(
+                    transaction=tx, seller=request.user, amount=get_commission_amount(amount)
+                )
                 product.status = "sold"
                 product.save(update_fields=["status"])
 
-            messages.success(request, _("Sold. Profit: %(p)s, Commission: %(c)s") % {"p": profit, "c": commission_amt})
+            messages.success(request, _("Sold successfully."))
             return redirect("sell")
         else:
-            # form error
             messages.error(request, "; ".join([" ".join(v) for v in form.errors.values()]))
-
     else:
         form = SaleForm(initial={"payment_type": "cash"})
         if picked:
             form.fields["product_id"].initial = picked.id
 
-    return render(request, "sales/sell.html", {
-        "q": q,
-        "products": products,
-        "picked": picked,
-        "form": form,
-    })
+    return render(request, "sales/sell.html", {"q": q, "products": products, "picked": picked, "form": form})
+
+
+
+
 
 @login_required
 def expense_create(request):
-    pqs = Product.objects.select_related("brand","model","store")
-    if not request.user.is_owner():
-        pqs = pqs.filter(store=request.user.store_id)
-
     q = (request.GET.get("q") or "").strip()
     picked_id = request.GET.get("product_id")
-    picked, products = None, []
+    picked = None
+
+    base_qs = Product.objects.select_related("brand", "model", "store")
 
     if picked_id:
-        picked = get_object_or_404(pqs, pk=picked_id)
-
-    if q and not picked:
-        q_digits = digits_only(q)
-        if q_digits and len(q_digits) == 4 and q_digits == q:
-            products = list(
-                pqs.annotate(last4=Right("imei_full", 4))
-                   .filter(last4__iexact=q_digits)
-                   .order_by("-created_at")[:50]
-            )
+        if request.user.is_owner:
+            picked = get_object_or_404(base_qs, pk=picked_id)
         else:
-            products = list(
-                pqs.filter(
-                    Q(imei_full__icontains=q_digits) |
-                    Q(brand__name__icontains=q) |
-                    Q(model__name__icontains=q)
-                ).order_by("-created_at")[:50]
-            )
+            picked = get_object_or_404(base_qs, pk=picked_id, store_id=request.user.store_id)
+
+    products = []
+    if q and not picked:
+        qs = product_search_queryset(
+            request.user,
+            q,
+            base_qs=base_qs.order_by("-created_at"),
+            for_sale=False,           # xarajat istalgan statusda
+            include_archived=False,
+            store_id=None,
+        )
+        products = list(qs[:50])
 
     if request.method == "POST":
         form = ExpenseForm(request.POST)
         if form.is_valid():
             product_id = form.cleaned_data.get("product_id")
             expense_type = form.cleaned_data["expense_type"]
-            amount: Decimal = form.cleaned_data["amount"]
+            amount = form.cleaned_data["amount"]
             note = form.cleaned_data.get("note", "")
 
             product = None
             if product_id:
-                product = get_object_or_404(pqs, pk=product_id)
+                if request.user.is_owner:
+                    product = get_object_or_404(base_qs, pk=product_id)
+                else:
+                    product = get_object_or_404(base_qs, pk=product_id, store_id=request.user.store_id)
 
             Transaction.objects.create(
-                store=(product.store if product else (request.user.store if not request.user.is_owner() else None)),
+                store=(product.store if product else (request.user.store if not request.user.is_owner else None)),
                 product=product,
                 seller=request.user,
                 type="expense",
@@ -156,43 +157,37 @@ def expense_create(request):
             return redirect("expense_new")
         else:
             messages.error(request, "; ".join([" ".join(v) for v in form.errors.values()]))
-
     else:
         init = {}
         if picked:
             init["product_id"] = picked.id
         form = ExpenseForm(initial=init)
 
-    return render(request, "sales/expense_form.html", {
-        "q": q, "products": products, "picked": picked, "form": form
-    })
+    return render(request, "sales/expense_form.html", {"q": q, "products": products, "picked": picked, "form": form})
 
-from decimal import Decimal
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.db import transaction as db_tx
-from django.db.models import Q, Sum, F
-from django.utils.translation import gettext as _
-from django.core.cache import cache
 
-from inventory.models import Product
-from .models import Transaction, SellerCommission
-from .forms import SaleForm, ExpenseForm, DebtNewForm, DebtPayForm, ConsignmentPayoutForm
-from .services import sum_product_expenses, get_commission_amount
 
-# ---- DEBT HELPERS ----
+
+# ======= DEBT / CONSIGNMENT =======
+
+def _debt_cache_key(user):
+    return f"report:debts:{'all' if user.is_owner else user.store_id}"
+
+
+def _cons_due_cache_key(user):
+    return f"report:consignment_due:{'all' if user.is_owner else user.store_id}"
+
+
 def debt_balance_qs(base_qs):
     """
-    note format: 'debtor: <name>' — shu bo'yicha guruhlab balans hisoblaymiz:
+    note format: 'debtor: <name>'
     balance = SUM(debt_out.amount) - SUM(debt_pay.amount)
     """
     out = base_qs.filter(type="debt_out").values("note").annotate(total=Sum("amount"))
     pay = base_qs.filter(type="debt_pay").values("note").annotate(total=Sum("amount"))
 
-    # note (debtor key) bo‘yicha birlashtirish:
-    out_map = {x["note"]: x["total"] or Decimal("0") for x in out}
-    pay_map = {x["note"]: x["total"] or Decimal("0") for x in pay}
+    out_map = {x["note"]: (x["total"] or Decimal("0")) for x in out}
+    pay_map = {x["note"]: (x["total"] or Decimal("0")) for x in pay}
 
     rows = []
     keys = set(out_map.keys()) | set(pay_map.keys())
@@ -200,11 +195,10 @@ def debt_balance_qs(base_qs):
         balance = (out_map.get(k, Decimal("0")) - pay_map.get(k, Decimal("0"))).quantize(Decimal("0.01"))
         if balance != 0:
             rows.append({"debtor_note": k, "balance": balance})
-    # katta-kichik tartib
     rows.sort(key=lambda r: r["balance"], reverse=True)
     return rows
 
-# ---- CONSIGNMENT HELPERS ----
+
 def consignment_due_qs(base_p):
     """
     Consignment bo‘lgan va sotilgan productlar uchun:
@@ -214,7 +208,8 @@ def consignment_due_qs(base_p):
 
     payouts = (
         Transaction.objects.filter(type="consignment_payout", product_id__in=sold_cons.values("id"))
-        .values("product_id").annotate(total=Sum("amount"))
+        .values("product_id")
+        .annotate(total=Sum("amount"))
     )
     pay_map = {x["product_id"]: (x["total"] or Decimal("0")) for x in payouts}
 
@@ -224,19 +219,17 @@ def consignment_due_qs(base_p):
         due = (p.consignment_price - total_paid).quantize(Decimal("0.01"))
         if due > 0:
             rows.append({"product": p, "due": due, "paid": total_paid})
-    # katta-kichik
     rows.sort(key=lambda r: r["due"], reverse=True)
     return rows
 
-# ---- DEBT LIST ----
+
 @login_required
 def debt_list(request):
     qs = Transaction.objects
-    if not request.user.is_owner():
+    if not request.user.is_owner:
         qs = qs.filter(store_id=request.user.store_id)
 
-    # cache key (store ga bog'lash maqsadga muvofiq)
-    cache_key = f"report:debts:store={request.user.store_id if not request.user.is_owner() else 'all'}"
+    cache_key = _debt_cache_key(request.user)
     rows = cache.get(cache_key)
     if rows is None:
         rows = debt_balance_qs(qs)
@@ -244,7 +237,7 @@ def debt_list(request):
 
     return render(request, "sales/debt_list.html", {"rows": rows})
 
-# ---- DEBT NEW (debt_out) ----
+
 @login_required
 def debt_new(request):
     if request.method == "POST":
@@ -254,14 +247,13 @@ def debt_new(request):
             amount: Decimal = form.cleaned_data["amount"]
             note = f"debtor: {debtor}"
             Transaction.objects.create(
-                store=(request.user.store if not request.user.is_owner() else None),
+                store=(request.user.store if not request.user.is_owner else None),
                 seller=request.user,
                 type="debt_out",
                 amount=amount,
                 note=note,
             )
-            # keshni buzamiz
-            cache.delete_pattern("report:debts:*")
+            cache.delete(_debt_cache_key(request.user))
             messages.success(request, _("Debt recorded."))
             return redirect("debt_list")
         else:
@@ -270,17 +262,11 @@ def debt_new(request):
         form = DebtNewForm()
     return render(request, "sales/debt_new.html", {"form": form})
 
-# ---- DEBT PAY ----
+
 @login_required
 def debt_pay(request, debtor_id):
-    """
-    Ui'da 'debtor_name' string o'rniga bir oddiy index bo'lsin deb id bilan keladi.
-    Aslida debtor — rows[debtor_id]['debtor_note']. Shartli soddalashtirish.
-    Productionda Debtor modeli ajratish tavsiya etiladi.
-    """
-    # mavjud ro'yxat
     qs = Transaction.objects
-    if not request.user.is_owner():
+    if not request.user.is_owner:
         qs = qs.filter(store_id=request.user.store_id)
     rows = debt_balance_qs(qs)
     try:
@@ -294,13 +280,13 @@ def debt_pay(request, debtor_id):
         if form.is_valid():
             amount = form.cleaned_data["amount"]
             Transaction.objects.create(
-                store=(request.user.store if not request.user.is_owner() else None),
+                store=(request.user.store if not request.user.is_owner else None),
                 seller=request.user,
                 type="debt_pay",
                 amount=amount,
                 note=row["debtor_note"],
             )
-            cache.delete_pattern("report:debts:*")
+            cache.delete(_debt_cache_key(request.user))
             messages.success(request, _("Debt payment saved."))
             return redirect("debt_list")
         else:
@@ -308,17 +294,20 @@ def debt_pay(request, debtor_id):
     else:
         form = DebtPayForm()
 
-    return render(request, "sales/debt_pay.html", {"form": form, "debtor_label": row["debtor_note"], "balance": row["balance"]})
+    return render(
+        request,
+        "sales/debt_pay.html",
+        {"form": form, "debtor_label": row["debtor_note"], "balance": row["balance"]},
+    )
 
-# ---- CONSIGNMENT LIST ----
+
 @login_required
 def consignment_list(request):
-    pqs = Product.objects.select_related("brand","model","store")
-    if not request.user.is_owner():
+    pqs = Product.objects.select_related("brand", "model", "store")
+    if not request.user.is_owner:
         pqs = pqs.filter(store_id=request.user.store_id)
 
-    # cache
-    cache_key = f"report:consignment_due:store={request.user.store_id if not request.user.is_owner() else 'all'}"
+    cache_key = _cons_due_cache_key(request.user)
     rows = cache.get(cache_key)
     if rows is None:
         rows = consignment_due_qs(pqs)
@@ -326,11 +315,11 @@ def consignment_list(request):
 
     return render(request, "sales/consignment_list.html", {"rows": rows})
 
-# ---- CONSIGNMENT PAYOUT ----
+
 @login_required
 def consignment_payout(request, product_id):
     qs = Product.objects.select_related("store")
-    if not request.user.is_owner():
+    if not request.user.is_owner:
         qs = qs.filter(store_id=request.user.store_id)
     p = get_object_or_404(qs, pk=product_id)
     if p.ownership != "consignment" or p.status != "sold":
@@ -341,7 +330,7 @@ def consignment_payout(request, product_id):
         form = ConsignmentPayoutForm(request.POST)
         if form.is_valid():
             amount = form.cleaned_data["amount"]
-            note = form.cleaned_data.get("note","")
+            note = form.cleaned_data.get("note", "")
             Transaction.objects.create(
                 store=p.store,
                 product=p,
@@ -350,7 +339,7 @@ def consignment_payout(request, product_id):
                 amount=amount,
                 note=note,
             )
-            cache.delete_pattern("report:consignment_due:*")
+            cache.delete(_cons_due_cache_key(request.user))
             messages.success(request, _("Consignment payout recorded."))
             return redirect("consignment_list")
         else:

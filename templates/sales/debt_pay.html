@@ -1,22 +1,22 @@
-{% extends "base.html" %}
-{% load i18n %}
-{% block header_title %}{% trans "Pay debt" %}{% endblock %}
+{% extends "base.html" %}{% load i18n form_extras %}
+{% block header_title %}{% trans "Debt payment" %}{% endblock %}
 {% block content %}
-<div class="p-4 space-y-2">
-  <div class="text-sm text-gray-600">{% trans "Debtor" %}: <strong>{{ debtor_label }}</strong></div>
-  <div class="text-sm text-gray-600">{% trans "Current balance" %}: <strong>{{ balance }}</strong></div>
-
-  <form method="post" class="bg-white border rounded-xl p-4 space-y-3 mt-3">
+<div class="p-3 space-y-2">
+  <div class="text-sm text-gray-600">
+    {% trans "Debtor" %}: <strong>{{ debtor_label }}</strong><br>
+    {% trans "Current balance" %}: <strong>{{ balance }}</strong>
+  </div>
+  <form method="post" class="bg-white border rounded-xl p-4 space-y-3">
     {% csrf_token %}
     <div>
-      <label class="block text-sm mb-1">{% trans "Amount to pay" %}</label>
-      {{ form.amount }}
+      <label class="text-sm">{% trans "Amount" %}</label>
+      {{ form.amount|add_class:"w-full border rounded-lg px-3 py-2" }}
     </div>
     <div>
-      <label class="block text-sm mb-1">{% trans "Note" %}</label>
-      {{ form.note }}
+      <label class="text-sm">{% trans "Note" %}</label>
+      {{ form.note|add_class:"w-full border rounded-lg px-3 py-2" }}
     </div>
-    <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Confirm payment" %}</button>
+    <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Save payment" %}</button>
   </form>
 </div>
 {% endblock %}

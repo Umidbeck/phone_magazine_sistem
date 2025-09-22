@@ -9,7 +9,7 @@ from .forms import BrandForm, ModelNameForm, ColorForm
 def owner_required(view):
     @login_required
     def _wrapped(request, *args, **kwargs):
-        if not request.user.is_owner():
+        if not request.user.is_owner:
             return HttpResponseForbidden(_("Only owner can manage reference data."))
         return view(request, *args, **kwargs)
     return _wrapped

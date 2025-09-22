@@ -1,21 +1,20 @@
-{% extends "base.html" %}
-{% load i18n %}
+{% extends "base.html" %}{% load i18n form_extras %}
 {% block header_title %}{% trans "New debt" %}{% endblock %}
 {% block content %}
-<div class="p-4">
+<div class="p-3">
   <form method="post" class="bg-white border rounded-xl p-4 space-y-3">
     {% csrf_token %}
     <div>
-      <label class="block text-sm mb-1">{% trans "Debtor name" %}</label>
-      {{ form.debtor_name }}
+      <label class="text-sm">{% trans "Debtor name" %}</label>
+      {{ form.debtor_name|add_class:"w-full border rounded-lg px-3 py-2" }}
     </div>
     <div>
-      <label class="block text-sm mb-1">{% trans "Amount" %}</label>
-      {{ form.amount }}
+      <label class="text-sm">{% trans "Amount" %}</label>
+      {{ form.amount|add_class:"w-full border rounded-lg px-3 py-2" }}
     </div>
     <div>
-      <label class="block text-sm mb-1">{% trans "Note" %}</label>
-      {{ form.note }}
+      <label class="text-sm">{% trans "Note" %}</label>
+      {{ form.note|add_class:"w-full border rounded-lg px-3 py-2" }}
     </div>
     <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Save" %}</button>
   </form>

@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% load i18n form_extras %}
+{% block header_title %}{% trans "Model" %}{% endblock %}
+{% block content %}
+<div class="p-4">
+  <form method="post" class="bg-white border rounded-xl p-4 space-y-3">
+    {% csrf_token %}
+    <div>
+      <label class="text-sm">{% trans "Brand" %}</label>
+      {{ form.brand|add_class:"w-full border rounded-lg px-3 py-2" }}
+    </div>
+    <div>
+      <label class="text-sm">{% trans "Name" %}</label>
+      {{ form.name|add_class:"w-full border rounded-lg px-3 py-2" }}
+    </div>
+    <div class="flex items-center gap-2">
+      {{ form.is_active }} <span class="text-sm">{% trans "Active" %}</span>
+    </div>
+    <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Save" %}</button>
+  </form>
+</div>
+{% endblock %}

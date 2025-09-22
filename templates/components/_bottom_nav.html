@@ -1,27 +1,54 @@
 {% load i18n %}
-<nav class="bottom-nav fixed bottom-0 inset-x-0 bg-white border-t">
-  <div class="mx-auto max-w-md h-full grid grid-cols-5">
-    <a href="{% url 'home' %}" class="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-      <i data-feather="home"></i>
-      <span class="text-xs">{% trans "Home" %}</span>
+
+<nav class="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200 sm:hidden">
+  <div class="grid grid-cols-5 text-xs text-gray-600">
+
+    <!-- Home -->
+    <a href="{% url 'home' %}" class="flex flex-col items-center gap-1 py-2 hover:bg-gray-50">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+      </svg>
+      <span class="hidden xs:inline">{% trans "Home" %}</span>
     </a>
-    <a href="{% url 'product_list' %}" class="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-      <i data-feather="search"></i>
-      <span class="text-xs">{% trans "Search" %}</span>
+
+    <!-- Inventory -->
+    <a href="{% url 'product_list' %}" class="flex flex-col items-center gap-1 py-2 hover:bg-gray-50">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+      </svg>
+      <span class="hidden xs:inline">{% trans "Inventory" %}</span>
     </a>
-    <a href="#" class="flex flex-col items-center justify-center text-gray-600 hover:text-black"
-       onclick="alert('{% trans 'Add flow will be in next steps' %}')">
-      <i data-feather="plus-square"></i>
-      <span class="text-xs">{% trans "Add" %}</span>
+
+    <!-- Add (accent) -->
+    <a href="{% url 'product_create' %}" class="flex flex-col items-center gap-1 py-2 font-semibold text-white bg-gradient-to-r from-blue-500 to-sky-500 rounded-t-xl">
+      <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      <span class="hidden xs:inline">{% trans "Add" %}</span>
     </a>
-    <a href="{% url 'product_list' %}" class="flex flex-col items-center justify-center text-gray-600 hover:text-black">
-      <i data-feather="grid"></i>
-      <span class="text-xs">{% trans "Inventory" %}</span>
+
+    <!-- Sell -->
+    <a href="{% url 'sell' %}" class="flex flex-col items-center gap-1 py-2 hover:bg-gray-50">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+      </svg>
+      <span class="hidden xs:inline">{% trans "Sell" %}</span>
     </a>
-    <a href="#" class="flex flex-col items-center justify-center text-gray-600 hover:text-black"
-       onclick="alert('{% trans 'Profile will be added' %}')">
-      <i data-feather="user"></i>
-      <span class="text-xs">{% trans "Profile" %}</span>
+
+    <!-- Reports -->
+    <a href="{% url 'owner_dashboard' %}" class="flex flex-col items-center gap-1 py-2 hover:bg-gray-50">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+      <span class="hidden xs:inline">{% trans "Reports" %}</span>
     </a>
+
   </div>
 </nav>
+
+<style>
+  /* 320 px dan kichik ekranlarda matnni yashirish */
+  @media (max-width: 320px) {
+    .xs\\:inline { display: none !important; }
+  }
+</style>

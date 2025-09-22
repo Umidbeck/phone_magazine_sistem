@@ -13,6 +13,7 @@ pytest-django = "*"
 django-storages = "*"
 google-cloud-storage = "*"
 sentry-sdk = "*"
+django-widget-tweaks = "*"
 
 [dev-packages]
 

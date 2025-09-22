@@ -29,7 +29,8 @@ class Product(models.Model):
     color = models.ForeignKey(Color, on_delete=models.SET_NULL, null=True, blank=True)
 
     year = models.PositiveSmallIntegerField(null=True, blank=True)
-    imei_full = models.CharField(max_length=20, unique=True)
+    imei_full = models.CharField(max_length=32, unique=True)  # faqat raqam saqlaymiz
+    imei_last4 = models.CharField(max_length=4, db_index=True, default='0000')
 
     has_documents = models.BooleanField(default=False)
     is_new = models.BooleanField(default=False)
@@ -50,6 +51,14 @@ class Product(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     is_archived = models.BooleanField(default=False)
+
+    # inventory/models.py (Product ichida)
+    def save(self, *args, **kwargs):
+        if getattr(self, "imei_full", None):
+            self.imei_full = "".join(ch for ch in self.imei_full if ch.isdigit())
+            if hasattr(self, "imei_last4") and len(self.imei_full) >= 4:
+                self.imei_last4 = self.imei_full[-4:]
+        super().save(*args, **kwargs)
 
     class Meta:
         indexes = [

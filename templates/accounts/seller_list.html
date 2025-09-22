@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Sellers" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-3">
+  <a href="{% url 'seller_new' %}" class="px-3 py-2 rounded bg-black text-white">{% trans "Add seller" %}</a>
+  <div class="bg-white border rounded-xl">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b">
+        <th class="p-2">{% trans "Username" %}</th>
+        <th class="p-2">{% trans "Name" %}</th>
+        <th class="p-2">{% trans "Store" %}</th>
+        <th class="p-2">{% trans "Active" %}</th>
+        <th class="p-2"></th>
+      </tr></thead>
+      <tbody>
+        {% for u in items %}
+          <tr class="border-b">
+            <td class="p-2">{{ u.username }}</td>
+            <td class="p-2">{{ u.first_name }} {{ u.last_name }}</td>
+            <td class="p-2">{{ u.store.name }}</td>
+            <td class="p-2">{{ u.is_active }}</td>
+            <td class="p-2 space-x-2">
+              <a class="text-xs px-2 py-1 border rounded" href="{% url 'seller_edit' u.id %}">{% trans "Edit" %}</a>
+              <a class="text-xs px-2 py-1 border rounded" href="{% url 'seller_reset_password' u.id %}">{% trans "Reset password" %}</a>
+              <a class="text-xs px-2 py-1 border rounded" href="{% url 'seller_delete' u.id %}">{% trans "Delete" %}</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td class="p-2 text-sm text-gray-500" colspan="5">{% trans "No items" %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
