@@ -1,7 +1,7 @@
 # accounts/urls.py
 from django.urls import path
 from .views import login_view, logout_view, home, store_list, store_form, store_delete, seller_list, seller_new, \
-    seller_edit, seller_delete, seller_reset_password
+    seller_edit, seller_delete, seller_reset_password, account_dashboard, account_stats_user, my_sales, my_commissions
 
 urlpatterns = [
     path("", home, name="home"),
@@ -19,4 +19,10 @@ urlpatterns = [
     path("sellers/<int:pk>/edit/", seller_edit, name="seller_edit"),
     path("sellers/<int:pk>/delete/", seller_delete, name="seller_delete"),
     path("sellers/<int:pk>/reset-password/", seller_reset_password, name="seller_reset_password"),
+
+    path("account/my-sales/", my_sales, name="my_sales"),
+    path("account/my-commissions/", my_commissions, name="my_commissions"),
+
+    path("account/", account_dashboard, name="account_dashboard"),
+    path("account/stats/", account_stats_user, name="account_stats_user"),
 ]

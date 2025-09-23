@@ -12,6 +12,8 @@ from django.utils.translation import gettext as _
 
 from inventory.models import Product
 from inventory.search_utils import digits_only, product_search_queryset
+from django.db import transaction as db_txn
+
 from .forms import (
     SaleForm,
     ExpenseForm,
@@ -20,84 +22,67 @@ from .forms import (
     ConsignmentPayoutForm,
 )
 from .models import Transaction, SellerCommission
-from .services import get_commission_amount, sum_product_expenses
+from .services import get_commission_amount, calc_product_cost
 
 
 @login_required
 def sell_view(request):
-    q = (request.GET.get("q") or "").strip()
-    picked_id = request.GET.get("product_id")
+    product_id = request.GET.get("product_id") or request.POST.get("product_id")
     picked = None
-
-    base_qs = Product.objects.select_related("brand", "model", "store")
-
-    # Picked scope
-    if picked_id:
-        if request.user.is_owner:
-            picked = get_object_or_404(base_qs, pk=picked_id)
-        else:
-            picked = get_object_or_404(base_qs, pk=picked_id, store_id=request.user.store_id)
-
-    products = []
-    if q and not picked:
-        qs = product_search_queryset(
-            request.user,
-            q,
-            base_qs=base_qs.order_by("-created_at"),
-            for_sale=True,            # faqat available
-            include_archived=False,
-            store_id=None,
-        )
-        products = list(qs[:50])
+    if product_id:
+        picked = get_object_or_404(Product.objects.select_related("store","brand","model"), pk=product_id)
 
     if request.method == "POST":
         form = SaleForm(request.POST)
+        if not picked:
+            messages.error(request, _("Select a product first."))
+            return redirect("inventory_search")
+
+        if picked.status != "available":
+            messages.error(request, _("Product is not available for sale."))
+            return redirect("product_detail", pk=picked.id)
+
         if form.is_valid():
-            pid = form.cleaned_data["product_id"]
-            amount: Decimal = form.cleaned_data["amount"]
-            payment_type = form.cleaned_data["payment_type"]
+            with db_txn.atomic():
+                amount = Decimal(form.cleaned_data["amount"])
+                pay_type = form.cleaned_data["payment_type"]
 
-            if request.user.is_owner:
-                product = get_object_or_404(base_qs, pk=pid)
-            else:
-                product = get_object_or_404(base_qs, pk=pid, store_id=request.user.store_id)
+                # cost / profit
+                cost = calc_product_cost(picked)
+                profit = amount - cost
 
-            if product.status != "available":
-                messages.error(request, _("Product is not available for sale."))
-                return redirect("sell")
-
-            base_cost = product.purchase_price if product.ownership == "owned" else product.consignment_price
-            expenses = sum_product_expenses(product.id)
-            cost = (base_cost + expenses).quantize(Decimal("0.01"))
-            profit = (amount - cost).quantize(Decimal("0.01"))
-
-            with db_tx.atomic():
                 tx = Transaction.objects.create(
-                    store=product.store,
-                    product=product,
-                    seller=request.user,
                     type="sale",
+                    product=picked,
+                    store=picked.store,    # foyda shu do'kon hisobiga
+                    seller=request.user,    # sotgan kim bo'lsa shu
                     amount=amount,
-                    payment_type=payment_type,
+                    payment_type=pay_type,
                     cost=cost,
                     profit=profit,
                 )
+
+                picked.status = "sold"
+                picked.save(update_fields=["status"])
+
+                # Komissiya (har bir sotuvga 5$)
+                com_amount = get_commission_amount(amount)
                 SellerCommission.objects.create(
-                    transaction=tx, seller=request.user, amount=get_commission_amount(amount)
+                    transaction=tx,
+                    seller=request.user,
+                    amount=com_amount,
                 )
-                product.status = "sold"
-                product.save(update_fields=["status"])
 
-            messages.success(request, _("Sold successfully."))
-            return redirect("sell")
+                messages.success(request, _("Sale recorded."))
+                return redirect("product_detail", pk=picked.id)
         else:
-            messages.error(request, "; ".join([" ".join(v) for v in form.errors.values()]))
+            messages.error(request, _("Fix errors."))
     else:
-        form = SaleForm(initial={"payment_type": "cash"})
-        if picked:
-            form.fields["product_id"].initial = picked.id
+        form = SaleForm(initial={"product_id": product_id})
 
-    return render(request, "sales/sell.html", {"q": q, "products": products, "picked": picked, "form": form})
+    return render(request, "sales/sell.html", {"form": form, "picked": picked, "q": ""})
+
+
 
 
 
@@ -106,66 +91,69 @@ def sell_view(request):
 @login_required
 def expense_create(request):
     q = (request.GET.get("q") or "").strip()
-    picked_id = request.GET.get("product_id")
+    products = []
     picked = None
 
-    base_qs = Product.objects.select_related("brand", "model", "store")
-
-    if picked_id:
-        if request.user.is_owner:
-            picked = get_object_or_404(base_qs, pk=picked_id)
-        else:
-            picked = get_object_or_404(base_qs, pk=picked_id, store_id=request.user.store_id)
-
-    products = []
-    if q and not picked:
-        qs = product_search_queryset(
-            request.user,
-            q,
-            base_qs=base_qs.order_by("-created_at"),
-            for_sale=False,           # xarajat istalgan statusda
-            include_archived=False,
-            store_id=None,
+    product_id = request.GET.get("product_id") or request.POST.get("product_id")
+    if product_id:
+        picked = get_object_or_404(
+            Product.objects.select_related("brand", "model", "store"), pk=product_id
         )
-        products = list(qs[:50])
+
+    if q and not picked:
+        base = Product.objects.select_related("brand", "model", "store").order_by("-created_at")
+        if q.isdigit() and len(q) <= 4:
+            products = list(base.filter(imei_suffix=q))
+        else:
+            products = list(base.filter(
+                Q(imei_full__icontains=q) |
+                Q(brand__name__icontains=q) |
+                Q(model__name__icontains=q)
+            )[:50])
 
     if request.method == "POST":
         form = ExpenseForm(request.POST)
         if form.is_valid():
-            product_id = form.cleaned_data.get("product_id")
-            expense_type = form.cleaned_data["expense_type"]
-            amount = form.cleaned_data["amount"]
-            note = form.cleaned_data.get("note", "")
+            amount = Decimal(form.cleaned_data["amount"])
+            note = form.cleaned_data.get("note") or ""
 
-            product = None
-            if product_id:
-                if request.user.is_owner:
-                    product = get_object_or_404(base_qs, pk=product_id)
-                else:
-                    product = get_object_or_404(base_qs, pk=product_id, store_id=request.user.store_id)
+            # STORE:
+            if picked:
+                store = picked.store
+            else:
+                # Owner/seller product tanlamagan bo'lsa formdagi store ishlatiladi
+                store = form.cleaned_data.get("store") or getattr(request.user, "store", None)
+
+            if store is None:
+                messages.error(request, _("Do'kon aniqlanmadi. Iltimos, store tanlang yoki product tanlang."))
+                return render(request, "sales/expense_form.html", {
+                    "form": form, "q": q, "products": products, "picked": picked
+                })
 
             Transaction.objects.create(
-                store=(product.store if product else (request.user.store if not request.user.is_owner else None)),
-                product=product,
-                seller=request.user,
                 type="expense",
                 amount=amount,
-                expense_type=expense_type,
                 note=note,
+                product=picked,         # None bo‘lishi mumkin
+                store=store,            # <-- ENDI MAJBURIY BERILYAPTI
+                seller=request.user,
+                expense_type=None,      # endi ishlatilmaydi
             )
             messages.success(request, _("Expense saved."))
             return redirect("expense_new")
         else:
-            messages.error(request, "; ".join([" ".join(v) for v in form.errors.values()]))
+            messages.error(request, _("Fix errors."))
     else:
-        init = {}
-        if picked:
-            init["product_id"] = picked.id
-        form = ExpenseForm(initial=init)
+        # GET — agar product tanlangan bo'lsa, store maydonini avtomatik yashirib yuboramiz (templateda)
+        initial = {"product_id": product_id}
+        form = ExpenseForm(initial=initial)
 
-    return render(request, "sales/expense_form.html", {"q": q, "products": products, "picked": picked, "form": form})
-
-
+    return render(request, "sales/expense_form.html", {
+        "form": form,
+        "q": q,
+        "products": products,
+        "picked": picked,
+    })
 
 
 # ======= DEBT / CONSIGNMENT =======

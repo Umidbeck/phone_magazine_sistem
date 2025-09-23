@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Account" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-4">
+  <div class="bg-white border rounded-xl p-4">
+    <div class="text-sm">{% trans "Signed in as" %}: <strong>{{ request.user.username }}</strong></div>
+    <div class="text-xs text-gray-500">{% if request.user.is_owner %}Owner{% else %}Seller{% endif %}</div>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <a href="{% url 'account_stats_user' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "My stats" %}</a>
+    {% if request.user.is_owner %}
+      <a href="{% url 'store_list' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "Stores" %}</a>
+      <a href="{% url 'seller_list' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "Sellers" %}</a>
+      <a href="{% url 'owner_dashboard' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "Owner reports" %}</a>
+    {% endif %}
+  </div>
+  {% if not request.user.is_owner %}
+      <a href="{% url 'my_sales' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "My sold phones" %}</a>
+  {% else %}
+      <a href="{% url 'sales_log' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "Sales log" %}</a>
+  {% endif %}
+  {% if not request.user.is_owner %}
+      <a href="{% url 'my_commissions' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "My commissions (daily)" %}</a>
+      <a href="{% url 'my_sales' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "My sold phones" %}</a>
+  {% else %}
+      <a href="{% url 'sales_log' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "Sales log" %}</a>
+      <a href="{% url 'expenses_log' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">{% trans "Expenses log" %}</a>
+  {% endif %}
+  <a href="{% url 'expense_new' %}" class="border rounded-lg p-3 text-center hover:bg-gray-50">
+    {% trans "New expense" %}
+  </a>
+  <div class="bg-white border rounded-xl p-4">
+    <a href="{% url 'password_change' %}" class="px-3 py-2 border rounded">{% trans "Change password" %}</a>
+  </div>
+</div>
+{% endblock %}

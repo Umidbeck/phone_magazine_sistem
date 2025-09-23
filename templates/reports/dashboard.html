@@ -34,6 +34,35 @@
       </div>
     </div>
   </div>
+    <!-- net profit & debts cards (period cards yoniga) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Net profit" %}</div><div class="text-sm font-semibold">{{ net_profit }}</div></div>
+      <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Unpaid debts" %}</div><div class="text-sm font-semibold">{{ debts_unpaid }}</div></div>
+      <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Consignment payouts" %}</div><div class="text-sm font-semibold">{{ cons_payouts_sum }}</div></div>
+    </div>
+
+    <!-- expenses breakdown -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div class="bg-white border rounded-xl p-4">
+        <div class="text-sm font-semibold mb-2">{% trans "Expenses by store" %}</div>
+        <ul class="text-sm space-y-1">
+          {% for r in exp_by_store %}<li class="flex justify-between"><span>{{ r.store__name }}</span><span>{{ r.s }}</span></li>{% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
+        </ul>
+      </div>
+      <div class="bg-white border rounded-xl p-4">
+        <div class="text-sm font-semibold mb-2">{% trans "Expenses by seller" %}</div>
+        <ul class="text-sm space-y-1">
+          {% for r in exp_by_seller %}<li class="flex justify-between"><span>{{ r.seller__username }}</span><span>{{ r.s }}</span></li>{% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
+        </ul>
+      </div>
+      <div class="bg-white border rounded-xl p-4">
+        <div class="text-sm font-semibold mb-2">{% trans "Expenses by type" %}</div>
+        <ul class="text-sm space-y-1">
+          {% for r in exp_by_type %}<li class="flex justify-between"><span>{{ r.expense_type__name }}</span><span>{{ r.s }}</span></li>{% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+
 
   <!-- Line chart -->
   <div class="bg-white border rounded-xl p-4">

@@ -1,19 +1,22 @@
 # inventory/views.py
 import csv
-from decimal import Decimal
+import datetime
+from decimal import Decimal, InvalidOperation
 
 import pandas as pd
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
-from django.db.models.functions import Right
+from django.db.models import Q, Model
+from django.db.models.functions import Right, Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils.translation import gettext as _
 from weasyprint import HTML
 
+from accounts.models import Store
 from reference.models import Brand, ModelName, Color
 from sales.models import Transaction
 from .forms import (
@@ -99,7 +102,7 @@ def product_create(request):
                         p.created_by = request.user
                         p.save()
 
-                        # YANGI: rasmlarni saqlash
+                        # p.save() dan keyin:
                         def _save_images(files, kind, set_primary=False):
                             first = True
                             for f in files:
@@ -110,12 +113,8 @@ def product_create(request):
                                     first = False
 
                         _save_images(request.FILES.getlist("doc_images"), "doc", set_primary=False)
-                        _save_images(request.FILES.getlist("cond_images"), "cond",
-                                     set_primary=True)  # birinchisi primary
+                        _save_images(request.FILES.getlist("cond_images"), "cond", set_primary=True)
                         _save_images(request.FILES.getlist("images"), "other", set_primary=False)
-
-                    messages.success(request, _("Product added successfully."))
-                    return redirect("product_create")
 
             messages.success(request, _("Product added successfully."))
             return redirect("product_create")
@@ -378,3 +377,146 @@ def import_excel(request):
         initial_store = request.user.store if not request.user.is_owner else None
         form = ExcelImportForm(initial={"store": initial_store})
     return render(request, "inventory/import_excel.html", {"form": form})
+
+def _parse_decimal(val):
+    if not val: return None
+    try:
+        return Decimal(str(val))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+def _parse_date(val):
+    if not val: return None
+    try:
+        return datetime.strptime(val, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+@login_required
+def home_feed(request):
+    """
+    Instagram-uslub feed: kartalar grid + to‘liq filtrlar.
+    """
+    qs = Product.objects.select_related("brand","model","store").prefetch_related("images")\
+                        .filter(is_archived=False).order_by("-created_at")
+
+    # Seller faqat o‘z do‘konini ko‘radi
+    if not request.user.is_owner:
+        qs = qs.filter(store_id=request.user.store_id)
+
+    # ---- Filtrlar ----
+    store_id = request.GET.get("store_id") or ""
+    brand_id = request.GET.get("brand") or ""
+    model_id = request.GET.get("model") or ""
+    status = request.GET.get("status") or ""  # available/on_repair/sold
+    is_new = request.GET.get("is_new")        # "1" bo‘lsa True
+    has_docs = request.GET.get("has_documents")
+    date_from = _parse_date(request.GET.get("date_from"))
+    date_to = _parse_date(request.GET.get("date_to"))
+    price_min = _parse_decimal(request.GET.get("price_min"))
+    price_max = _parse_decimal(request.GET.get("price_max"))
+
+    if store_id:
+        if request.user.is_owner:
+            qs = qs.filter(store_id=store_id)
+        else:
+            # seller boshqa do‘kon kiritolmaydi
+            qs = qs.filter(store_id=request.user.store_id)
+
+    if brand_id:
+        qs = qs.filter(brand_id=brand_id)
+    if model_id:
+        qs = qs.filter(model_id=model_id)
+    if status in ("available","on_repair","sold"):
+        qs = qs.filter(status=status)
+    if is_new == "1":
+        qs = qs.filter(is_new=True)
+    if has_docs == "1":
+        qs = qs.filter(has_documents=True)
+
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    # Narx: purchase_price yoki consignment_price
+    qs = qs.annotate(price=Coalesce("purchase_price", "consignment_price"))
+    if price_min is not None:
+        qs = qs.filter(price__gte=price_min)
+    if price_max is not None:
+        qs = qs.filter(price__lte=price_max)
+
+    paginator = Paginator(qs, 18)
+    page = paginator.get_page(request.GET.get("page"))
+
+    stores = Store.objects.filter(is_active=True).order_by("name")
+    brands = Brand.objects.filter(is_active=True).order_by("name")
+    models = ModelName.objects.filter(is_active=True).order_by("brand__name","name")
+
+    ctx = {
+        "page": page,
+        "stores": stores, "brands": brands, "models": models,
+        "store_id": store_id, "brand_id": brand_id, "model_id": model_id,
+        "status": status, "is_new_val": is_new == "1", "has_docs_val": has_docs == "1",
+        "date_from": date_from, "date_to": date_to,
+        "price_min": request.GET.get("price_min") or "", "price_max": request.GET.get("price_max") or "",
+    }
+    return render(request, "inventory/home_feed.html", ctx)
+
+@login_required
+def inventory_search(request):
+    """
+    Faqat qidiruv (IMEI oxirgi 4 yoki to‘liq IMEI). Natija -> detail orqali sotish/repair.
+    """
+    q = (request.GET.get("q") or "").strip()
+    results = []
+    if q:
+        base_qs = Product.objects.select_related("brand", "model", "store")
+        qs = product_search_queryset(
+            request.user,
+            q,
+            base_qs=base_qs.order_by("-created_at"),
+            for_sale=False,
+            include_archived=False,
+            store_id=None,
+        )
+        results = list(qs[:50])
+
+    return render(request, "inventory/search.html", {"q": q, "results": results})
+
+
+@login_required
+def product_detail(request, pk):
+    # Cross-store viewing: hech qaysi store bo‘yicha cheklamaymiz
+    p = get_object_or_404(
+        Product.objects.select_related("brand","model","store").prefetch_related("images"),
+        pk=pk
+    )
+
+    can_edit = (request.user.is_owner or p.created_by_id == request.user.id)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "to_repair" and p.status == "available":
+            # Buni faqat owner yoki product yaratuvchisi qilsin (ixtiyoriy)
+            if not can_edit:
+                messages.error(request, _("You cannot change status for this product."))
+            else:
+                p.status = "on_repair"; p.save(update_fields=["status"])
+                messages.success(request, _("Moved to repair."))
+            return redirect("product_detail", pk=p.id)
+
+        if action == "to_available" and p.status == "on_repair":
+            if not can_edit:
+                messages.error(request, _("You cannot change status for this product."))
+            else:
+                p.status = "available"; p.save(update_fields=["status"])
+                messages.success(request, _("Set to available."))
+            return redirect("product_detail", pk=p.id)
+
+        if action == "sell" and p.status == "available":
+            # Cross-store sell: bevosita sales/sell/ ga yo‘naltiramiz
+            return redirect(f"/sales/sell/?product_id={p.id}")
+
+    return render(request, "inventory/product_detail.html", {"p": p, "can_edit": can_edit})
+

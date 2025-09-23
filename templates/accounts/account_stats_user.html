@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "My statistics (2 years)" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-4">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Sales count" %}</div>
+      <div class="text-sm font-semibold">{{ total_sales_count }}</div>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Total sales amount" %}</div>
+      <div class="text-sm font-semibold">{{ total_amount }}</div>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Profit" %}</div>
+      <div class="text-sm font-semibold">{{ total_profit }}</div>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Expenses" %}</div>
+      <div class="text-sm font-semibold">{{ total_expenses }}</div>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Intake count" %}</div>
+      <div class="text-sm font-semibold">{{ intake_count }}</div>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Owned intake sum" %}</div>
+      <div class="text-sm font-semibold">{{ intake_owned_sum }}</div>
+    </div>
+    <div class="bg-white border rounded-xl p-4">
+      <div class="text-xs text-gray-500">{% trans "Commission total" %}</div>
+      <div class="text-sm font-semibold">{{ commission_total }}</div>
+    </div>
+  </div>
+
+  <div class="bg-white border rounded-xl p-4">
+    <div class="text-sm font-semibold mb-2">{% trans "Monthly sales (count)" %}</div>
+    <canvas id="chartM"></canvas>
+  </div>
+  <div class="bg-white border rounded-xl p-4">
+    <div class="text-sm font-semibold mb-2">{% trans "Weekly sales (count)" %}</div>
+    <canvas id="chartW"></canvas>
+  </div>
+  <div class="bg-white border rounded-xl p-4">
+    <div class="text-sm font-semibold mb-2">{% trans "Daily sales (count)" %}</div>
+    <canvas id="chartD"></canvas>
+  </div>
+
+  <div class="h-24"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const M = {{ monthly|safe }}.map(x=>x.key), Mv = {{ monthly|safe }}.map(x=>x.c);
+const W = {{ weekly|safe }}.map(x=>x.key), Wv = {{ weekly|safe }}.map(x=>x.c);
+const D = {{ daily|safe }}.map(x=>x.key), Dv = {{ daily|safe }}.map(x=>x.c);
+new Chart(document.getElementById('chartM'), {type:'bar', data:{labels:M,datasets:[{label:'Monthly',data:Mv}]}});
+new Chart(document.getElementById('chartW'), {type:'bar', data:{labels:W,datasets:[{label:'Weekly',data:Wv}]}});
+new Chart(document.getElementById('chartD'), {type:'line', data:{labels:D,datasets:[{label:'Daily',data:Dv,fill:false,tension:0.3}]}})
+</script>
+{% endblock %}

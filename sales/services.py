@@ -1,22 +1,36 @@
 from decimal import Decimal
+from django.conf import settings
 from django.db.models import Sum
 from inventory.models import Product
-from .models import Transaction, SellerCommission
-from reference.models import Config
+from sales.models import Transaction
 
-def sum_product_expenses(product_id: int) -> Decimal:
-    total = (
-        Transaction.objects.filter(type="expense", product_id=product_id)
-        .aggregate(s=Sum("amount"))["s"]
-        or Decimal("0")
-    )
-    return total
+def get_commission_amount(amount=None) -> Decimal:
+    """
+    Har bir sotuv uchun qat'iy komissiya. Default: 5.00 USD (yoki so'm).
+    settings.COMMISSION_FLAT o'rnatilsa, shuni oladi.
+    """
+    val = getattr(settings, "COMMISSION_FLAT", Decimal("5"))
+    try:
+        return Decimal(str(val))
+    except Exception:
+        return Decimal("5")
 
-def get_commission_amount(sale_amount: Decimal) -> Decimal:
-    # Config: commission_mode (fixed|percent), commission_value (5|1.5 ...)
-    mode = Config.objects.filter(key="commission_mode").values_list("value", flat=True).first() or "fixed"
-    val_s = Config.objects.filter(key="commission_value").values_list("value", flat=True).first() or "5"
-    val = Decimal(val_s)
-    if mode == "percent":
-        return (sale_amount * val / Decimal("100")).quantize(Decimal("0.01"))
-    return val.quantize(Decimal("0.01"))
+def calc_product_cost(product: Product) -> Decimal:
+    """
+    Sotuv uchun 'cost' qiymati:
+      owned:       purchase_price + (shu telefonga bog'langan barcha expenses)
+      consignment: consignment_price + (shu telefonga bog'langan barcha expenses)
+    """
+    base = Decimal("0")
+    if product.ownership == "owned":
+        base = Decimal(product.purchase_price or 0)
+    else:
+        base = Decimal(product.consignment_price or 0)
+
+    # Ushbu telefonga bog'langan barcha xarajatlar (Transaction.type='expense')
+    exp_sum = Transaction.objects.filter(
+        type="expense",
+        product=product,
+    ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
+
+    return base + exp_sum

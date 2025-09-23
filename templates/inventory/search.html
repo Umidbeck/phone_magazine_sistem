@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Search" %}{% endblock %}
+{% block content %}
+<div class="p-3 space-y-3">
+  <form method="get" class="bg-white border rounded-xl p-3">
+    <div class="flex gap-2 items-center">
+      <input name="q" value="{{ q }}" placeholder="{% trans 'IMEI (last 4), brand, model' %}" class="flex-1 border rounded-lg px-3 py-2">
+      <button class="px-4 py-2 bg-black text-white rounded-lg">{% trans "Search" %}</button>
+    </div>
+    <div class="text-xs text-gray-500 mt-2">{% trans "Tip: Type last 4 digits for fast lookup." %}</div>
+  </form>
+
+  <div class="space-y-2">
+    {% for p in results %}
+      <div class="bg-white border rounded-xl p-3">
+        <div class="flex items-start justify-between">
+          <div>
+            <div class="text-sm font-semibold">{{ p.brand.name }} {{ p.model.name }}</div>
+            <div class="text-xs text-gray-500">IMEI: {{ p.imei_full }} · {{ p.store.name }}</div>
+            <div class="text-xs text-gray-500">{% trans "Status" %}: {{ p.status }}</div>
+          </div>
+          <a href="{% url 'product_detail' p.id %}" class="text-xs px-2 py-1 border rounded hover:bg-gray-50">{% trans "Details" %}</a>
+        </div>
+      </div>
+    {% empty %}
+      {% if q %}<div class="text-center text-sm text-gray-500">{% trans "No results" %}</div>{% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="h-24"></div>
+</div>
+{% endblock %}

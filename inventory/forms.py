@@ -15,23 +15,11 @@ def digits_only(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
 
 class ProductCreateForm(forms.ModelForm):
-    # Doim barcha do‘konlar — so‘ngra __init__ da role bo‘yicha majburiylikni sozlaymiz
-    store = forms.ModelChoiceField(
-        queryset=Store.objects.all().order_by("name"),
-        required=False,
-        label="Store"
-    )
+    ...
+    doc_images = forms.FileField(required=False, widget=MultipleFileInput)
+    cond_images = forms.FileField(required=False, widget=MultipleFileInput)
+    images = forms.FileField(required=False, widget=MultipleFileInput)
 
-    # YANGI: rasmlar
-    doc_images = forms.FileField(
-        required=False, widget=MultipleFileInput, label="Document photos"
-    )
-    cond_images = forms.FileField(
-        required=False, widget=MultipleFileInput, label="Condition photos"
-    )
-    images = forms.FileField(
-        required=False, widget=MultipleFileInput, label="Other photos"
-    )
     class Meta:
         model = Product
         fields = [
@@ -41,29 +29,30 @@ class ProductCreateForm(forms.ModelForm):
             "owner_name", "owner_phone",
         ]
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        self.user = user
+        # Owner -> store tanlay oladi; Seller -> default store va disabled
+        if self.user and not getattr(self.user, "is_owner", False):
+            if getattr(self.user, "store", None):
+                self.fields["store"].initial = self.user.store
+                self.fields["store"].disabled = True
 
-        # Reference querysetlar
-        self.fields["brand"].queryset = Brand.objects.all().order_by("name")
-        self.fields["model"].queryset = ModelName.objects.all().order_by("name")
-        self.fields["color"].queryset = Color.objects.all().order_by("name")
+    def clean(self):
+        cleaned = super().clean()
+        own = cleaned.get("ownership")
+        if own == "owned" and not cleaned.get("purchase_price"):
+            self.add_error("purchase_price", "Required for owned.")
+        if own == "consignment" and not cleaned.get("consignment_price"):
+            self.add_error("consignment_price", "Required for consignment.")
 
-        # STORE majburiyligi — rolega qarab
-        if user and getattr(user, "is_owner", False):
-            # OWNER: majburiy tanlash
-            self.fields["store"].required = True
-        else:
-            # SELLER:
-            if getattr(user, "store_id", None):
-                # Sellerning do‘koni bor: select ko‘rsatiladi (bosilishi mumkin),
-                # lekin saqlashda baribir user.store yoziladi.
-                self.fields["store"].initial = user.store
-                self.fields["store"].required = False
-            else:
-                # Sellerning do‘koni yo‘q: majburiy tanlash kerak (fallback)
-                self.fields["store"].required = True
+        total = 0
+        for k in ("doc_images", "cond_images", "images"):
+            total += len(self.files.getlist(k))
+        if total > 7:
+            raise forms.ValidationError("Maximum 7 images allowed.")
+
+        return cleaned
 
     def clean_imei_full(self):
         v = digits_only(self.cleaned_data.get("imei_full") or "")

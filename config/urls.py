@@ -21,30 +21,19 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('i18n/', include('django.conf.urls.i18n')),  # til almashtirish formasi uchun
+    path("i18n/", include("django.conf.urls.i18n")),
+    path("auth/", include("django.contrib.auth.urls")),  # <-- password_change, login/logout, va hok.
 ]
 
-# Default til uchun prefix kerak bo‘lmasa, settings.LANGUAGE_CODE bilan ishlaydi
 urlpatterns += i18n_patterns(
-    path('admin/', admin.site.urls),
-
-    # Accounts (login/home va hk)
-    path('', include('accounts.urls')),
-
-    # Inventory
-    path('inventory/', include('inventory.urls')),
-
-    # Sales
-    path('sales/', include('sales.urls')),
-
-    # Reference
-    path('reference/', include('reference.urls')),
-
-    # Reports
-    path('reports/', include('reports.urls')),
+    path("admin/", admin.site.urls),
+    path("", include("accounts.urls")),
+    path("inventory/", include("inventory.urls")),
+    path("sales/", include("sales.urls")),
+    path("reference/", include("reference.urls")),
+    path("reports/", include("reports.urls")),
     prefix_default_language=False,
 )
 
-# Media fayllar (rasm) dev rejimda
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
