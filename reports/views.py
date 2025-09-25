@@ -3,10 +3,11 @@ import datetime
 from datetime import date, timedelta
 from decimal import Decimal
 
+from dateutil.utils import today
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.db.models import Sum, Count
-from django.db.models.functions import TruncDate
+from django.db.models import Sum, Count, Q
+from django.db.models.functions import TruncDate, TruncDay, TruncWeek, TruncMonth
 from django.shortcuts import render
 from django.utils.translation import gettext as _
 
@@ -14,46 +15,105 @@ from accounts.models import Store, User
 from inventory.models import Product
 from sales.models import Transaction, SellerCommission
 from django.db.models import F
+from django.utils import timezone as dj_tz
 
 
 @login_required
 def store_report(request):
-    period = (request.GET.get("period") or "30").strip()  # 7/30/90/365/custom
+    # parametrlar
+    period = int(request.GET.get("period") or 30)
+    store_id = (request.GET.get("store") or "").strip()
+
     today = date.today()
-    if period.isdigit():
-        days = int(period)
-        date_from = today - timedelta(days=days)
-        date_to = today
-    else:
-        date_from = today - timedelta(days=30)
-        date_to = today
+    date_from = today - timedelta(days=period-1)
 
-    store_id = request.GET.get("store")
     stores = Store.objects.filter(is_active=True).order_by("name")
-    if not request.user.is_owner:
-        store_id = request.user.store_id
+    tx_exp = Transaction.objects.filter(type="expense", is_approved=True, created_at__date__range=(date_from, today))
+    tx_cons = Transaction.objects.filter(type="consignment_payout", is_approved=True,
+                                         created_at__date__range=(date_from, today))
 
-    qs = Transaction.objects.filter(created_at__date__gte=date_from, created_at__date__lte=date_to)
+    commission_total = SellerCommission.objects.filter(is_approved=True,
+                                                       transaction__created_at__date__range=(date_from,
+                                                                                             today)).aggregate(
+        s=Sum("amount"))["s"] or 0
+    commission_paid = SellerCommission.objects.filter(is_approved=True, is_paid=True,
+                                                      transaction__created_at__date__range=(date_from,
+                                                                                            today)).aggregate(
+        s=Sum("amount"))["s"] or 0
 
+    tx_sales = Transaction.objects.filter(type="sale", created_at__date__range=(date_from, today))
     if store_id:
-        qs = qs.filter(store_id=store_id)
+        tx_sales = tx_sales.filter(store_id=store_id)
 
-    sales_sum = qs.filter(type="sale").aggregate(s=Sum("amount"))["s"] or Decimal("0")
-    cost_sum = qs.filter(type="sale").aggregate(s=Sum("cost"))["s"] or Decimal("0")
-    profit_sum = qs.filter(type="sale").aggregate(s=Sum("profit"))["s"] or Decimal("0")
-    expense_sum = qs.filter(type="expense").aggregate(s=Sum("amount"))["s"] or Decimal("0")
+    # sotilganlar soni / summalar
+    sold_count = tx_sales.count()
+    sales_sum = tx_sales.aggregate(s=Sum("amount"))["s"] or 0
+    cost_sum = tx_sales.aggregate(s=Sum("cost"))["s"] or 0
+    profit_sum = tx_sales.aggregate(s=Sum("profit"))["s"] or 0
 
-    ctx = {
-        "stores": stores,
-        "store_id": int(store_id) if store_id else None,
-        "date_from": date_from,
-        "date_to": date_to,
-        "sales_sum": sales_sum,
-        "cost_sum": cost_sum,
-        "profit_sum": profit_sum,
-        "expense_sum": expense_sum,
-    }
-    return render(request, "reports/store_report.html", ctx)
+    # xarajatlar (store bo‘yicha)
+    exp = Transaction.objects.filter(type="expense",
+                                     created_at__date__range=(date_from, today))
+    if store_id:
+        exp = exp.filter(store_id=store_id)
+    expense_sum = exp.aggregate(s=Sum("amount"))["s"] or 0
+
+    # komissiya (paid/unpaid)
+    comm = SellerCommission.objects.filter(transaction__created_at__date__range=(date_from, today))
+    if store_id:
+        comm = comm.filter(transaction__store_id=store_id)
+    commission_sum = comm.aggregate(s=Sum("amount"))["s"] or 0
+    commission_paid = comm.filter(is_paid=True).aggregate(s=Sum("amount"))["s"] or 0
+
+    # consignment payouts (agar bitta Transaction turida bo‘lsa)
+    cons_payouts = Transaction.objects.filter(type="consignment_payout",
+                                              created_at__date__range=(date_from, today))
+    if store_id:
+        cons_payouts = cons_payouts.filter(store_id=store_id)
+    cons_payouts_sum = cons_payouts.aggregate(s=Sum("amount"))["s"] or 0
+
+    # inv holati (hozirgi vaqtda)
+    inv_qs = Product.objects.filter(is_archived=False).exclude(status="sold")
+    if store_id:
+        inv_qs = inv_qs.filter(store_id=store_id)
+    inv_count = inv_qs.count()
+
+    # olinganlar soni (period ichida yaratilgan)
+    acquired_qs = Product.objects.filter(created_at__date__range=(date_from, today))
+    if store_id:
+        acquired_qs = acquired_qs.filter(store_id=store_id)
+    acquired_count = acquired_qs.count()
+
+    # sotuvchilar kesimi (TOP)
+    top_sellers = (tx_sales.values("seller__username")
+                   .annotate(cnt=Count("id"), s=Sum("amount"), p=Sum("profit"))
+                   .order_by("-s")[:10])
+
+    # brend/model insight (tezkor)
+    top_brands = (tx_sales.values("product__brand__name")
+                  .annotate(s=Sum("amount"))
+                  .order_by("-s")[:10])
+    top_models = (tx_sales.values("product__brand__name", "product__model__name")
+                  .annotate(cnt=Count("id"), s=Sum("amount"))
+                  .order_by("-cnt")[:10])
+
+    # net profit (aniq)
+    net_profit = (profit_sum or 0) - (expense_sum or 0) - (commission_sum or 0) - (cons_payouts_sum or 0)
+
+    ctx = dict(
+        stores=stores,
+        store_id=store_id and int(store_id) or "",
+        date_from=date_from, date_to=today, period=period,
+
+        sales_sum=sales_sum, cost_sum=cost_sum, profit_sum=profit_sum,
+        expense_sum=expense_sum, commission_sum=commission_sum,
+        commission_paid=commission_paid, cons_payouts_sum=cons_payouts_sum,
+
+        sold_count=sold_count, acquired_count=acquired_count, inv_count=inv_count,
+        top_sellers=top_sellers, top_brands=top_brands, top_models=top_models,
+        net_profit=net_profit,
+    )
+    return render(request, "store_report.html", ctx)
 
 
 @login_required
@@ -96,97 +156,63 @@ def network_report(request):
 
 @login_required
 def owner_dashboard(request):
-    if not request.user.is_owner:
-        return render(request, "reports/dashboard.html", {"error": _("Only owner.")})
-
-    days = int(request.GET.get("days", 30))
+    days = int(request.GET.get("days") or 30)
     today = date.today()
-    date_from = today - timedelta(days=days - 1)
+    date_from = today - timedelta(days=days-1)
 
-    sales = (Transaction.objects
-              .filter(type="sale", created_at__date__range=(date_from, today)))
-    expenses = (Transaction.objects
-                .filter(type="expense", created_at__date__range=(date_from, today)))
+    tx_sales = Transaction.objects.filter(type="sale", created_at__date__range=(date_from, today))
+    tx_exp = Transaction.objects.filter(type="expense", is_approved=True, created_at__date__range=(date_from, today))
+    tx_cons = Transaction.objects.filter(type="consignment_payout", is_approved=True,
+                                         created_at__date__range=(date_from, today))
 
-    sales_sum = sales.aggregate(s=Sum("amount"))["s"] or 0
-    cost_sum  = sales.aggregate(s=Sum("cost"))["s"] or 0
-    profit_sum = sales.aggregate(s=Sum("profit"))["s"] or 0
+    commission_total = SellerCommission.objects.filter(is_approved=True,
+                                                       transaction__created_at__date__range=(date_from,
+                                                                                             today)).aggregate(
+        s=Sum("amount"))["s"] or 0
+    commission_paid = SellerCommission.objects.filter(is_approved=True, is_paid=True,
+                                                      transaction__created_at__date__range=(date_from,
+                                                                                            today)).aggregate(
+        s=Sum("amount"))["s"] or 0
 
-    # ---------- Daily chart (UNIVERSAL) ----------
-    rows = (sales.annotate(d=TruncDate("created_at"))  # 2023-09-23
-            .values("d")
-            .annotate(s=Sum("amount"))
-            .order_by("d"))
-    labels = [r["d"].strftime("%Y-%m-%d") for r in rows]
-    series = [r["s"] for r in rows]
+    sales_sum   = tx_sales.aggregate(s=Sum("amount"))["s"] or 0
+    cost_sum    = tx_sales.aggregate(s=Sum("cost"))["s"] or 0
+    profit_sum  = tx_sales.aggregate(s=Sum("profit"))["s"] or 0
+    expense_sum = tx_exp.aggregate(s=Sum("amount"))["s"] or 0
+    commission_total = SellerCommission.objects.filter(transaction__created_at__date__range=(date_from, today)).aggregate(s=Sum("amount"))["s"] or 0
+    commission_paid  = SellerCommission.objects.filter(transaction__created_at__date__range=(date_from, today), is_paid=True).aggregate(s=Sum("amount"))["s"] or 0
+    cons_payouts_sum = tx_cons.aggregate(s=Sum("amount"))["s"] or 0
+    net_profit = (profit_sum or 0) - (expense_sum or 0) - (commission_total or 0) - (cons_payouts_sum or 0)
 
-    # ---------- Toplar ----------
-    top_stores = list(
-        sales.values("store__name")
-             .annotate(s=Sum("amount"))
-             .order_by("-s")[:10]
-    )
-    top_brands = list(
-        sales.values("product__brand__name")
-             .annotate(s=Sum("amount"))
-             .order_by("-s")[:10]
-    )
-    top_models = list(
-        sales.values("product__brand__name", "product__model__name")
-             .annotate(s=Sum("amount"))
-             .order_by("-s")[:10]
-    )
+    def daily_series(qs, field="amount"):
+        rows = (qs.annotate(d=TruncDate("created_at")).values("d").annotate(s=Sum(field)).order_by("d"))
+        by_date = {r["d"]: float(r["s"] or 0) for r in rows}
+        labels, series = [], []
+        for i in range(days):
+            d = date_from + timedelta(days=i)
+            labels.append(d.strftime("%Y-%m-%d"))
+            series.append(by_date.get(d, 0.0))
+        return labels, series
 
-    # ---------- Qarzlar ----------
-    debts_out  = (Transaction.objects.filter(type="debt_out")
-                  .aggregate(s=Sum("amount"))["s"] or 0)
-    debts_pay  = (Transaction.objects.filter(type="debt_pay")
-                  .aggregate(s=Sum("amount"))["s"] or 0)
-    debts_unpaid = debts_out - debts_pay
-
-    # ---------- Konsignment va komissiya ----------
-    cons_payouts_sum = (Transaction.objects
-                        .filter(type="consignment_payout",
-                                created_at__date__range=(date_from, today))
-                        .aggregate(s=Sum("amount"))["s"] or 0)
-
-    commission_sum = (SellerCommission.objects
-                      .filter(transaction__created_at__date__range=(date_from, today))
-                      .aggregate(s=Sum("amount"))["s"] or 0)
-
-    net_profit = (profit_sum or 0) - (commission_sum or 0) - (cons_payouts_sum or 0)
-
-    # ---------- Xarajalar tahlili ----------
-    exp_by_store = list(
-        expenses.values("store__name")
-                .annotate(s=Sum("amount"))
-                .order_by("-s")[:10]
-    )
-    exp_by_seller = list(
-        expenses.values("seller__username")
-                .annotate(s=Sum("amount"))
-                .order_by("-s")[:10]
-    )
-    exp_by_type = list(
-        expenses.values("expense_type__name")
-                .annotate(s=Sum("amount"))
-                .order_by("-s")[:10]
-    )
+    labels, sales_series = daily_series(tx_sales, "amount")
+    _, profit_series = daily_series(tx_sales, "profit")
+    _, expense_series = daily_series(tx_exp, "amount")
+    rows_comm = (SellerCommission.objects
+                 .filter(transaction__created_at__date__range=(date_from, today))
+                 .annotate(d=TruncDate("transaction__created_at"))
+                 .values("d").annotate(s=Sum("amount")).order_by("d"))
+    by_date_comm = {r["d"]: float(r["s"] or 0) for r in rows_comm}
+    commission_series = [by_date_comm.get(date_from + timedelta(days=i), 0.0) for i in range(days)]
 
     ctx = dict(
         days=days, date_from=date_from, date_to=today,
         sales_sum=sales_sum, cost_sum=cost_sum, profit_sum=profit_sum,
-        labels=labels, series=series,
-        top_stores=top_stores, top_brands=top_brands, top_models=top_models,
-        debts_unpaid=debts_unpaid,
-        cons_payouts_sum=cons_payouts_sum,
-        commission_sum=commission_sum,
-        net_profit=net_profit,
-        exp_by_store=exp_by_store,
-        exp_by_seller=exp_by_seller,
-        exp_by_type=exp_by_type,
+        expense_sum=expense_sum, net_profit=net_profit,
+        commission_total=commission_total, commission_paid=commission_paid, cons_payouts_sum=cons_payouts_sum,
+        labels=labels, series=sales_series, profit_series=profit_series, expense_series=expense_series, commission_series=commission_series,
     )
     return render(request, "reports/dashboard.html", ctx)
+
+
 
 @login_required
 def sales_log(request):
@@ -239,6 +265,18 @@ def expenses_log(request):
     date_from = request.GET.get("date_from") or ""
     date_to   = request.GET.get("date_to") or ""
     include_commissions = request.GET.get("include_commissions") == "1"
+    tx_exp = Transaction.objects.filter(type="expense", is_approved=True, created_at__date__range=(date_from, today))
+    tx_cons = Transaction.objects.filter(type="consignment_payout", is_approved=True,
+                                         created_at__date__range=(date_from, today))
+
+    commission_total = SellerCommission.objects.filter(is_approved=True,
+                                                       transaction__created_at__date__range=(date_from,
+                                                                                             today)).aggregate(
+        s=Sum("amount"))["s"] or 0
+    commission_paid = SellerCommission.objects.filter(is_approved=True, is_paid=True,
+                                                      transaction__created_at__date__range=(date_from,
+                                                                                            today)).aggregate(
+        s=Sum("amount"))["s"] or 0
 
     # Faqat expense yozuvlari
     qs = (Transaction.objects
@@ -326,5 +364,183 @@ def expenses_log(request):
         "commission_total": commission_total,
     }
     return render(request, "reports/expenses_log.html", ctx)
+
+
+@login_required
+def profit_overview(request):
+    """
+    Kassa formulasi (siz aytgandek):
+      KASSA = (sotilgan telefonlar narxi) - (tasdiqlangan rashodlar) - (komissiya 5$) + (tasdiqlangan qarzdor to'lovlari)
+
+    Sotuvchi (owner emas) faqat o'z do'koni bo'yicha ko'radi.
+    Owner istasa bir yoki ko'p do'konni tanlab ko'radi.
+    """
+    period = (request.GET.get("period") or "month").lower()
+    if period not in ("day", "week", "month"):
+        period = "month"
+    try:
+        days = max(7, min(int(request.GET.get("days") or "730"), 730))
+    except Exception:
+        days = 730
+
+    end_date = dj_tz.now().date()
+    start_date = end_date - timedelta(days=days - 1)
+
+    # ===== Store filtri (rolga qarab)
+    if getattr(request.user, "is_owner", False):
+        store_ids = [int(s) for s in request.GET.getlist("stores") if s.isdigit()]
+        store_q = Q()
+        if store_ids:
+            store_q = Q(store_id__in=store_ids)
+        stores = Store.objects.order_by("name")
+    else:
+        store_ids = []
+        store_q = Q(store_id=request.user.store_id)
+        stores = Store.objects.filter(pk=request.user.store_id)
+
+    trunc = {"day": TruncDay, "week": TruncWeek, "month": TruncMonth}[period]
+
+    # ===== Guruhlangan metrikalar (grafik/jadval uchun)
+    sales_qs = (
+        Transaction.objects.filter(type="sale", is_void=False, created_at__date__range=(start_date, end_date))
+        .filter(store_q)
+        .annotate(p=trunc("created_at"))
+        .values("p")
+        .annotate(sales_sum=Sum("amount"), profit_sum=Sum("profit"))
+        .order_by("p")
+    )
+    expense_qs = (
+        Transaction.objects.filter(type="expense", is_void=False, is_approved=True, created_at__date__range=(start_date, end_date))
+        .filter(store_q)
+        .annotate(p=trunc("created_at"))
+        .values("p")
+        .annotate(expense_sum=Sum("amount"))
+        .order_by("p")
+    )
+    cons_qs = (
+        Transaction.objects.filter(type="consignment_payout", is_void=False, is_approved=True, created_at__date__range=(start_date, end_date))
+        .filter(store_q)
+        .annotate(p=trunc("created_at"))
+        .values("p")
+        .annotate(cons_sum=Sum("amount"))
+        .order_by("p")
+    )
+    comm_qs = (
+        SellerCommission.objects.filter(is_approved=True, transaction__is_void=False,
+                                        transaction__created_at__date__range=(start_date, end_date))
+        .filter(transaction__store_id__in=store_ids if (getattr(request.user, "is_owner", False) and store_ids)
+                else ([request.user.store_id] if not getattr(request.user, "is_owner", False) else Store.objects.values_list("id", flat=True)))
+        .annotate(p=trunc("transaction__created_at"))
+        .values("p")
+        .annotate(comm_sum=Sum("amount"))
+        .order_by("p")
+    )
+
+    s_map = {row["p"].date() if hasattr(row["p"], "date") else row["p"]: row for row in sales_qs}
+    e_map = {row["p"].date() if hasattr(row["p"], "date") else row["p"]: row for row in expense_qs}
+    c_map = {row["p"].date() if hasattr(row["p"], "date") else row["p"]: row for row in cons_qs}
+    k_map = {row["p"].date() if hasattr(row["p"], "date") else row["p"]: row for row in comm_qs}
+
+    # Fallback komissiya: tasdiqlangan sotuvlar soni * 5
+    if not k_map:
+        sale_cnt = (
+            Transaction.objects.filter(type="sale", is_void=False, is_approved=True, created_at__date__range=(start_date, end_date))
+            .filter(store_q)
+            .annotate(p=trunc("created_at"))
+            .values("p")
+            .annotate(cnt=Count("id"))
+        )
+        for r in sale_cnt:
+            key = r["p"].date() if hasattr(r["p"], "date") else r["p"]
+            k_map[key] = {"comm_sum": Decimal(r["cnt"]) * Decimal("5")}
+
+    # Bucketlar
+    step = {"day": 1, "week": 7, "month": 30}[period]
+    cur = start_date
+    rows = []
+    tot_sales = tot_profit = tot_exp = tot_comm = tot_cons = Decimal("0")
+    while cur <= end_date:
+        key = cur
+        s = s_map.get(key, {}); e = e_map.get(key, {}); k = k_map.get(key, {}); c = c_map.get(key, {})
+        sales_sum = Decimal(s.get("sales_sum") or 0)
+        profit_sum = Decimal(s.get("profit_sum") or 0)
+        expense_sum = Decimal(e.get("expense_sum") or 0)
+        comm_sum = Decimal(k.get("comm_sum") or 0)
+        cons_sum = Decimal(c.get("cons_sum") or 0)
+
+        # Net foyda (klassik): profit - expense - commission - consignment payout
+        net = profit_sum - expense_sum - comm_sum - cons_sum
+
+        tot_sales += sales_sum; tot_profit += profit_sum
+        tot_exp += expense_sum; tot_comm += comm_sum; tot_cons += cons_sum
+
+        rows.append({
+            "period": key,
+            "sales": sales_sum,
+            "profit": profit_sum,
+            "expense": expense_sum,
+            "commission": comm_sum,
+            "consignment": cons_sum,
+            "net": net,
+        })
+        cur += timedelta(days=step)
+
+    def _kassa_breakdown(date_from, date_to, store_filter_q: Q):
+        # Sotuv tushumlari (void emas)
+        sale_aggr = (Transaction.objects
+                     .filter(type="sale", is_void=False, created_at__date__range=(date_from, date_to))
+                     .filter(store_filter_q)
+                     .aggregate(cash=Sum("cash_amount"), card=Sum("card_amount")))
+        # Qarzdorlardan tushum (faqat APPROVED)
+        debt_aggr = (Transaction.objects
+                     .filter(type="debt_pay", is_void=False, is_approved=True,
+                             created_at__date__range=(date_from, date_to))
+                     .filter(store_filter_q)
+                     .aggregate(cash=Sum("cash_amount"), card=Sum("card_amount")))
+        # Rashod (faqat APPROVED)
+        exp_aggr = (Transaction.objects
+                    .filter(type="expense", is_void=False, is_approved=True,
+                            created_at__date__range=(date_from, date_to))
+                    .filter(store_filter_q)
+                    .aggregate(total=Sum("amount")))
+
+        cash_in = Decimal(sale_aggr["cash"] or 0) + Decimal(debt_aggr["cash"] or 0)
+        card_in = Decimal(sale_aggr["card"] or 0) + Decimal(debt_aggr["card"] or 0)
+        exp_out = Decimal(exp_aggr["total"] or 0)
+        return cash_in, card_in, exp_out
+
+    cash_in, card_in, exp_out = _kassa_breakdown(start_date, end_date, store_q)
+
+    # Komissiya: approved komissiyalar summasi, bo‘lmasa fallback 5$ * approved sale count
+    comm_total = (SellerCommission.objects
+                  .filter(is_approved=True, transaction__is_void=False,
+                          transaction__created_at__date__range=(start_date, end_date))
+                  .filter(
+        transaction__store_id__in=store_ids if (getattr(request.user, "is_owner", False) and store_ids)
+        else (
+            [request.user.store_id] if not getattr(request.user, "is_owner", False) else Store.objects.values_list("id",
+                                                                                                                   flat=True)))
+                  .aggregate(total=Sum("amount"))["total"] or 0)
+    if not comm_total:
+        appr_sale_count = (Transaction.objects
+                           .filter(type="sale", is_void=False, is_approved=True,
+                                   created_at__date__range=(start_date, end_date))
+                           .filter(store_q).count())
+        comm_total = Decimal(appr_sale_count) * Decimal("5")
+
+    kassa_total = cash_in + card_in - exp_out - Decimal(comm_total)
+
+    context = {
+        "period": period, "days": days, "start_date": start_date, "end_date": end_date,
+        "rows": rows,
+        "total_sales": tot_sales, "total_profit": tot_profit,
+        "total_expense": tot_exp, "total_commission": tot_comm, "total_cons": tot_cons,
+        "total_net": tot_profit - tot_exp - tot_comm - tot_cons,
+        "stores": stores, "store_ids": store_ids,
+        "cash_in": cash_in,
+        "card_in": card_in,
+        "kassa_total": kassa_total,
+    }
+    return render(request, "reports/profit_overview.html", context)
 
 

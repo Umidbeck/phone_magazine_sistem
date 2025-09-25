@@ -1,99 +1,116 @@
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Inventory" %}{% endblock %}
+# inventor/product_list.html
+{% extends "base.html" %}
+{% load i18n %}
 {% block content %}
-<div class="p-3 space-y-3">
+<h2 class="mb-3">{% trans "Received Phones" %}</h2>
 
-  <!-- Search + filters -->
-  <form method="get" class="bg-white border rounded-xl p-3">
-    <div class="flex flex-col gap-2 md:flex-row md:items-center">
-      <input name="q" value="{{ q }}" placeholder="{% trans 'IMEI or last 4' %}"
-             class="flex-1 border rounded-lg px-3 py-2">
-      <select name="status" class="border rounded-lg px-3 py-2">
-        <option value="">{% trans "All" %}</option>
-        <option value="available" {% if status == "available" %}selected{% endif %}>{% trans "Available" %}</option>
-        <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>{% trans "On repair" %}</option>
-        <option value="sold" {% if status == "sold" %}selected{% endif %}>{% trans "Sold" %}</option>
-      </select>
-      <label class="flex items-center gap-2 text-xs">
-        <input type="checkbox" name="archived" value="1" {% if include_archived %}checked{% endif %}>
-        {% trans "Show archived" %}
-      </label>
-      <button class="px-4 py-2 bg-black text-white rounded-lg">{% trans "Search" %}</button>
-    </div>
-    <div class="text-xs text-gray-500 mt-2">
-      {% trans "Results" %}: {{ result_count }}
-    </div>
-  </form>
-
-  <!-- Cards grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-    {% for p in products %}
-      <div class="bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow transition">
-        <!-- thumb -->
-        <div class="h-36 bg-gray-50 flex items-center justify-center relative">
-          {% with p.images.all|default_if_none:'' as imgs %}
-            {% if imgs and imgs.0.image %}
-              <img src="{{ imgs.0.image.url }}" alt="" class="h-36 w-full object-cover">
-            {% else %}
-              <div class="text-gray-400 text-sm">
-                {{ p.brand.name }} {{ p.model.name }}
-              </div>
-            {% endif %}
-          {% endwith %}
-          <!-- status badge -->
-          <div class="absolute top-2 right-2">
-            {% if p.status == "available" %}
-              <span class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Available</span>
-            {% elif p.status == "on_repair" %}
-              <span class="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800">On repair</span>
-            {% else %}
-              <span class="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">Sold</span>
-            {% endif %}
-          </div>
-        </div>
-
-        <!-- body -->
-        <div class="p-3 space-y-1">
-          <div class="text-sm font-semibold">{{ p.brand.name }} {{ p.model.name }}</div>
-          <div class="text-xs text-gray-500">IMEI: {{ p.imei_full }}</div>
-          <div class="text-xs text-gray-500">{{ p.store.name }}</div>
-          <div class="text-xs">
-            {% if p.ownership == "owned" %}
-              <span class="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[10px]">Owned</span>
-              <span class="text-gray-600 ml-2">{{ p.purchase_price }}</span>
-            {% else %}
-              <span class="px-2 py-0.5 rounded-full bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 text-[10px]">Consignment</span>
-              <span class="text-gray-600 ml-2">{{ p.consignment_price }}</span>
-            {% endif %}
-          </div>
-        </div>
-
-        <!-- actions -->
-        <div class="p-3 border-t flex items-center justify-between">
-          {% if p.status == "available" %}
-            <form action="{% url 'product_to_repair' p.id %}" method="post">
-              {% csrf_token %}
-              <button class="text-xs px-2 py-1 border rounded hover:bg-gray-50">{% trans "To repair" %}</button>
-            </form>
-            <a href="{% url 'sell' %}?product_id={{ p.id }}"
-               class="text-xs px-3 py-1 rounded bg-black text-white">{% trans "Sell" %}</a>
-          {% elif p.status == "on_repair" %}
-            <form action="{% url 'product_to_available' p.id %}" method="post">
-              {% csrf_token %}
-              <button class="text-xs px-2 py-1 border rounded hover:bg-gray-50">{% trans "Available" %}</button>
-            </form>
-            <a class="text-xs px-3 py-1 rounded bg-gray-200 text-gray-500 cursor-not-allowed">{% trans "Sell" %}</a>
-          {% else %}
-            <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500">{% trans "Sold" %}</span>
-            <a class="text-xs px-3 py-1 rounded bg-gray-200 text-gray-500 cursor-not-allowed">{% trans "Action" %}</a>
-          {% endif %}
-        </div>
-      </div>
-    {% empty %}
-      <div class="col-span-full text-center text-sm text-gray-500">{% trans "No products found." %}</div>
-    {% endfor %}
+<form method="get" class="row g-2 mb-3">
+  {% if request.user.is_owner %}
+  <div class="col-auto">
+    <label class="form-label">{% trans "Store" %}</label>
+    <select name="store_id" class="form-select">
+      <option value="">{% trans "All" %}</option>
+      {% for s in stores %}
+        <option value="{{ s.id }}" {% if store_id == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
   </div>
+  {% endif %}
 
-  <div class="h-24"></div>
-</div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "Brand" %}</label>
+    <select name="brand" class="form-select">
+      <option value="">{% trans "All" %}</option>
+      {% for b in brands %}<option value="{{ b.id }}" {% if brand_id == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "Model" %}</label>
+    <select name="model" class="form-select">
+      <option value="">{% trans "All" %}</option>
+      {% for m in models %}<option value="{{ m.id }}" {% if model_id == m.id|stringformat:"s" %}selected{% endif %}>{{ m.brand.name }} {{ m.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "Ownership" %}</label>
+    <select name="ownership" class="form-select">
+      <option value="">{% trans "All" %}</option>
+      <option value="owned" {% if ownership == "owned" %}selected{% endif %}>Owned</option>
+      <option value="consignment" {% if ownership == "consignment" %}selected{% endif %}>Consignment</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "Status" %}</label>
+    <select name="status" class="form-select">
+      <option value="">{% trans "All" %}</option>
+      <option value="available" {% if status == "available" %}selected{% endif %}>Available</option>
+      <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>On Repair</option>
+    </select>
+  </div>
+  <div class="col-auto form-check mt-4">
+    <input class="form-check-input" type="checkbox" name="is_new" value="1" id="isnew" {% if is_new_val %}checked{% endif %}>
+    <label class="form-check-label" for="isnew">{% trans "New" %}</label>
+  </div>
+  <div class="col-auto form-check mt-4">
+    <input class="form-check-input" type="checkbox" name="has_documents" value="1" id="hasdocs" {% if has_docs_val %}checked{% endif %}>
+    <label class="form-check-label" for="hasdocs">{% trans "With documents" %}</label>
+  </div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "From" %}</label>
+    <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "To" %}</label>
+    <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+  </div>
+  <div class="col-auto mt-4"><button class="btn btn-outline-secondary">{% trans "Filter" %}</button></div>
+</form>
+
+<table class="table table-sm align-middle">
+  <thead>
+    <tr>
+      <th>{% trans "Created" %}</th>
+      <th>{% trans "Store" %}</th>
+      <th>{% trans "Phone" %}</th>
+      <th>{% trans "Ownership" %}</th>
+      <th class="text-end">{% trans "Base Price" %}</th>
+      <th>{% trans "Flags" %}</th>
+      <th>{% trans "Status" %}</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in rows %}
+      <tr>
+        <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ p.store.name }}</td>
+        <td>{{ p.brand.name }} {{ p.model.name }} — {{ p.imei_full }}</td>
+        <td>
+          {% if p.ownership == "owned" %}
+            <span class="badge bg-primary">Owned</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Consignment</span>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          {% if p.ownership == "owned" %}{{ p.purchase_price }}{% else %}{{ p.consignment_price }}{% endif %}
+        </td>
+        <td>
+          {% if p.is_new %}<span class="badge bg-success">New</span>{% endif %}
+          {% if p.has_documents %}<span class="badge bg-info text-dark">Docs</span>{% endif %}
+        </td>
+        <td>
+          {% if p.status == "available" %}
+            <span class="badge bg-success">Available</span>
+          {% elif p.status == "on_repair" %}
+            <span class="badge bg-danger">On Repair</span>
+          {% endif %}
+        </td>
+        <td><a class="btn btn-sm btn-outline-primary" href="{% url 'product_detail' p.id %}">{% trans "Open" %}</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8" class="text-center text-muted py-4">{% trans "No data" %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% endblock %}

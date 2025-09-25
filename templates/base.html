@@ -1,121 +1,122 @@
-{% load static i18n form_extras %}
-<!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE|default:'uz' }}">
+<!doctype html>
+<html lang="uz" class="h-full bg-neutral-50">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{% block header_title %}{% endblock %} · PhoneMag{% endblock %}</title>
-
-  <!-- Tailwind -->
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}PhoneStore{% endblock %}</title>
+  <!-- Tailwind Play CDN (dev uchun) -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#0095f6' } // Instagram ko‘kiga yaqin
+          }
+        }
+      }
+    }
+  </script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full text-neutral-900">
+  <!-- Navbar (mobile) -->
+  <header class="md:hidden sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-200">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="text-2xl font-extrabold tracking-tight">Phone<span class="text-brand">Store</span></a>
+      <div class="flex items-center gap-3">
+        <a href="{% url 'inventory_search' %}" class="p-2 rounded hover:bg-neutral-100">🔎</a>
+        {% if request.user.is_authenticated %}
+          <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm">Chiqish</a>
+        {% else %}
+          <a href="{% url 'login' %}" class="px-3 py-1.5 rounded-lg bg-brand text-white text-sm">Kirish</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
 
-  <!-- Heroicons (outline) -->
-  <script src="https://unpkg.com/heroicons@2.0.18/24/outline/index.js"></script>
+  <div class="max-w-7xl mx-auto w-full grid md:grid-cols-[250px_1fr] gap-6 md:gap-10 px-3 md:px-6 py-4 md:py-8">
+    <!-- Left rail (Instagram sidebar) -->
+    <aside class="hidden md:flex md:flex-col md:sticky md:top-6 h-max bg-white rounded-2xl border border-neutral-200 p-3">
+      <a href="/" class="flex items-center gap-2 px-3 py-2">
+        <span class="text-2xl font-extrabold">Phone<span class="text-brand">Store</span></span>
+      </a>
+      <nav class="mt-2">
+        <ul class="space-y-1">
+          <li>
+            <a href="{% url 'owner_dashboard' %}" class="navlink">
+              <span>🏠</span><span>Dashboard</span>
+            </a>
+          </li>
+          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Inventory</li>
+          <li><a class="navlink" href="{% url 'product_received_list' %}">📥 Olinganlar</a></li>
+          <li><a class="navlink" href="{% url 'product_sold_list' %}">💸 Sotilganlar</a></li>
+          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Sales</li>
+          <li><a class="navlink" href="{% url 'expenses_list' %}">🧾 Rashodlar</a></li>
+          <li><a class="navlink" href="{% url 'debt_list' %}">👤 Qarzdorlar</a></li>
+          <li><a class="navlink" href="{% url 'consignment_list' %}">🤝 Do‘kon qarzlari</a></li>
+          <li><a class="navlink" href="{% url 'commissions_list' %}">🎯 Komissiyalar</a></li>
+          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Reports</li>
+          <li><a class="dropdown-item navlink" href="{% url 'profit_overview' %}">📈 Foyda</a></li>
+          <li><a class="navlink" href="{% url 'report_store' %}">🏪 Store report</a></li>
+          <li><a class="navlink" href="{% url 'report_network' %}">🌐 Network report</a></li>
+          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Reference</li>
+          <li><a class="navlink" href="{% url 'brand_list' %}">🏷️ Brendlar</a></li>
+          <li><a class="navlink" href="{% url 'model_list' %}">📱 Modellar</a></li>
+          <li><a class="navlink" href="{% url 'color_list' %}">🎨 Ranglar</a></li>
+        </ul>
+      </nav>
+      <div class="mt-4 border-t border-neutral-200 pt-3 px-3 text-sm">
+        {% if request.user.is_authenticated %}
+          <div class="flex items-center justify-between">
+            <div class="font-medium">👤 {{ request.user.username }}</div>
+            <a href="{% url 'logout' %}" class="text-brand hover:underline">Chiqish</a>
+          </div>
+        {% else %}
+          <a href="{% url 'login' %}" class="px-3 py-2 rounded-xl bg-brand text-white text-sm block text-center">Kirish</a>
+        {% endif %}
+      </div>
+    </aside>
+
+    <!-- Content area -->
+    <main class="min-w-0">
+      {% if messages %}
+        <div class="space-y-2 mb-4">
+          {% for m in messages %}
+            <div class="rounded-xl border {% if m.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-900{% elif m.tags == 'error' %}border-rose-200 bg-rose-50 text-rose-900{% elif m.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-900{% else %}border-neutral-200 bg-white text-neutral-900{% endif %} px-4 py-3">
+              {{ m }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 
   <style>
-    /* Instagram-style: clean white bg + subtle borders */
-    html { background:#fafafa; }
-    .container { max-width: 960px; margin:0 auto; }
+    .navlink{
+      @apply flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm text-neutral-700 hover:bg-neutral-100;
+    }
+    .card {
+      @apply bg-white border border-neutral-200 rounded-2xl shadow-sm;
+    }
+    .btn {
+      @apply inline-flex items-center justify-center px-3 py-2 rounded-xl text-sm font-medium;
+    }
+    .btn-primary { @apply bg-brand text-white hover:opacity-90; }
+    .btn-ghost { @apply bg-neutral-100 text-neutral-900 hover:bg-neutral-200; }
+    .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+    .badge-ok { @apply bg-emerald-100 text-emerald-900; }
+    .badge-draft { @apply bg-neutral-200 text-neutral-700; }
+    .badge-warn { @apply bg-amber-100 text-amber-900; }
+    .badge-danger { @apply bg-rose-100 text-rose-900; }
+    .tbl { @apply w-full text-sm; }
+    .th { @apply text-left text-neutral-500 font-medium pb-2; }
+    .td { @apply py-3 border-t border-neutral-100 align-top; }
+    .td-num { @apply text-right; }
   </style>
-</head>
 
-<body class="min-h-screen bg-white text-gray-900">
-
-<!-- =================  TOP NAVBAR  ================= -->
-<header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200">
-  <div class="container px-4 py-3 flex items-center justify-between gap-3">
-
-    <!-- Logo -->
-    <a href="{% url 'home' %}" class="flex items-center gap-2 text-xl font-bold text-gray-900">
-      <svg class="w-7 h-7 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.85s-.011 3.584-.069 4.85c-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07s-3.584-.012-4.85-.07c-3.252-.148-4.771-1.691-4.919-4.919-.058-1.265-.069-1.645-.069-4.85s.011-3.584.069-4.85c.149-3.225 1.664-4.771 4.919-4.919C8.416 2.175 8.796 2.163 12 2.163zm0 1.802C9.042 3.965 8.71 3.977 7.433 4.032c-2.43.11-3.483 1.15-3.593 3.593-.056 1.277-.067 1.604-.067 4.375s.011 3.098.067 4.375c.11 2.443 1.163 3.483 3.593 3.593 1.277.056 1.604.067 4.567.067s3.29-.011 4.567-.067c2.43-.11 3.483-1.15 3.593-3.593.056-1.277.067-1.604.067-4.375s-.011-3.098-.067-4.375c-.11-2.443-1.163-3.483-3.593-3.593-1.277-.055-1.604-.067-4.567-.067zM12 6.837c-2.846 0-5.163 2.317-5.163 5.163s2.317 5.163 5.163 5.163 5.163-2.317 5.163-5.163-2.317-5.163-5.163-5.163zm0 8.482c-1.833 0-3.319-1.486-3.319-3.319s1.486-3.319 3.319-3.319 3.319 1.486 3.319 3.319-1.486 3.319-3.319 3.319zm4.332-6.605c-.624 0-1.13.506-1.13 1.13s.506 1.13 1.13 1.13 1.13-.506 1.13-1.13-.506-1.13-1.13-1.13z"/>
-      </svg>
-      PhoneMag
-    </a>
-
-    <!-- Global Search (desktop) -->
-    <form action="{% url 'product_list' %}" method="get" class="hidden md:flex flex-1 max-w-xs">
-      <div class="relative w-full">
-        <input name="q" placeholder="{% trans 'Search IMEI (last 4), brand or model' %}"
-               class="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400">
-        <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-gray-900 px-3 py-1 text-xs text-white">
-          {% trans "Go" %}
-        </button>
-      </div>
-    </form>
-
-    <!-- Right group -->
-    <div class="flex items-center gap-3">
-
-      <!-- Lang switcher -->
-      {% include "components/_lang_switcher.html" %}
-
-      <!-- Owner links -->
-      {% if request.user.is_authenticated and request.user.is_owner %}
-        <a href="{% url 'store_list' %}" class="hidden sm:flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
-          <span>{% trans "Stores" %}</span>
-        </a>
-        <a href="{% url 'seller_list' %}" class="hidden sm:flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-          <span>{% trans "Sellers" %}</span>
-        </a>
-      {% endif %}
-
-      <!-- Auth -->
-      {% if request.user.is_authenticated %}
-        <a href="{% url 'logout' %}" class="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-          <span class="hidden sm:inline">{% trans "Logout" %}</span>
-        </a>
-      {% else %}
-        <a href="{% url 'login' %}" class="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
-          <span class="hidden sm:inline">{% trans "Login" %}</span>
-        </a>
-      {% endif %}
-
-    </div>
-  </div>
-</header>
-
-<!-- =================  FLASH MESSAGES  ================= -->
-<div class="container px-4 mt-4 space-y-2">
-  {% if messages %}
-    {% for m in messages %}
-      <div class="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm
-        {% if m.tags == 'success' %}bg-green-50 border-green-200 text-green-800
-        {% elif m.tags == 'error' %}bg-red-50 border-red-200 text-red-800
-        {% elif m.tags == 'warning' %}bg-amber-50 border-amber-200 text-amber-800
-        {% else %}bg-gray-50 border-gray-200 text-gray-800{% endif %}">
-        <!-- icon -->
-        {% if m.tags == 'success' %}
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        {% elif m.tags == 'error' %}
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        {% else %}
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        {% endif %}
-        <span>{{ m }}</span>
-      </div>
-    {% endfor %}
-  {% endif %}
-</div>
-
-<!-- =================  PAGE HEADER  ================= -->
-<div class="container px-4 mt-4">
-  <h1 class="text-xl font-bold text-gray-900"></h1>
-</div>
-
-<!-- =================  MAIN CONTENT  ================= -->
-<main class="container px-4 py-4 mb-24 sm:mb-0">
-  {% block content %}{% endblock %}
-</main>
-
-<!-- =================  BOTTOM NAV (mobile only)  ================= -->
-<footer class="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200 sm:hidden">
-  {% include "components/_bottom_nav.html" %}
-</footer>
-
+  {% block extra_js %}{% endblock %}
 </body>
 </html>

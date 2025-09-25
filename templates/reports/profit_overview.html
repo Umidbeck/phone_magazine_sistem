@@ -1,0 +1,112 @@
+# reports/profit_overview.html
+{% extends "base.html" %}
+{% block title %}Foyda & Kassa · PhoneStore{% endblock %}
+{% block content %}
+<div class="card p-5">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Foyda & Kassa</h1>
+  </div>
+
+  <form method="get" class="grid md:grid-cols-6 gap-3 mb-6">
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Period</label>
+      <select name="period" class="w-full rounded-xl border-neutral-300">
+        <option value="day"   {% if period == "day" %}selected{% endif %}>Kunlik</option>
+        <option value="week"  {% if period == "week" %}selected{% endif %}>Haftalik</option>
+        <option value="month" {% if period == "month" %}selected{% endif %}>Oylik</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Kunlar (7..730)</label>
+      <input type="number" name="days" min="7" max="730" value="{{ days }}" class="w-full rounded-xl border-neutral-300">
+    </div>
+    {% if request.user.is_owner %}
+      <div class="md:col-span-4">
+        <label class="block text-xs text-neutral-500 mb-1">Do‘konlar</label>
+        <select name="stores" multiple class="w-full rounded-xl border-neutral-300 h-28">
+          {% for s in stores %}
+            <option value="{{ s.id }}" {% if store_ids and s.id in store_ids %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="text-xs text-neutral-500 mt-1">Ctrl/Cmd bilan bir nechta tanlang</div>
+      </div>
+    {% endif %}
+    <div class="md:col-span-6">
+      <button class="btn btn-ghost">Filter</button>
+    </div>
+  </form>
+
+  <div class="grid md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+    <div class="rounded-2xl bg-neutral-900 text-white p-4">
+      <div class="text-xs text-neutral-300">Umumiy savdo</div>
+      <div class="text-2xl font-bold">{{ total_sales }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border p-4">
+      <div class="text-xs text-neutral-500">Brutto profit</div>
+      <div class="text-2xl font-bold">{{ total_profit }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border p-4">
+      <div class="text-xs text-neutral-500">Rashod (appr.)</div>
+      <div class="text-2xl font-bold">{{ total_expense }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border p-4">
+      <div class="text-xs text-neutral-500">Komissiya</div>
+      <div class="text-2xl font-bold">{{ total_commission }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border p-4">
+      <div class="text-xs text-neutral-500">Cons. payout</div>
+      <div class="text-2xl font-bold">{{ total_cons }}</div>
+    </div>
+    <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
+      <div class="text-xs text-emerald-700">Net foyda</div>
+      <div class="text-2xl font-bold text-emerald-900">{{ total_net }}</div>
+    </div>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-3 mb-6">
+      <div class="rounded-2xl bg-white border p-4">
+        <div class="text-xs text-neutral-500">Kassa — Naqd (kirim)</div>
+        <div class="text-2xl font-bold">{{ cash_in }}</div>
+      </div>
+      <div class="rounded-2xl bg-white border p-4">
+        <div class="text-xs text-neutral-500">Kassa — Karta (kirim)</div>
+        <div class="text-2xl font-bold">{{ card_in }}</div>
+      </div>
+      <div class="rounded-2xl bg-neutral-900 text-white p-4">
+        <div class="text-xs text-neutral-300">Kassa — Jami</div>
+        <div class="text-2xl font-bold">{{ kassa_total }}</div>
+      </div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="tbl">
+      <thead>
+        <tr class="border-b border-neutral-200">
+          <th class="th">Period</th>
+          <th class="th td-num">Sales</th>
+          <th class="th td-num">Profit</th>
+          <th class="th td-num">Expense</th>
+          <th class="th td-num">Commission</th>
+          <th class="th td-num">Cons. payout</th>
+          <th class="th td-num">Net</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="td">{{ r.period }}</td>
+            <td class="td td-num">{{ r.sales }}</td>
+            <td class="td td-num">{{ r.profit }}</td>
+            <td class="td td-num">{{ r.expense }}</td>
+            <td class="td td-num">{{ r.commission }}</td>
+            <td class="td td-num">{{ r.consignment }}</td>
+            <td class="td td-num font-semibold">{{ r.net }}</td>
+          </tr>
+        {% empty %}
+          <tr><td class="td text-neutral-500" colspan="7">Ma’lumot yo‘q</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

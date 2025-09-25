@@ -1,3 +1,4 @@
+
 {% load i18n %}
 <!DOCTYPE html>
 <html>
@@ -33,7 +34,7 @@
         <td>{{ p.store.name }}</td>
         <td>{{ p.brand.name }}</td>
         <td>{{ p.model.name }}</td>
-        <td>{{ p.color.name if p.color }}</td>
+        <td>{% if p.color %}{{ p.color.name }}{% endif %}</td>
         <td>{{ p.imei_full }}</td>
         <td>{{ p.ownership }}</td>
         <td>{{ p.purchase_price }}</td>

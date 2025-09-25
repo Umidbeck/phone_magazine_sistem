@@ -1,6 +1,7 @@
 # inventory/views.py
 import csv
 import datetime
+import io
 from decimal import Decimal, InvalidOperation
 
 import pandas as pd
@@ -8,23 +9,26 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q, Model
+from django.db.models import Q, Model, Sum, When, Case, F
 from django.db.models.functions import Right, Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _
+from openpyxl import load_workbook
 from weasyprint import HTML
 
-from accounts.models import Store
+from accounts.models import Store, User
 from reference.models import Brand, ModelName, Color
-from sales.models import Transaction
+from sales.models import Transaction, SellerCommission
 from .forms import (
     ProductCreateForm,
     BatchIntakeForm,
     BatchItemForm,
-    ExcelImportForm,
+    ExcelImportForm, ImportExcelForm,
 )
+from .mixins import can_edit_product
 from .models import Product, ProductImage
 from .search_utils import product_search_queryset
 
@@ -72,59 +76,70 @@ def product_list(request):
 
 @login_required
 def product_create(request):
+    instance = None
+    edit_id = request.GET.get("edit")
+    if edit_id:
+        # edit rejimi uchun instance
+        qs = Product.objects.all()
+        if not request.user.is_owner:
+            qs = qs.filter(created_by_id=request.user.id)
+        instance = get_object_or_404(qs.select_related("brand","model","store"), pk=edit_id)
+
     if request.method == "POST":
-        form = ProductCreateForm(request.POST, request.FILES, user=request.user)
+        # edit bo‘lsa POST ichidan ham instance id kelsa olish mumkin
+        if request.POST.get("id"):
+            qs = Product.objects.all()
+            if not request.user.is_owner:
+                qs = qs.filter(created_by_id=request.user.id)
+            instance = get_object_or_404(qs, pk=request.POST.get("id"))
+
+        form = ProductCreateForm(request.POST, request.FILES, user=request.user, instance=instance)
         if form.is_valid():
             with transaction.atomic():
                 p: Product = form.save(commit=False)
 
+                # Store siyosati
                 if request.user.is_owner:
-                    # OWNER: formdan store kelishi shart
                     if not p.store_id:
                         messages.error(request, _("Select a store."))
                         return render(request, "inventory/product_create.html", {"form": form})
                 else:
-                    # SELLER: agar user.store bor — majburan o‘shani yozamiz
+                    # seller — tayinlangan bo‘lsa majburiy o‘sha, bo‘lmasa formdan
                     if getattr(request.user, "store_id", None):
                         p.store = request.user.store
-                    else:
-                        # Sellerda store yo‘q — formdan tanlaganini qoldiramiz (fallback)
-                        if not p.store_id:
-                            messages.error(request, _("Select a store."))
-                            return render(request, "inventory/product_create.html", {"form": form})
+                    elif not p.store_id:
+                        messages.error(request, _("Select a store."))
+                        return render(request, "inventory/product_create.html", {"form": form})
 
-                p.created_by = request.user
+                if not instance:
+                    p.created_by = request.user  # faqat yangi yaratilganda
                 p.save()
-                if form.is_valid():
-                    with transaction.atomic():
-                        p: Product = form.save(commit=False)
-                        ...
-                        p.created_by = request.user
-                        p.save()
 
-                        # p.save() dan keyin:
-                        def _save_images(files, kind, set_primary=False):
-                            first = True
-                            for f in files:
-                                pi = ProductImage.objects.create(product=p, image=f, kind=kind)
-                                if set_primary and first:
-                                    pi.is_primary = True
-                                    pi.save(update_fields=["is_primary"])
-                                    first = False
+                # Rasmlar
+                def _save_images(files, kind, set_primary=False):
+                    first = True
+                    for f in files:
+                        pi = ProductImage.objects.create(product=p, image=f, kind=kind)
+                        if set_primary and first:
+                            pi.is_primary = True
+                            pi.save(update_fields=["is_primary"])
+                            first = False
 
-                        _save_images(request.FILES.getlist("doc_images"), "doc", set_primary=False)
-                        _save_images(request.FILES.getlist("cond_images"), "cond", set_primary=True)
-                        _save_images(request.FILES.getlist("images"), "other", set_primary=False)
+                _save_images(request.FILES.getlist("doc_images"), "doc", set_primary=False)
+                _save_images(request.FILES.getlist("cond_images"), "cond", set_primary=True if not instance else False)
+                _save_images(request.FILES.getlist("images"), "other", set_primary=False)
 
-            messages.success(request, _("Product added successfully."))
+            messages.success(request, _("Saved successfully."))
+            if instance:
+                return redirect("product_detail", pk=p.id)
             return redirect("product_create")
         else:
-            # xatolarni ko‘rinadigan qilish
             messages.error(request, "; ".join([" ".join(v) for v in form.errors.values()]))
     else:
-        form = ProductCreateForm(user=request.user)
+        form = ProductCreateForm(user=request.user, instance=instance)
 
-    return render(request, "inventory/product_create.html", {"form": form})
+    return render(request, "inventory/product_create.html", {"form": form, "editing": bool(instance), "obj": instance})
+
 
 
 
@@ -465,24 +480,70 @@ def home_feed(request):
 
 @login_required
 def inventory_search(request):
-    """
-    Faqat qidiruv (IMEI oxirgi 4 yoki to‘liq IMEI). Natija -> detail orqali sotish/repair.
-    """
     q = (request.GET.get("q") or "").strip()
-    results = []
-    if q:
-        base_qs = Product.objects.select_related("brand", "model", "store")
-        qs = product_search_queryset(
-            request.user,
-            q,
-            base_qs=base_qs.order_by("-created_at"),
-            for_sale=False,
-            include_archived=False,
-            store_id=None,
-        )
-        results = list(qs[:50])
+    store_id = request.GET.get("store_id") or ""
+    brand_id = request.GET.get("brand") or ""
+    model_id = request.GET.get("model") or ""
+    status = request.GET.get("status") or ""
+    ownership = request.GET.get("ownership") or ""
+    date_from = request.GET.get("date_from") or ""
+    date_to   = request.GET.get("date_to") or ""
+    price_min = request.GET.get("price_min") or ""
+    price_max = request.GET.get("price_max") or ""
+    is_new_val = True if request.GET.get("is_new") == "1" else False
+    has_docs_val = True if request.GET.get("has_documents") == "1" else False
 
-    return render(request, "inventory/search.html", {"q": q, "results": results})
+    base_qs = Product.objects.select_related("brand","model","store").order_by("-created_at")
+    if q:
+        qs = product_search_queryset(request.user, q, base_qs=base_qs, for_sale=False, include_archived=False, store_id=None)
+    else:
+        qs = base_qs
+        if not request.user.is_owner:
+            qs = qs.filter(store_id=request.user.store_id)
+
+    if store_id:
+        qs = qs.filter(store_id=store_id if request.user.is_owner else request.user.store_id)
+    if brand_id:
+        qs = qs.filter(brand_id=brand_id)
+    if model_id:
+        qs = qs.filter(model_id=model_id)
+    if status in ("available","on_repair","sold"):
+        qs = qs.filter(status=status)
+    if ownership in ("owned","consignment"):
+        qs = qs.filter(ownership=ownership)
+
+    def _pdate(s):
+        try: return datetime.strptime(s, "%Y-%m-%d").date()
+        except: return None
+    df = _pdate(date_from); dt = _pdate(date_to)
+    if df: qs = qs.filter(created_at__date__gte=df)
+    if dt: qs = qs.filter(created_at__date__lte=dt)
+
+    # price va flaglar
+    qs = qs.annotate(price_for_filter=Case(
+        When(ownership="owned", then=F("purchase_price")),
+        When(ownership="consignment", then=F("consignment_price")),
+        default=F("purchase_price"),
+    ))
+    if price_min: qs = qs.filter(price_for_filter__gte=price_min)
+    if price_max: qs = qs.filter(price_for_filter__lte=price_max)
+    if is_new_val: qs = qs.filter(is_new=True)
+    if has_docs_val: qs = qs.filter(has_documents=True)
+
+    stores = Store.objects.filter(is_active=True).order_by("name")
+    brands = Brand.objects.filter(is_active=True).order_by("name")
+    models = ModelName.objects.filter(is_active=True).order_by("brand__name","name")
+
+    ctx = {
+        "q": q, "results": list(qs[:200]),
+        "stores": stores, "brands": brands, "models": models,
+        "store_id": store_id, "brand_id": brand_id, "model_id": model_id,
+        "status": status, "ownership": ownership,
+        "date_from": date_from, "date_to": date_to,
+        "price_min": price_min, "price_max": price_max,
+        "is_new_val": is_new_val, "has_docs_val": has_docs_val,
+    }
+    return render(request, "inventory/search.html", ctx)
 
 
 @login_required
@@ -520,3 +581,307 @@ def product_detail(request, pk):
 
     return render(request, "inventory/product_detail.html", {"p": p, "can_edit": can_edit})
 
+@login_required
+def product_edit(request, pk):
+    qs = Product.objects.select_related("brand","model","store")
+    p = get_object_or_404(qs, pk=pk)
+    if not can_edit_product(request.user, p):
+        messages.error(request, _("You cannot edit this product."))
+        return redirect("product_detail", pk=pk)
+
+    if request.method == "POST":
+        form = ProductCreateForm(request.POST, request.FILES, user=request.user, instance=p)
+        if form.is_valid():
+            with transaction.atomic():
+                p = form.save()
+                # rasmlar qo‘shish (limit form.clean’da tekshirildi)
+                def _save_images(files, kind, set_primary=False):
+                    first = True
+                    for f in files:
+                        pi = ProductImage.objects.create(product=p, image=f, kind=kind)
+                        if set_primary and first:
+                            pi.is_primary = True
+                            pi.save(update_fields=["is_primary"])
+                            first = False
+
+                _save_images(request.FILES.getlist("doc_images"), "doc", set_primary=False)
+                _save_images(request.FILES.getlist("cond_images"), "cond", set_primary=False)
+                _save_images(request.FILES.getlist("images"), "other", set_primary=False)
+            messages.success(request, _("Updated."))
+            return redirect("product_detail", pk=p.id)
+        else:
+            messages.error(request, _("Fix errors."))
+    else:
+        form = ProductCreateForm(user=request.user, instance=p)
+
+    return render(request, "inventory/product_create.html", {"form": form, "editing": True, "obj": p})
+
+@login_required
+def my_acquisitions(request):
+    qs = Product.objects.select_related("brand","model","store")\
+            .filter(created_by_id=request.user.id).order_by("-created_at")
+    return render(request, "accounts/my_acquisitions.html", {"rows": qs[:500]})
+
+@login_required
+def my_stats(request):
+    # period: day/week/month/year
+    period = (request.GET.get("period") or "month")
+    today = datetime.date.today()
+    if period == "day":
+        df = today
+    elif period == "week":
+        df = today - datetime.timedelta(days=6)
+    elif period == "year":
+        df = today - datetime.timedelta(days=364)
+    else:  # month
+        df = today - datetime.timedelta(days=29)
+
+    sales = (Transaction.objects
+             .filter(type="sale", seller_id=request.user.id, created_at__date__range=(df, today)))
+    expenses = (Transaction.objects
+                .filter(type="expense", seller_id=request.user.id, created_at__date__range=(df, today)))
+
+    sales_count = sales.count()
+    sales_sum = sales.aggregate(s=Sum("amount"))["s"] or 0
+    cost_sum = sales.aggregate(s=Sum("cost"))["s"] or 0
+    profit_sum = sales.aggregate(s=Sum("profit"))["s"] or 0
+
+    my_expenses = expenses.aggregate(s=Sum("amount"))["s"] or 0
+
+    commissions = (SellerCommission.objects
+                   .filter(seller_id=request.user.id, transaction__created_at__date__range=(df, today)))
+    commission_total = commissions.aggregate(s=Sum("amount"))["s"] or 0
+    commission_paid = commissions.filter(is_paid=True).aggregate(s=Sum("amount"))["s"] or 0
+
+    acquired_count = Product.objects.filter(created_by_id=request.user.id, created_at__date__range=(df, today)).count()
+
+    ctx = dict(
+        period=period, date_from=df, date_to=today,
+        sales_count=sales_count, sales_sum=sales_sum, cost_sum=cost_sum, profit_sum=profit_sum,
+        my_expenses=my_expenses,
+        commission_total=commission_total, commission_paid=commission_paid,
+        acquired_count=acquired_count,
+    )
+    return render(request, "accounts/my_stats.html", ctx)
+
+@login_required
+def import_products_excel(request):
+    """
+    Excel headerlar: brand, model, color, year, imei_full, ownership, purchase_price,
+                     consignment_price, has_documents, is_new, defect, battery_pct, owner_name, owner_phone
+    """
+    from reference.models import Brand, ModelName, Color
+
+    if request.method == "POST":
+        form = ImportExcelForm(request.POST, request.FILES)
+        if form.is_valid():
+            store = form.cleaned_data["store"]
+            data = form.cleaned_data["file"].read()
+            wb = load_workbook(io.BytesIO(data))
+            ws = wb.active
+
+            header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+            expected = ["brand","model","color","year","imei_full","ownership",
+                        "purchase_price","consignment_price","has_documents","is_new",
+                        "defect","battery_pct","owner_name","owner_phone"]
+            missing = [h for h in expected if h not in header]
+            if missing:
+                messages.error(request, _("Missing headers: ") + ", ".join(missing))
+                return render(request, "inventory/import_products_excel.html", {"form": form})
+
+            idx = {name: header.index(name) for name in expected}
+            results, created_count = [], 0
+
+            for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
+                def cell(n):
+                    val = row[idx[n]].value
+                    return val if val is not None else ""
+
+                rr = {"row": i, "status": "ok", "message": ""}
+                try:
+                    brand_name = str(cell("brand")).strip()
+                    model_name = str(cell("model")).strip()
+                    color_name = str(cell("color")).strip()
+                    year = cell("year")
+                    imei_full = str(cell("imei_full")).strip()
+                    ownership = str(cell("ownership")).strip() or "owned"
+                    purchase_price = cell("purchase_price") or 0
+                    consignment_price = cell("consignment_price") or 0
+                    has_documents = bool(int(cell("has_documents") or 0))
+                    is_new = bool(int(cell("is_new") or 0))
+                    defect = str(cell("defect")).strip() or ""
+                    battery_pct = cell("battery_pct") or None
+                    owner_name = str(cell("owner_name")).strip() or ""
+                    owner_phone = str(cell("owner_phone")).strip() or ""
+
+                    if not brand_name or not model_name or not imei_full:
+                        raise ValueError(_("brand/model/imei_full required"))
+
+                    brand = Brand.objects.get(name__iexact=brand_name)
+                    model = ModelName.objects.get(brand=brand, name__iexact=model_name)
+                    color = None
+                    if color_name:
+                        color = Color.objects.get(name__iexact=color_name)
+
+                    if ownership not in ("owned","consignment"):
+                        raise ValueError(_("Ownership must be 'owned' or 'consignment'"))
+
+                    p = Product(
+                        store=store, brand=brand, model=model, color=color, year=year or None,
+                        imei_full=imei_full, ownership=ownership,
+                        purchase_price=Decimal(purchase_price or 0),
+                        consignment_price=Decimal(consignment_price or 0),
+                        has_documents=has_documents, is_new=is_new,
+                        defect=defect or "", battery_pct=battery_pct if battery_pct not in ("", None) else None,
+                        owner_name=owner_name, owner_phone=owner_phone, created_by=request.user,
+                    )
+                    p.save()
+                    created_count += 1
+                except Exception as e:
+                    rr["status"] = "error"
+                    rr["message"] = str(e)
+                results.append(rr)
+
+            messages.success(request, _(f"Imported: {created_count}"))
+            return render(request, "inventory/import_products_result.html", {"results": results})
+        else:
+            messages.error(request, _("Fix form errors."))
+    else:
+        init = {}
+        if not request.user.is_owner and getattr(request.user, "store_id", None):
+            init["store"] = request.user.store_id
+        form = ImportExcelForm(initial=init)
+
+    return render(request, "inventory/import_products_excel.html", {"form": form})
+
+# ==== OLINGAN TELEFONLAR (available/on_repair) ====
+@login_required
+def product_received_list(request):
+    """
+    Olingan telefonlar: status in ['available','on_repair'].
+    Filtrlar: store, brand, model, ownership, is_new, has_documents, date_from/to
+    """
+    qs = (Product.objects
+          .select_related("brand","model","store","created_by")
+          .filter(is_archived=False)
+          .exclude(status="sold")
+          .order_by("-created_at"))
+
+    # Ruxsat
+    if not request.user.is_owner:
+        qs = qs.filter(store_id=request.user.store_id)
+
+    # Filtrlar
+    store_id = request.GET.get("store_id") or ""
+    brand_id = request.GET.get("brand") or ""
+    model_id = request.GET.get("model") or ""
+    ownership = request.GET.get("ownership") or ""
+    status = request.GET.get("status") or ""  # available/on_repair
+    is_new = True if request.GET.get("is_new") == "1" else False
+    has_docs = True if request.GET.get("has_documents") == "1" else False
+
+    def _pdate(s):
+        try: return datetime.datetime.strptime(s, "%Y-%m-%d").date()
+        except: return None
+    date_from = _pdate(request.GET.get("date_from") or "")
+    date_to   = _pdate(request.GET.get("date_to") or "")
+
+    if store_id:
+        qs = qs.filter(store_id=(store_id if request.user.is_owner else request.user.store_id))
+    if brand_id:
+        qs = qs.filter(brand_id=brand_id)
+    if model_id:
+        qs = qs.filter(model_id=model_id)
+    if ownership in ("owned","consignment"):
+        qs = qs.filter(ownership=ownership)
+    if status in ("available","on_repair"):
+        qs = qs.filter(status=status)
+    if is_new:
+        qs = qs.filter(is_new=True)
+    if has_docs:
+        qs = qs.filter(has_documents=True)
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    # Ro‘yxatlar
+    stores = Store.objects.filter(is_active=True).order_by("name")
+    brands = Brand.objects.filter(is_active=True).order_by("name")
+    models = ModelName.objects.filter(is_active=True).order_by("brand__name","name")
+
+    ctx = {
+        "rows": list(qs[:400]),
+        "stores": stores, "brands": brands, "models": models,
+        "store_id": store_id, "brand_id": brand_id, "model_id": model_id,
+        "ownership": ownership, "status": status,
+        "is_new_val": is_new, "has_docs_val": has_docs,
+        "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
+    }
+    return render(request, "inventory/product_received_list.html", ctx)
+
+
+# ==== SOTILGAN TELEFONLAR ====
+# inventory/views.py
+@login_required
+def product_sold_list(request):
+    """
+    1) Transaction(type='sale') (is_void=False, product!=NULL)
+    2) Fallback: Product(status='sold')
+    """
+    df = parse_date(request.GET.get("date_from") or "")
+    dt = parse_date(request.GET.get("date_to") or "")
+    store_id = request.GET.get("store_id") if getattr(request.user, "is_owner", False) else None
+    seller_id = request.GET.get("seller_id") or ""
+
+    tx_qs = (Transaction.objects
+             .select_related("product", "product__brand", "product__model", "store", "seller")
+             .filter(type="sale", is_void=False, product__isnull=False))
+    p_qs = (Product.objects.select_related("brand", "model", "store").filter(status="sold"))
+
+    if not getattr(request.user, "is_owner", False):
+        tx_qs = tx_qs.filter(store_id=request.user.store_id)
+        p_qs = p_qs.filter(store_id=request.user.store_id)
+    elif store_id:
+        tx_qs = tx_qs.filter(store_id=store_id)
+        p_qs = p_qs.filter(store_id=store_id)
+
+    if seller_id:
+        tx_qs = tx_qs.filter(seller_id=seller_id)
+
+    if df:
+        tx_qs = tx_qs.filter(created_at__date__gte=df)
+        p_qs = p_qs.filter(sold_at__date__gte=df)
+    if dt:
+        tx_qs = tx_qs.filter(created_at__date__lte=dt)
+        p_qs = p_qs.filter(sold_at__date__lte=dt)
+
+    tx_map = {t.product_id: t for t in tx_qs}
+    rows = [{"p": t.product, "tx": t} for t in tx_qs]
+    rows += [{"p": p, "tx": None} for p in p_qs.exclude(id__in=tx_map.keys())[:400]]
+    rows.sort(key=lambda r: (r["tx"].created_at if r["tx"] else (r["p"].sold_at or r["p"].updated_at)), reverse=True)
+    rows = rows[:400]
+
+    stores = Store.objects.order_by("name") if getattr(request.user, "is_owner", False) else None
+    sellers = User.objects.filter(is_active=True).order_by("username") if getattr(request.user, "is_owner", False) else None
+
+    return render(request, "inventory/product_sold_list.html", {
+        "rows": rows, "stores": stores, "sellers": sellers,
+        "store_id": store_id or "", "seller_id": seller_id or "",
+        "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
+    })
+
+
+
+def _sold_list_ctx_base(request, rows, store_id, brand_id, model_id, seller_id, payment_type, date_from, date_to):
+    stores = Store.objects.filter(is_active=True).order_by("name")
+    brands = Brand.objects.filter(is_active=True).order_by("name")
+    models = ModelName.objects.filter(is_active=True).order_by("brand__name","name")
+    sellers = User.objects.filter(is_active=True).order_by("username")
+    return {
+        "rows": rows,
+        "stores": stores, "brands": brands, "models": models, "sellers": sellers,
+        "store_id": store_id, "brand_id": brand_id, "model_id": model_id, "seller_id": seller_id,
+        "payment_type": payment_type,
+        "date_from": date_from, "date_to": date_to,
+    }

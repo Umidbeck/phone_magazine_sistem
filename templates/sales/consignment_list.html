@@ -1,34 +1,47 @@
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Consignment due" %}{% endblock %}
+# sales/consignment_list.html
+{% extends "base.html" %}
+{% block title %}Do‘kon qarzlari (Consignment) · PhoneStore{% endblock %}
 {% block content %}
-<div class="p-3">
-  <div class="bg-white border rounded-xl">
-    <table class="w-full text-sm">
+<div class="card p-4">
+  <h1 class="text-xl font-semibold mb-4">Do‘kon qarzlari (Consignment)</h1>
+  <div class="overflow-x-auto">
+    <table class="tbl">
       <thead>
-        <tr class="text-left border-b">
-          <th class="p-2">{% trans "Product" %}</th>
-          <th class="p-2">{% trans "Due" %}</th>
-          <th class="p-2">{% trans "Paid" %}</th>
-          <th class="p-2"></th>
+        <tr class="border-b border-neutral-200">
+          <th class="th">Telefon</th>
+          <th class="th td-num">Egasiga (base)</th>
+          <th class="th td-num">Berilgan</th>
+          <th class="th td-num">Qolgan</th>
+          <th class="th">Holat</th>
+          <th class="th">Harakat</th>
         </tr>
       </thead>
       <tbody>
         {% for r in rows %}
-          <tr class="border-b">
-            <td class="p-2">{{ r.product.brand.name }} {{ r.product.model.name }} — {{ r.product.imei_full }}</td>
-            <td class="p-2">{{ r.due }}</td>
-            <td class="p-2">{{ r.paid }}</td>
-            <td class="p-2">
-              <a class="text-xs px-2 py-1 border rounded hover:bg-gray-50"
-                 href="{% url 'consignment_payout' r.product.id %}">{% trans "Payout" %}</a>
+          <tr>
+            <td class="td">
+              {{ r.due.product.brand.name }} {{ r.due.product.model.name }} ({{ r.due.product.imei_full }})
+            </td>
+            <td class="td td-num">{{ r.due.base_amount }}</td>
+            <td class="td td-num">{{ r.paid }}</td>
+            <td class="td td-num"><span class="badge badge-warn">{{ r.remaining }}</span></td>
+            <td class="td">
+              {% if r.due.is_approved %}<span class="badge badge-ok">Approved</span>
+              {% else %}<span class="badge badge-draft">Draft</span>{% endif %}
+            </td>
+            <td class="td">
+              {% if row.product_id %}
+                <a class="btn btn-primary" href="{% url 'cons_due_approve' row.product_id %}">Tasdiqlash</a>
+              {% else %}
+                <span class="text-neutral-400">—</span>
+              {% endif %}
             </td>
           </tr>
         {% empty %}
-          <tr><td class="p-3 text-sm text-gray-500" colspan="4">{% trans "No due items" %}</td></tr>
+          <tr><td class="td text-neutral-500" colspan="6">Ma’lumot yo‘q</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <div class="h-24"></div>
 </div>
 {% endblock %}

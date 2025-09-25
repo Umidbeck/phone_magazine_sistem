@@ -1,13 +1,61 @@
+# inventor/search.html
 {% extends "base.html" %}{% load i18n %}
 {% block header_title %}{% trans "Search" %}{% endblock %}
 {% block content %}
 <div class="p-3 space-y-3">
-  <form method="get" class="bg-white border rounded-xl p-3">
+
+  <form method="get" class="bg-white border rounded-xl p-3 space-y-3">
     <div class="flex gap-2 items-center">
       <input name="q" value="{{ q }}" placeholder="{% trans 'IMEI (last 4), brand, model' %}" class="flex-1 border rounded-lg px-3 py-2">
       <button class="px-4 py-2 bg-black text-white rounded-lg">{% trans "Search" %}</button>
     </div>
-    <div class="text-xs text-gray-500 mt-2">{% trans "Tip: Type last 4 digits for fast lookup." %}</div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <select name="store_id" class="border rounded-lg px-3 py-2 {% if not request.user.is_owner %}opacity-50 pointer-events-none{% endif %}">
+        <option value="">{% trans "All stores" %}</option>
+        {% for s in stores %}
+          <option value="{{ s.id }}" {% if store_id|default:''|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="brand" class="border rounded-lg px-3 py-2">
+        <option value="">{% trans "All brands" %}</option>
+        {% for b in brands %}
+          <option value="{{ b.id }}" {% if brand_id|default:''|stringformat:"s" == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="model" class="border rounded-lg px-3 py-2">
+        <option value="">{% trans "All models" %}</option>
+        {% for m in models %}
+          <option value="{{ m.id }}" {% if model_id|default:''|stringformat:"s" == m.id|stringformat:"s" %}selected{% endif %}>{{ m.brand.name }} {{ m.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="status" class="border rounded-lg px-3 py-2">
+        <option value="">{% trans "Any status" %}</option>
+        <option value="available" {% if status == "available" %}selected{% endif %}>{% trans "Available" %}</option>
+        <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>{% trans "On repair" %}</option>
+        <option value="sold" {% if status == "sold" %}selected{% endif %}>{% trans "Sold" %}</option>
+      </select>
+      <select name="ownership" class="border rounded-lg px-3 py-2">
+        <option value="">{% trans "Any ownership" %}</option>
+        <option value="owned" {% if ownership == "owned" %}selected{% endif %}>{% trans "Owned" %}</option>
+        <option value="consignment" {% if ownership == "consignment" %}selected{% endif %}>{% trans "Consignment" %}</option>
+      </select>
+      <input type="date" name="date_from" value="{{ date_from }}" class="border rounded-lg px-3 py-2">
+      <input type="date" name="date_to" value="{{ date_to }}" class="border rounded-lg px-3 py-2">
+    </div>
+    <div class="flex items-center gap-4">
+      <label class="text-xs flex items-center gap-2">
+        <input type="checkbox" name="is_new" value="1" {% if is_new_val %}checked{% endif %}> {% trans "New" %}
+      </label>
+      <label class="text-xs flex items-center gap-2">
+        <input type="checkbox" name="has_documents" value="1" {% if has_docs_val %}checked{% endif %}> {% trans "Has documents" %}
+      </label>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <input type="number" step="0.01" name="price_min" value="{{ price_min }}" class="border rounded-lg px-3 py-2" placeholder="{% trans 'Min price' %}">
+      <input type="number" step="0.01" name="price_max" value="{{ price_max }}" class="border rounded-lg px-3 py-2" placeholder="{% trans 'Max price' %}">
+    </div>
   </form>
 
   <div class="space-y-2">

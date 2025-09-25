@@ -1,0 +1,52 @@
+# inventor/product_sold_list.html
+{% extends "base.html" %}
+{% block title %}Sotilgan telefonlar · PhoneStore{% endblock %}
+{% block content %}
+<div class="card p-5">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Sotilgan telefonlar</h1>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="tbl">
+      <thead>
+        <tr class="border-b border-neutral-200">
+          <th class="th">Model</th>
+          <th class="th">Store</th>
+          <th class="th">Seller</th>
+          <th class="th td-num">Narx</th>
+          <th class="th">Harakat</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td class="td">
+              {% if row.p %}{{ row.p.brand.name }} {{ row.p.model.name }}{% else %}-{% endif %}
+            </td>
+            <td class="td">{% if row.tx %}{{ row.tx.store.name }}{% else %}{{ row.p.store.name }}{% endif %}</td>
+            <td class="td">{% if row.tx %}{{ row.tx.seller.username }}{% else %}-{% endif %}</td>
+            <td class="td td-num">{% if row.tx %}{{ row.tx.amount }}{% else %}-{% endif %}</td>
+            <td class="td">
+              {% if request.user.is_owner %}
+                {% if row.tx %}
+                  <a class="btn btn-ghost" href="{% url 'sale_return_tx' row.tx.id %}"
+                     onclick="return confirm('Ushbu sotuvni qaytarilsinmi?');">Qaytarish</a>
+                {% else %}
+                  <a class="btn btn-ghost" href="{% url 'sale_return_product' row.p.id %}"
+                     onclick="return confirm('Transaction topilmadi. Faqat product holati tiklanadi. Davom?');">Qaytarish</a>
+                {% endif %}
+              {% endif %}
+              {% if row.p %}
+                <a class="btn btn-ghost" href="{% url 'product_detail' row.p.id %}">Ochilish</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td class="td text-neutral-500" colspan="5">Ma’lumot yo‘q</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

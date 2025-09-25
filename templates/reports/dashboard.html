@@ -1,118 +1,78 @@
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Owner Dashboard" %}{% endblock %}
+# reports/dashboard.html
+{% extends "base.html" %}
+{% block title %}Dashboard · PhoneStore{% endblock %}
 {% block content %}
-<div class="p-4 space-y-4">
-
-  <form method="get" class="bg-white border rounded-xl p-3">
-    <div class="flex items-center gap-2">
-      <label class="text-sm">{% trans "Period" %}</label>
-      <select name="days" class="border rounded-lg px-3 py-2">
-        <option value="7" {% if days == 7 %}selected{% endif %}>7</option>
-        <option value="30" {% if days == 30 %}selected{% endif %}>30</option>
-        <option value="90" {% if days == 90 %}selected{% endif %}>90</option>
-      </select>
-      <button class="px-3 py-2 bg-black text-white rounded-lg">{% trans "Apply" %}</button>
-    </div>
-  </form>
-
-  <!-- Cards -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-    <div class="bg-white border rounded-xl p-4">
-      <div class="text-xs text-gray-500">{% trans "Period" %}</div>
-      <div class="text-sm font-semibold">{{ date_from }} — {{ date_to }}</div>
-    </div>
-    <div class="bg-white border rounded-xl p-4">
-      <div class="text-xs text-gray-500">{% trans "Top store (sales)" %}</div>
-      <div class="text-sm font-semibold">
-        {% if top_stores %}{{ top_stores.0.store__name }} — {{ top_stores.0.s }}{% else %}-{% endif %}
-      </div>
-    </div>
-    <div class="bg-white border rounded-xl p-4">
-      <div class="text-xs text-gray-500">{% trans "Top brand (sales)" %}</div>
-      <div class="text-sm font-semibold">
-        {% if top_brands %}{{ top_brands.0.product__brand__name }} — {{ top_brands.0.s }}{% else %}-{% endif %}
-      </div>
-    </div>
-  </div>
-    <!-- net profit & debts cards (period cards yoniga) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-      <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Net profit" %}</div><div class="text-sm font-semibold">{{ net_profit }}</div></div>
-      <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Unpaid debts" %}</div><div class="text-sm font-semibold">{{ debts_unpaid }}</div></div>
-      <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Consignment payouts" %}</div><div class="text-sm font-semibold">{{ cons_payouts_sum }}</div></div>
-    </div>
-
-    <!-- expenses breakdown -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-      <div class="bg-white border rounded-xl p-4">
-        <div class="text-sm font-semibold mb-2">{% trans "Expenses by store" %}</div>
-        <ul class="text-sm space-y-1">
-          {% for r in exp_by_store %}<li class="flex justify-between"><span>{{ r.store__name }}</span><span>{{ r.s }}</span></li>{% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
-        </ul>
-      </div>
-      <div class="bg-white border rounded-xl p-4">
-        <div class="text-sm font-semibold mb-2">{% trans "Expenses by seller" %}</div>
-        <ul class="text-sm space-y-1">
-          {% for r in exp_by_seller %}<li class="flex justify-between"><span>{{ r.seller__username }}</span><span>{{ r.s }}</span></li>{% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
-        </ul>
-      </div>
-      <div class="bg-white border rounded-xl p-4">
-        <div class="text-sm font-semibold mb-2">{% trans "Expenses by type" %}</div>
-        <ul class="text-sm space-y-1">
-          {% for r in exp_by_type %}<li class="flex justify-between"><span>{{ r.expense_type__name }}</span><span>{{ r.s }}</span></li>{% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
-        </ul>
+<div class="grid lg:grid-cols-3 gap-6">
+  <section class="lg:col-span-2 space-y-6">
+    <div class="card p-5">
+      <h2 class="text-lg font-semibold mb-4">Oxirgi {{ days }} kun</h2>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="rounded-2xl bg-neutral-900 text-white p-4">
+          <div class="text-xs text-neutral-300">Sales</div>
+          <div class="text-2xl font-bold">{{ sales_sum }}</div>
+        </div>
+        <div class="rounded-2xl bg-white border border-neutral-200 p-4">
+          <div class="text-xs text-neutral-500">Profit</div>
+          <div class="text-2xl font-bold">{{ profit_sum }}</div>
+        </div>
+        <div class="rounded-2xl bg-white border border-neutral-200 p-4">
+          <div class="text-xs text-neutral-500">Expenses (approved)</div>
+          <div class="text-2xl font-bold">{{ expense_sum }}</div>
+        </div>
+        <div class="rounded-2xl bg-white border border-neutral-200 p-4">
+          <div class="text-xs text-neutral-500">Net Profit</div>
+          <div class="text-2xl font-bold">{{ net_profit }}</div>
+        </div>
       </div>
     </div>
 
-
-  <!-- Line chart -->
-  <div class="bg-white border rounded-xl p-4">
-    <div class="text-sm font-semibold mb-2">{% trans "Daily sales (amount)" %}</div>
-    <canvas id="salesLine"></canvas>
-  </div>
-
-  <!-- TOP tables -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-    <div class="bg-white border rounded-xl p-4">
-      <div class="text-sm font-semibold mb-2">{% trans "Top stores" %}</div>
-      <ul class="text-sm space-y-1">
-        {% for r in top_stores %}
-          <li class="flex justify-between"><span>{{ r.store__name }}</span><span>{{ r.s }}</span></li>
-        {% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
-      </ul>
+    <div class="card p-5">
+      <h3 class="font-semibold mb-2">Kunlik trendlar</h3>
+      <!-- Agar chart.js ishlatmoqchi bo'lsangiz, keyincha qo'shamiz; hozir ro'yxat -->
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+        <div>
+          <div class="text-neutral-500">Sales series</div>
+          <div class="font-mono break-all">{{ series }}</div>
+        </div>
+        <div>
+          <div class="text-neutral-500">Profit series</div>
+          <div class="font-mono break-all">{{ profit_series }}</div>
+        </div>
+        <div>
+          <div class="text-neutral-500">Expenses series</div>
+          <div class="font-mono break-all">{{ expense_series }}</div>
+        </div>
+        <div>
+          <div class="text-neutral-500">Commissions series</div>
+          <div class="font-mono break-all">{{ commission_series }}</div>
+        </div>
+      </div>
     </div>
-    <div class="bg-white border rounded-xl p-4">
-      <div class="text-sm font-semibold mb-2">{% trans "Top brands" %}</div>
-      <ul class="text-sm space-y-1">
-        {% for r in top_brands %}
-          <li class="flex justify-between"><span>{{ r.product__brand__name }}</span><span>{{ r.s }}</span></li>
-        {% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
-      </ul>
-    </div>
-    <div class="bg-white border rounded-xl p-4">
-      <div class="text-sm font-semibold mb-2">{% trans "Top models" %}</div>
-      <ul class="text-sm space-y-1">
-        {% for r in top_models %}
-          <li class="flex justify-between">
-            <span>{{ r.product__brand__name }} {{ r.product__model__name }}</span><span>{{ r.s }}</span>
-          </li>
-        {% empty %}<li class="text-gray-500">{% trans "No data" %}</li>{% endfor %}
-      </ul>
-    </div>
-  </div>
+  </section>
 
-  <div class="h-24"></div>
+  <aside class="space-y-6">
+    <div class="card p-5">
+      <h3 class="font-semibold mb-3">Sana oralig‘i</h3>
+      <form method="get" class="space-y-3">
+        <div>
+          <label class="block text-xs text-neutral-500 mb-1">Kun</label>
+          <input type="number" name="days" min="7" max="90" value="{{ days }}" class="w-full rounded-xl border-neutral-300">
+        </div>
+        <button class="btn btn-primary w-full">Yangilash</button>
+      </form>
+    </div>
+
+    <div class="card p-5">
+      <h3 class="font-semibold mb-3">Komissiyalar</h3>
+      <div class="text-sm">
+        <div class="flex items-center justify-between py-1">
+          <span>Jami</span><span class="font-medium">{{ commission_total }}</span>
+        </div>
+        <div class="flex items-center justify-between py-1">
+          <span>Paid</span><span class="font-medium">{{ commission_paid }}</span>
+        </div>
+      </div>
+    </div>
+  </aside>
 </div>
-
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  const labels = {{ labels|safe }};
-  const series = {{ series|safe }};
-  const ctx = document.getElementById('salesLine').getContext('2d');
-  new Chart(ctx, {
-    type: 'line',
-    data: { labels: labels, datasets: [{ label: 'Sales', data: series, fill:false, tension:0.3 }] },
-    options: { responsive:true, scales:{ y:{ beginAtZero:true } } }
-  });
-</script>
 {% endblock %}

@@ -1,0 +1,29 @@
+# accounts/my_acquisitions.html
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "My acquisitions" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-3">
+  <div class="bg-white border rounded-xl overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b">
+        <th class="p-2">{% trans "Date" %}</th>
+        <th class="p-2">{% trans "Product" %}</th>
+        <th class="p-2">{% trans "Store" %}</th>
+        <th class="p-2">{% trans "Ownership" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for p in rows %}
+          <tr class="border-b">
+            <td class="p-2">{{ p.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="p-2">{{ p.brand.name }} {{ p.model.name }} — {{ p.imei_full }}</td>
+            <td class="p-2">{{ p.store.name }}</td>
+            <td class="p-2">{{ p.ownership }}</td>
+          </tr>
+        {% empty %}
+          <tr><td class="p-3 text-sm text-gray-500" colspan="4">{% trans "No items" %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

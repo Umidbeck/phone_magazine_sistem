@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from django.forms.widgets import ClearableFileInput
 
 from accounts.models import Store
 from .models import Product, ProductImage, BatchIntake
@@ -15,16 +16,33 @@ def digits_only(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
 
 class ProductCreateForm(forms.ModelForm):
-    ...
-    doc_images = forms.FileField(required=False, widget=MultipleFileInput)
-    cond_images = forms.FileField(required=False, widget=MultipleFileInput)
-    images = forms.FileField(required=False, widget=MultipleFileInput)
+    # multi-upload (create/edit ikkalasida ishlaydi)
+    doc_images = forms.FileField(
+        widget=MultipleFileInput(),
+        required=False,
+        label="Dokument rasmlari"
+    )
+
+    # 2) Holat rasmlari – bir nechta
+    cond_images = forms.FileField(
+        widget=MultipleFileInput(),
+        required=False,
+        label="Holat rasmlari"
+    )
+
+    # 3) Asosiy rasm – bir nechta (agar kerak boʻlsa)
+    image = forms.FileField(
+        widget=MultipleFileInput(),
+        required=False,
+        label="Asosiy rasm"
+    )
 
     class Meta:
         model = Product
         fields = [
             "store", "brand", "model", "color", "year",
-            "imei_full", "has_documents", "is_new", "defect", "battery_pct",
+            "imei_full", "has_documents", "is_new",
+            "defect", "battery_pct",
             "ownership", "purchase_price", "consignment_price",
             "owner_name", "owner_phone",
         ]
@@ -32,26 +50,27 @@ class ProductCreateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        # Owner -> store tanlay oladi; Seller -> default store va disabled
-        if self.user and not getattr(self.user, "is_owner", False):
-            if getattr(self.user, "store", None):
-                self.fields["store"].initial = self.user.store
-                self.fields["store"].disabled = True
+        # Owner bo‘lmasa store ni o‘qish uchun chiqarsin, saqlaganda baribir user.store’ga majbur qilamiz
+        self.fields["store"].queryset = Store.objects.filter(is_active=True)
+        self.fields["brand"].queryset = Brand.objects.filter(is_active=True)
+        self.fields["model"].queryset = ModelName.objects.filter(is_active=True)
+        self.fields["color"].queryset = Color.objects.filter(is_active=True)
 
     def clean(self):
         cleaned = super().clean()
-        own = cleaned.get("ownership")
-        if own == "owned" and not cleaned.get("purchase_price"):
-            self.add_error("purchase_price", "Required for owned.")
-        if own == "consignment" and not cleaned.get("consignment_price"):
-            self.add_error("consignment_price", "Required for consignment.")
+        # 7 ta rasm limiti: mavjud + yangi <= 7
+        instance = getattr(self, "instance", None)
+        existing = 0
+        if instance and instance.pk:
+            existing = ProductImage.objects.filter(product=instance).count()
 
-        total = 0
-        for k in ("doc_images", "cond_images", "images"):
-            total += len(self.files.getlist(k))
-        if total > 7:
-            raise forms.ValidationError("Maximum 7 images allowed.")
+        new_count = 0
+        for key in ("doc_images", "cond_images", "images"):
+            files = self.files.getlist(key)
+            new_count += len(files)
 
+        if existing + new_count > 7:
+            raise forms.ValidationError("Rasm cheklovi: jami 7 tadan oshmasin (mavjud + yangi).")
         return cleaned
 
     def clean_imei_full(self):
@@ -109,4 +128,8 @@ class ExcelImportForm(forms.Form):
     imei_col  = forms.CharField(required=False, initial="IMEI")
     price_col = forms.CharField(required=False, initial="NARX")  # purchase or consign decide below
     ownership = forms.ChoiceField(choices=Product.OWNERSHIP, initial="owned")
+
+class ImportExcelForm(forms.Form):
+    file = forms.FileField()
+    store = forms.ModelChoiceField(queryset=Store.objects.filter(is_active=True))
 

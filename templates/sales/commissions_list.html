@@ -1,0 +1,109 @@
+# sales/commissions_list.html
+{% extends "base.html" %}
+{% block title %}Komissiyalar · PhoneStore{% endblock %}
+{% block content %}
+<div class="card p-4">
+  <div class="flex items-center justify-between mb-3">
+    <h1 class="text-xl font-semibold">Sotuvchi komissiyalari</h1>
+  </div>
+
+  <form method="get" class="grid md:grid-cols-6 gap-3 mb-4">
+    {% if request.user.is_owner %}
+      <div class="md:col-span-2">
+        <label class="block text-xs text-neutral-500 mb-1">Sotuvchi</label>
+        <select name="seller_id" class="w-full rounded-xl border-neutral-300">
+          <option value="">Barchasi</option>
+          {% for s in sellers %}
+            <option value="{{ s.id }}" {% if seller_id|default:"" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Tasdiq</label>
+      <select name="approved" class="w-full rounded-xl border-neutral-300">
+        <option value="">Barchasi</option>
+        <option value="1" {% if approved == "1" %}selected{% endif %}>Approved</option>
+        <option value="0" {% if approved == "0" %}selected{% endif %}>Draft</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">To‘lov</label>
+      <select name="paid" class="w-full rounded-xl border-neutral-300">
+        <option value="">Barchasi</option>
+        <option value="1" {% if paid == "1" %}selected{% endif %}>Paid</option>
+        <option value="0" {% if paid == "0" %}selected{% endif %}>Unpaid</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Boshlanish</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border-neutral-300">
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Tugash</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border-neutral-300">
+    </div>
+    <div class="md:col-span-6">
+      <button class="btn btn-ghost">Filter</button>
+    </div>
+  </form>
+
+  <div class="overflow-x-auto">
+    <table class="tbl">
+      <thead>
+        <tr class="border-b border-neutral-200">
+          <th class="th">Sana</th>
+          <th class="th">Sotuvchi</th>
+          <th class="th">Telefon</th>
+          <th class="th td-num">Komissiya</th>
+          <th class="th">Tasdiq</th>
+          <th class="th">To‘lov</th>
+          {% if request.user.is_owner %}<th class="th">Harakat</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="td">{{ r.transaction.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="td">{{ r.seller.username }}</td>
+            <td class="td">
+              {% if r.transaction.product %}
+                {{ r.transaction.product.brand.name }} {{ r.transaction.product.model.name }} ({{ r.transaction.product.imei_full }})
+              {% else %}-{% endif %}
+            </td>
+            <td class="td td-num font-medium">{{ r.amount }}</td>
+            <td class="td">
+              {% if r.is_approved %}<span class="badge badge-ok">Approved</span>
+              {% else %}<span class="badge badge-draft">Draft</span>{% endif %}
+            </td>
+            <td class="td">
+              {% if r.is_paid %}<span class="badge badge-ok">Paid</span>
+              {% else %}<span class="badge badge-warn">Unpaid</span>{% endif %}
+            </td>
+            {% if request.user.is_owner %}
+              <td class="td space-x-2">
+                {% if not r.is_approved %}
+                  <a class="btn btn-primary" href="{% url 'commission_approve' r.id %}">Tasdiqlash</a>
+                  <a class="btn btn-ghost" href="{% url 'commission_reject' r.id %}">Bekor qilish</a>
+                {% endif %}
+                {% if not r.is_paid %}
+                  <a class="btn btn-ghost" href="{% url 'commission_mark_paid' r.id %}">Paid belgilash</a>
+                {% endif %}
+              </td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          <tr><td class="td text-neutral-500" colspan="7">Ma’lumot yo‘q</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="border-t border-neutral-200">
+          <th class="th td-num" colspan="3">Jami</th>
+          <th class="th td-num">{{ total_amount }}</th>
+          <th class="th" colspan="3"></th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}

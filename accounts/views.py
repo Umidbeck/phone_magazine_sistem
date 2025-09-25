@@ -23,7 +23,7 @@ def login_view(request):
         if user:
             login(request, user)
             messages.success(request, _("Welcome, %(name)s!") % {"name": user.get_full_name() or user.username})
-            return redirect("home")
+            return redirect("account_dashboard")
         messages.error(request, _("Invalid username or password."))
     return render(request, "accounts/login.html")
 
@@ -138,7 +138,24 @@ def seller_delete(request, pk):
 
 @login_required
 def account_dashboard(request):
-    return render(request, "accounts/account_dashboard.html", {})
+    today = date.today()
+    df_30 = today - timedelta(days=29)
+
+    sales_qs = Transaction.objects.filter(type="sale", seller_id=request.user.id, created_at__date__range=(df_30, today))
+    expenses_qs = Transaction.objects.filter(type="expense", seller_id=request.user.id, created_at__date__range=(df_30, today))
+    acquired_30 = Product.objects.filter(created_by_id=request.user.id, created_at__date__range=(df_30, today)).count()
+
+    ctx = dict(
+        sales_30=sales_qs.count(),
+        profit_30=sales_qs.aggregate(s=Sum("profit"))["s"] or 0,
+        expenses_30=expenses_qs.aggregate(s=Sum("amount"))["s"] or 0,
+        acquired_30=acquired_30,
+    )
+    return render(request, "accounts/dashboard.html", ctx)
+
+
+
+
 
 @login_required
 def account_stats_user(request):
@@ -194,8 +211,34 @@ def account_stats_user(request):
 
 @login_required
 def my_sales(request):
-    qs = Transaction.objects.select_related("product","store").filter(type="sale", seller=request.user).order_by("-created_at")
-    return render(request, "accounts/my_sales.html", {"rows": qs[:300]})
+    period = (request.GET.get("period") or "month")
+    today = date.today()
+    if period == "day":
+        df = today
+    elif period == "week":
+        df = today - timedelta(days=6)
+    elif period == "year":
+        df = today - timedelta(days=364)
+    else:
+        df = today - timedelta(days=29)
+
+    qs = (Transaction.objects
+          .select_related("product", "product__brand", "product__model", "store", "seller", "commission")
+          .filter(type="sale", seller_id=request.user.id,
+                  created_at__date__range=(df, today))
+          .order_by("-created_at"))
+
+    total_amount = qs.aggregate(s=Sum("amount"))["s"] or 0
+    total_profit = qs.aggregate(s=Sum("profit"))["s"] or 0
+
+    ctx = dict(
+        rows=list(qs[:1000]),
+        total_amount=total_amount,
+        total_profit=total_profit,
+        date_from=df, date_to=today, period=period,
+    )
+    return render(request, "my_sales.html", ctx)
+
 
 @login_required
 def my_commissions(request):

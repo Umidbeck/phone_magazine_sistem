@@ -1,7 +1,9 @@
 # inventory/models.py
+from decimal import Decimal
+
 from django.db import models
 from django.conf import settings
-from django.db.models import Index
+from django.db.models import Index, Sum
 from django.db.models.functions import Right  # <<— MUHIM
 from accounts.models import Store
 from reference.models import Brand, ModelName, Color
@@ -44,13 +46,30 @@ class Product(models.Model):
     owner_name = models.CharField(max_length=80, blank=True)
     owner_phone = models.CharField(max_length=20, blank=True)
 
-    status = models.CharField(max_length=12, choices=STATUS, default="available")
+    status = models.CharField(max_length=20,
+                              choices=(("available", "available"), ("on_repair", "on_repair"), ("sold", "sold")),
+                              default="available")
+    # YANGI:
+    sold_at = models.DateTimeField(null=True, blank=True)  # sotilganda to‘ldiriladi
 
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="products_created")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     is_archived = models.BooleanField(default=False)
+
+    def calc_cost(self) -> Decimal:
+        """
+        Sotuv uchun cost:
+          base = purchase_price (owned) yoki consignment_price (consignment)
+          + shu productga biriktirilgan tasdiqlangan barcha expense (Transaction.type='expense', is_approved=True)
+        """
+        from sales.models import Transaction  # circular importdan qochish
+        base = Decimal(self.purchase_price or 0) if self.ownership == "owned" else Decimal(self.consignment_price or 0)
+        exp = Transaction.objects.filter(
+            type="expense", product_id=self.id, is_approved=True
+        ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
+        return (base + exp).quantize(Decimal("0.01"))
 
     # inventory/models.py (Product ichida)
     def save(self, *args, **kwargs):
