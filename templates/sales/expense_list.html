@@ -1,80 +1,169 @@
-# sales/expense_list.html
 {% extends "base.html" %}
-{% block title %}Rashodlar · PhoneStore{% endblock %}
-{% load widget_tweaks %}
+{% load i18n %}
+
 {% block content %}
-<div class="card p-4">
-  <div class="flex items-center justify-between mb-3">
-    <h1 class="text-xl font-semibold">Rashodlar</h1>
-    <a class="btn btn-primary" href="{% url 'expense_new' %}">Yangi rashod</a>
+<div class="max-w-7xl mx-auto p-4 space-y-6">
+
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-semibold">🧾 {% trans "Rashodlar" %}</h1>
+    <a href="{% url 'expense_new' %}" class="px-4 py-2 rounded-xl bg-black text-white">+ Rashod kiritish</a>
   </div>
 
-  <form method="get" class="grid md:grid-cols-6 gap-3 mb-4">
-    {% if request.user.is_owner %}
-      <div class="md:col-span-2">
-        <label class="block text-xs text-neutral-500 mb-1">Do‘kon</label>
-        <select name="store_id" class="w-full rounded-xl border-neutral-300">
-          <option value="">Barchasi</option>
-          {% for s in stores|default_if_none:"" %}
-            <option value="{{ s.id }}" {% if store_id|default:"" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
+  <!-- Filters -->
+  <form method="get" class="grid md:grid-cols-5 gap-3 bg-white border border-neutral-200 rounded-2xl p-4">
+    {% if stores %}
+    <div>
+      <label class="text-xs text-neutral-500">Do‘kon</label>
+      <select name="store_id" class="w-full rounded-xl border p-2">
+        <option value="">Hammasi</option>
+        {% for s in stores %}
+          <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
     {% endif %}
-    <div class="flex items-center gap-2 mt-6">
-      <label class="inline-flex items-center gap-2">
-        <input type="checkbox" name="approved" value="1" {% if only_approved %}checked{% endif %} class="rounded">
-        <span>Faqat tasdiqlangan</span>
-      </label>
-      <button class="btn btn-ghost">Filter</button>
+    {% if sellers %}
+    <div>
+      <label class="text-xs text-neutral-500">Sotuvchi</label>
+      <select name="seller_id" class="w-full rounded-xl border p-2">
+        <option value="">Hammasi</option>
+        {% for u in sellers %}
+          <option value="{{ u.id }}" {% if seller_id|stringformat:"s" == u.id|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div>
+      <label class="text-xs text-neutral-500">Sana — dan</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border p-2">
+    </div>
+    <div>
+      <label class="text-xs text-neutral-500">Sana — gacha</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border p-2">
+    </div>
+
+    <div class="md:col-span-5 flex justify-end">
+      <button class="px-4 py-2 rounded-xl bg-black text-white">Filtrlash</button>
+      <a href="{% url 'expenses_list' %}" class="ml-2 px-4 py-2 rounded-xl border">Reset</a>
     </div>
   </form>
 
-  <div class="overflow-x-auto">
-    <table class="tbl">
-      <thead>
-        <tr class="border-b border-neutral-200">
-          <th class="th">Sana</th>
-          <th class="th">Do‘kon</th>
-          <th class="th">Sotuvchi</th>
-          <th class="th">Telefon</th>
-          <th class="th td-num">Summa</th>
-          <th class="th">Izoh</th>
-          <th class="th">Holat</th>
-          {% if request.user.is_owner %}<th class="th">Harakat</th>{% endif %}
+  <!-- Big cards -->
+  <div class="grid sm:grid-cols-2 gap-4">
+    <div class="rounded-2xl border bg-white p-4">
+      <div class="text-xs text-neutral-500">Bugun – Tasdiqlangan</div>
+      <div class="text-2xl font-semibold text-emerald-700 mt-1">{{ today_approved }}</div>
+    </div>
+    <div class="rounded-2xl border bg-white p-4">
+      <div class="text-xs text-neutral-500">Bugun – Pending</div>
+      <div class="text-2xl font-semibold text-amber-600 mt-1">{{ today_pending }}</div>
+    </div>
+  </div>
+
+  <!-- Pending -->
+  <div class="rounded-2xl border overflow-x-auto bg-white">
+    <div class="px-4 py-3 text-sm font-semibold border-b bg-amber-50">⏳ Tasdiqlash kutilmoqda</div>
+    <table class="min-w-full text-sm">
+      <thead class="bg-neutral-50 text-neutral-600">
+        <tr>
+          <th class="text-left px-4 py-2">Sana</th>
+          <th class="text-left px-4 py-2">Do‘kon</th>
+          <th class="text-left px-4 py-2">Sotuvchi</th>
+          <th class="text-left px-4 py-2">Turi</th>
+          <th class="text-left px-4 py-2">Telefon</th>
+          <th class="text-right px-4 py-2">Summa</th>
+          <th class="text-left px-4 py-2">Izoh</th>
+          <th class="text-right px-4 py-2">Amal</th>
         </tr>
       </thead>
       <tbody>
-        {% for r in rows %}
-          <tr>
-            <td class="td">{{ r.created_at|date:"Y-m-d H:i" }}</td>
-            <td class="td">{{ r.store.name }}</td>
-            <td class="td">{{ r.seller.username }}</td>
-            <td class="td">
-              {% if r.product %}
-                {{ r.product.brand.name }} {{ r.product.model.name }} ({{ r.product.imei_full }})
-              {% else %}-{% endif %}
+        {% for r in pending %}
+          <tr class="border-t">
+            <td class="px-4 py-2">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="px-4 py-2">{{ r.store.name }}</td>
+            <td class="px-4 py-2">{{ r.seller.username }}</td>
+            <td class="px-4 py-2">{{ r.expense_type.name|default:"-" }}</td>
+            <td class="px-4 py-2">{% if r.product %}{{ r.product.brand.name }} {{ r.product.model.name }} • {{ r.product.imei_full|slice:"-4:" }}{% else %}-{% endif %}</td>
+            <td class="px-4 py-2 text-right font-medium">{{ r.amount }}</td>
+            <td class="px-4 py-2">{{ r.note|default:"" }}</td>
+            <td class="px-4 py-2 text-right">
+              {% if request.user.is_owner %}
+                <form method="post" action="{% url 'expense_approve' r.id %}" class="inline">
+                  {% csrf_token %}
+                  <button class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white">Tasdiqlash</button>
+                </form>
+                <form method="post" action="{% url 'expense_reject' r.id %}" class="inline" onsubmit="return confirm('O‘chirilsinmi?')">
+                  {% csrf_token %}
+                  <button class="px-3 py-1.5 rounded-lg border">Bekor qilish</button>
+                </form>
+              {% else %}
+                <span class="text-neutral-400">Owner tasdiqlaydi</span>
+              {% endif %}
             </td>
-            <td class="td td-num font-medium">{{ r.amount }}</td>
-            <td class="td">{{ r.note|default:"" }}</td>
-            <td class="td">
-              {% if r.is_approved %}<span class="badge badge-ok">Approved</span>
-              {% else %}<span class="badge badge-draft">Draft</span>{% endif %}
-            </td>
-            {% if request.user.is_owner %}
-              <td class="td">
-                {% if not r.is_approved %}
-                  <a class="btn btn-primary" href="{% url 'expense_approve' r.id %}">Tasdiqlash</a>
-                  <a class="btn btn-ghost" href="{% url 'expense_reject' r.id %}">Bekor qilish</a>
-                {% else %}—{% endif %}
-              </td>
-            {% endif %}
           </tr>
         {% empty %}
-          <tr><td class="td text-neutral-500" colspan="8">Ma’lumot yo‘q</td></tr>
+          <tr><td colspan="8" class="px-4 py-6 text-center text-neutral-500">Pending yo‘q</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
+  <!-- Approved -->
+  <div class="rounded-2xl border overflow-x-auto bg-white">
+    <div class="px-4 py-3 text-sm font-semibold border-b bg-emerald-50">✅ Tasdiqlangan</div>
+    <table class="min-w-full text-sm">
+      <thead class="bg-neutral-50 text-neutral-600">
+        <tr>
+          <th class="text-left px-4 py-2">Sana</th>
+          <th class="text-left px-4 py-2">Do‘kon</th>
+          <th class="text-left px-4 py-2">Sotuvchi</th>
+          <th class="text-left px-4 py-2">Turi</th>
+          <th class="text-left px-4 py-2">Telefon</th>
+          <th class="text-right px-4 py-2">Summa</th>
+          <th class="text-left px-4 py-2">Izoh</th>
+          <th class="text-right px-4 py-2">Amal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in approved %}
+          <tr class="border-t">
+            <td class="px-4 py-2">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="px-4 py-2">{{ r.store.name }}</td>
+            <td class="px-4 py-2">{{ r.seller.username }}</td>
+            <td class="px-4 py-2">{{ r.expense_type.name|default:"-" }}</td>
+            <td class="px-4 py-2">{% if r.product %}{{ r.product.brand.name }} {{ r.product.model.name }} • {{ r.product.imei_full|slice:"-4:" }}{% else %}-{% endif %}</td>
+            <td class="px-4 py-2 text-right font-medium">{{ r.amount }}</td>
+            <td class="px-4 py-2">{{ r.note|default:"" }}</td>
+            <td class="px-4 py-2 text-right">
+              {% if request.user.is_owner %}
+                <form method="post" action="{% url 'expense_unapprove' r.id %}">
+                  {% csrf_token %}
+                  <button class="px-3 py-1.5 rounded-lg border">Qaytarish (Unapprove)</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="px-4 py-6 text-center text-neutral-500">Hech narsa yo‘q</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 7/30 kun ko‘rinishlari (sonlar) -->
+  <div class="grid sm:grid-cols-2 gap-4">
+    <div class="rounded-2xl border bg-white p-4">
+      <div class="text-sm font-semibold mb-2">7 kun (Approved vs Pending)</div>
+      <div class="text-sm">Approved: <span class="font-medium">{{ total_appr7 }}</span></div>
+      <div class="text-sm">Pending: <span class="font-medium">{{ total_pend7 }}</span></div>
+    </div>
+    <div class="rounded-2xl border bg-white p-4">
+      <div class="text-sm font-semibold mb-2">30 kun (Approved vs Pending)</div>
+      <div class="text-sm">Approved: <span class="font-medium">{{ total_appr30 }}</span></div>
+      <div class="text-sm">Pending: <span class="font-medium">{{ total_pend30 }}</span></div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

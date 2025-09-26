@@ -1,20 +1,8 @@
 {% extends "base.html" %}
 {% load i18n %}
-{% block header_title %}{% trans "Do'kon hisobot" %}{% endblock %}
+{% block header_title %}{% trans "Owner Dashboard" %}{% endblock %}
 {% block content %}
-<form method="get" class="flex flex-wrap gap-2 items-end">
-  {% if stores %}
-  <select name="store_id" class="border rounded-xl px-3 py-2">
-    <option value="">{% trans "Barchasi" %}</option>
-    {% for s in stores %}
-      <option value="{{ s.id }}" {% if s.id|stringformat:"s" == store_id %}selected{% endif %}>{{ s.name }}</option>
-    {% endfor %}
-  </select>
-  {% endif %}
-  <input type="date" name="date_from" value="{{ df }}" class="border rounded-xl px-3 py-2">
-  <input type="date" name="date_to"   value="{{ dt }}" class="border rounded-xl px-3 py-2">
-  <button class="btn btn-primary">{% trans "Filtrlash" %}</button>
-</form>
+<div class="text-sm text-gray-500">{{ df }} → {{ dt }}</div>
 
 <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
   <div class="rounded-2xl p-4 border bg-gray-50">

@@ -82,7 +82,6 @@ class InstallmentSaleForm(forms.Form):
 class ExpenseForm(forms.Form):
     amount = forms.CharField()
     note = forms.CharField(required=False)
-    store = forms.ModelChoiceField(queryset=Store.objects.all(), required=False)
     def clean_amount(self): return parse_amount(self.cleaned_data["amount"])
 
 

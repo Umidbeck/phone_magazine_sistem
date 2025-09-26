@@ -826,19 +826,23 @@ def product_received_list(request):
 @login_required
 def product_sold_list(request):
     """
-    1) Transaction(type='sale') (is_void=False, product!=NULL)
-    2) Fallback: Product(status='sold')
+    Sotilganlar: Transaction(type='sale') + fallback Product(status='sold').
+    Kuchli filterlar: store, seller, brand, model, date_from, date_to.
     """
+    from django.core.paginator import Paginator
     df = parse_date(request.GET.get("date_from") or "")
     dt = parse_date(request.GET.get("date_to") or "")
     store_id = request.GET.get("store_id") if getattr(request.user, "is_owner", False) else None
     seller_id = request.GET.get("seller_id") or ""
+    brand_id = request.GET.get("brand") or ""
+    model_id = request.GET.get("model") or ""
 
     tx_qs = (Transaction.objects
              .select_related("product", "product__brand", "product__model", "store", "seller")
              .filter(type="sale", is_void=False, product__isnull=False))
     p_qs = (Product.objects.select_related("brand", "model", "store").filter(status="sold"))
 
+    # Akses
     if not getattr(request.user, "is_owner", False):
         tx_qs = tx_qs.filter(store_id=request.user.store_id)
         p_qs = p_qs.filter(store_id=request.user.store_id)
@@ -846,9 +850,19 @@ def product_sold_list(request):
         tx_qs = tx_qs.filter(store_id=store_id)
         p_qs = p_qs.filter(store_id=store_id)
 
+    # Seller
     if seller_id:
         tx_qs = tx_qs.filter(seller_id=seller_id)
 
+    # Brand/Model
+    if brand_id:
+        tx_qs = tx_qs.filter(product__brand_id=brand_id)
+        p_qs = p_qs.filter(brand_id=brand_id)
+    if model_id:
+        tx_qs = tx_qs.filter(product__model_id=model_id)
+        p_qs = p_qs.filter(model_id=model_id)
+
+    # Sana
     if df:
         tx_qs = tx_qs.filter(created_at__date__gte=df)
         p_qs = p_qs.filter(sold_at__date__gte=df)
@@ -856,18 +870,26 @@ def product_sold_list(request):
         tx_qs = tx_qs.filter(created_at__date__lte=dt)
         p_qs = p_qs.filter(sold_at__date__lte=dt)
 
+    # Birlashtirish (tx bo‘lganlari + fallback)
     tx_map = {t.product_id: t for t in tx_qs}
     rows = [{"p": t.product, "tx": t} for t in tx_qs]
-    rows += [{"p": p, "tx": None} for p in p_qs.exclude(id__in=tx_map.keys())[:400]]
+    rows += [{"p": p, "tx": None} for p in p_qs.exclude(id__in=tx_map.keys())]
+
+    # Sort va paginate
     rows.sort(key=lambda r: (r["tx"].created_at if r["tx"] else (r["p"].sold_at or r["p"].updated_at)), reverse=True)
-    rows = rows[:400]
+    paginator = Paginator(rows, 30)
+    page = paginator.get_page(request.GET.get("page"))
 
     stores = Store.objects.order_by("name") if getattr(request.user, "is_owner", False) else None
     sellers = User.objects.filter(is_active=True).order_by("username") if getattr(request.user, "is_owner", False) else None
+    brands  = Brand.objects.filter(is_active=True).order_by("name")
+    models  = ModelName.objects.filter(is_active=True).order_by("brand__name","name")
 
     return render(request, "inventory/product_sold_list.html", {
-        "rows": rows, "stores": stores, "sellers": sellers,
+        "page": page,
+        "stores": stores, "sellers": sellers, "brands": brands, "models": models,
         "store_id": store_id or "", "seller_id": seller_id or "",
+        "brand_id": brand_id or "", "model_id": model_id or "",
         "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
     })
 

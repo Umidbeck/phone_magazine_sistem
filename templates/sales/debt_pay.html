@@ -9,6 +9,11 @@
 
   <form method="post" class="space-y-4">
     {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="p-3 rounded-xl bg-amber-50 text-amber-800 mb-3">
+          {{ form.non_field_errors }}
+         </div>
+     {% endif %}
     <div>
       <label class="block text-xs text-neutral-500 mb-1">To‘lov turi</label>
       <select name="payment_type" id="ptype" class="w-full rounded-xl border-neutral-300">
@@ -27,6 +32,11 @@
         <input type="text" name="card_amount" id="card" class="w-full rounded-xl border-neutral-300" placeholder="Masalan: 0" value="0">
       </div>
     </div>
+      {% if form.non_field_errors %}
+          <div class="p-3 rounded-xl bg-amber-50 text-amber-800 mb-3">
+            {{ form.non_field_errors }}
+          </div>
+      {% endif %}
     <button class="btn btn-primary">Saqlash</button>
   </form>
 </div>

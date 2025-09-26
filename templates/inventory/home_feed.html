@@ -1,88 +1,60 @@
 # inventor/home_feed.html
-
 {% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Home" %}{% endblock %}
+{% block title %}{% trans "Home" %} · PhoneStore{% endblock %}
 {% block content %}
-<div class="p-3 space-y-3">
-  <!-- Filtrlar -->
-  <form method="get" class="bg-white border rounded-xl p-3 space-y-2">
+<div class="py-4 space-y-4">
+  <form method="get" class="card p-4 space-y-3">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-      <select name="store_id" class="border rounded-lg px-3 py-2 {% if not request.user.is_owner %}opacity-50 pointer-events-none{% endif %}">
+      <select name="store_id" class="border rounded-xl px-3 py-2 {% if not request.user.is_owner %}opacity-50 pointer-events-none{% endif %}">
         <option value="">{% trans "All stores" %}</option>
         {% for s in stores %}
           <option value="{{ s.id }}" {% if store_id|default:''|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
       </select>
-      <select name="brand" class="border rounded-lg px-3 py-2">
+      <select name="brand" class="border rounded-xl px-3 py-2">
         <option value="">{% trans "All brands" %}</option>
         {% for b in brands %}
           <option value="{{ b.id }}" {% if brand_id|default:''|stringformat:"s" == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
         {% endfor %}
       </select>
-      <select name="model" class="border rounded-lg px-3 py-2">
+      <select name="model" class="border rounded-xl px-3 py-2">
         <option value="">{% trans "All models" %}</option>
         {% for m in models %}
           <option value="{{ m.id }}" {% if model_id|default:''|stringformat:"s" == m.id|stringformat:"s" %}selected{% endif %}>{{ m.brand.name }} {{ m.name }}</option>
         {% endfor %}
       </select>
-      <select name="status" class="border rounded-lg px-3 py-2">
+      <select name="status" class="border rounded-xl px-3 py-2">
         <option value="">{% trans "Any status" %}</option>
         <option value="available" {% if status == "available" %}selected{% endif %}>{% trans "Available" %}</option>
         <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>{% trans "On repair" %}</option>
         <option value="sold" {% if status == "sold" %}selected{% endif %}>{% trans "Sold" %}</option>
       </select>
     </div>
-
-    <div class="flex items-center gap-4">
-      <label class="text-xs flex items-center gap-2">
-        <input type="checkbox" name="is_new" value="1" {% if is_new_val %}checked{% endif %}> {% trans "New" %}
-      </label>
-      <label class="text-xs flex items-center gap-2">
-        <input type="checkbox" name="has_documents" value="1" {% if has_docs_val %}checked{% endif %}> {% trans "Has documents" %}
-      </label>
+    <div class="flex items-center gap-4 text-xs">
+      <label class="flex items-center gap-2"><input type="checkbox" name="is_new" value="1" {% if is_new_val %}checked{% endif %}> {% trans "New" %}</label>
+      <label class="flex items-center gap-2"><input type="checkbox" name="has_documents" value="1" {% if has_docs_val %}checked{% endif %}> {% trans "Has documents" %}</label>
     </div>
-
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-      <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" class="border rounded-lg px-3 py-2" placeholder="{% trans 'From' %}">
-      <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}" class="border rounded-lg px-3 py-2" placeholder="{% trans 'To' %}">
-      <input type="number" step="0.01" name="price_min" value="{{ price_min }}" class="border rounded-lg px-3 py-2" placeholder="{% trans 'Min price' %}">
-      <input type="number" step="0.01" name="price_max" value="{{ price_max }}" class="border rounded-lg px-3 py-2" placeholder="{% trans 'Max price' %}">
+      <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" class="border rounded-xl px-3 py-2">
+      <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}" class="border rounded-xl px-3 py-2">
+      <input type="number" step="0.01" name="price_min" value="{{ price_min }}" class="border rounded-xl px-3 py-2" placeholder="{% trans 'Min price' %}">
+      <input type="number" step="0.01" name="price_max" value="{{ price_max }}" class="border rounded-xl px-3 py-2" placeholder="{% trans 'Max price' %}">
     </div>
-
-    <div><button class="px-3 py-2 bg-black text-white rounded-lg">{% trans "Apply" %}</button></div>
+    <div><button class="btn btn-ghost">{% trans "Apply" %}</button></div>
   </form>
 
-  <!-- Instagram grid -->
   <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2">
     {% for p in page.object_list %}
-      <a href="{% url 'product_detail' p.id %}" class="block rounded-xl overflow-hidden bg-white border group">
-        <div class="aspect-[4/3] bg-gray-100 relative">
-          {% with p.images.all as imgs %}
-            {% if imgs and imgs.0.image %}
-              <img src="{{ imgs.0.image.url }}" class="w-full h-full object-cover group-hover:scale-105 transition">
-            {% else %}
-              <div class="w-full h-full flex items-center justify-center text-xs text-gray-400">
-                {{ p.brand.name }} {{ p.model.name }}
-              </div>
-            {% endif %}
-          {% endwith %}
-          <div class="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-[11px] p-1">
-            {{ p.brand.name }} {{ p.model.name }} · {{ p.store.name }}
-          </div>
-        </div>
-      </a>
+      {% include "components/_product_card.html" with p=p %}
     {% empty %}
-      <div class="col-span-full text-center text-sm text-gray-500">{% trans "No content" %}</div>
+      <div class="col-span-full text-center text-sm text-neutral-500">{% trans "No content" %}</div>
     {% endfor %}
   </div>
 
-  <!-- Pagination -->
-  <div class="flex justify-center gap-2">
-    {% if page.has_previous %}<a class="px-3 py-1 border rounded" href="?page={{ page.previous_page_number }}">{% trans "Prev" %}</a>{% endif %}
-    <span class="text-xs text-gray-500 px-2 py-1">{{ page.number }}/{{ page.paginator.num_pages }}</span>
-    {% if page.has_next %}<a class="px-3 py-1 border rounded" href="?page={{ page.next_page_number }}">{% trans "Next" %}</a>{% endif %}
+  <div class="flex justify-center items-center gap-2 text-sm">
+    {% if page.has_previous %}<a class="btn btn-ghost" href="?page={{ page.previous_page_number }}">{% trans "Prev" %}</a>{% endif %}
+    <span class="text-neutral-500 px-2 py-1">{{ page.number }}/{{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="btn btn-ghost" href="?page={{ page.next_page_number }}">{% trans "Next" %}</a>{% endif %}
   </div>
-
-  <div class="h-24"></div>
 </div>
 {% endblock %}

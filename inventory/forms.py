@@ -16,26 +16,13 @@ def digits_only(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
 
 class ProductCreateForm(forms.ModelForm):
-    # multi-upload (create/edit ikkalasida ishlaydi)
-    doc_images = forms.FileField(
-        widget=MultipleFileInput(),
-        required=False,
-        label="Dokument rasmlari"
-    )
+    from django.forms.widgets import FileInput
+    class MultipleFileInput(FileInput):
+        allow_multiple_selected = True
 
-    # 2) Holat rasmlari – bir nechta
-    cond_images = forms.FileField(
-        widget=MultipleFileInput(),
-        required=False,
-        label="Holat rasmlari"
-    )
-
-    # 3) Asosiy rasm – bir nechta (agar kerak boʻlsa)
-    image = forms.FileField(
-        widget=MultipleFileInput(),
-        required=False,
-        label="Asosiy rasm"
-    )
+    doc_images = forms.FileField(widget=MultipleFileInput(), required=False, label="Dokument rasmlari")
+    cond_images = forms.FileField(widget=MultipleFileInput(), required=False, label="Holat rasmlari")
+    images     = forms.FileField(widget=MultipleFileInput(), required=False, label="Asosiy rasm(lar)")
 
     class Meta:
         model = Product
@@ -50,28 +37,14 @@ class ProductCreateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        # Owner bo‘lmasa store ni o‘qish uchun chiqarsin, saqlaganda baribir user.store’ga majbur qilamiz
+        # queryset’larni sizning model holatingizga moslang
+        # (Brand/ModelName/Color/Store active bo‘lsa, filter qiling)
+
+
         self.fields["store"].queryset = Store.objects.filter(is_active=True)
         self.fields["brand"].queryset = Brand.objects.filter(is_active=True)
         self.fields["model"].queryset = ModelName.objects.filter(is_active=True)
         self.fields["color"].queryset = Color.objects.filter(is_active=True)
-
-    def clean(self):
-        cleaned = super().clean()
-        # 7 ta rasm limiti: mavjud + yangi <= 7
-        instance = getattr(self, "instance", None)
-        existing = 0
-        if instance and instance.pk:
-            existing = ProductImage.objects.filter(product=instance).count()
-
-        new_count = 0
-        for key in ("doc_images", "cond_images", "images"):
-            files = self.files.getlist(key)
-            new_count += len(files)
-
-        if existing + new_count > 7:
-            raise forms.ValidationError("Rasm cheklovi: jami 7 tadan oshmasin (mavjud + yangi).")
-        return cleaned
 
     def clean_imei_full(self):
         v = digits_only(self.cleaned_data.get("imei_full") or "")
@@ -81,6 +54,20 @@ class ProductCreateForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        # Rasm limiti
+        instance = getattr(self, "instance", None)
+        existing = 0
+        if instance and instance.pk:
+            existing = ProductImage.objects.filter(product=instance).count()
+
+        new_count = 0
+        for key in ("doc_images", "cond_images", "images"):  # <-- Faqat shu 3 ta nom
+            files = self.files.getlist(key)
+            new_count += len(files)
+
+        if existing + new_count > 7:
+            raise forms.ValidationError("Rasm cheklovi: jami 7 tadan oshmasin (mavjud + yangi).")
+
         ownership = cleaned.get("ownership")
         pp = cleaned.get("purchase_price") or Decimal("0")
         cp = cleaned.get("consignment_price") or Decimal("0")

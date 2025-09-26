@@ -1,8 +1,9 @@
 # sales/views.py
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4, UUID
 
+from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction as db_txn
@@ -11,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _
 from django.utils import timezone as dj_tz
+from django.views.decorators.http import require_POST
 
 from accounts.models import User, Store
 from inventory.models import Product
@@ -19,12 +21,17 @@ from .forms import (
     ExpenseForm,
     DebtNewForm,
     DebtPayForm,
-    ConsignmentPayoutForm, InstallmentSaleForm, DebtNewSimpleForm,
+    ConsignmentPayoutForm, InstallmentSaleForm, DebtNewSimpleForm, parse_amount,
 )
 from .models import Transaction, SellerCommission, ConsignmentDue
 
 
 # ====== SOTUV ======
+def _can_award_commission(product: Product) -> bool:
+    # Produkt tarixida qachondir sale bo'lsa (hatto void bo'lsa ham), endi yangi komissiya bermaymiz
+    return not Transaction.objects.filter(type="sale", product_id=product.id).exists()
+
+
 @login_required
 def sell_view(request):
     product_id = request.GET.get("product_id")
@@ -61,11 +68,10 @@ def sell_view(request):
                 p.sold_at = dj_tz.now()
                 p.save(update_fields=["status","sold_at"])
 
-                # Komissiya yozuvi (5$ default, approve'ni owner qiladi)
-                com_amount = SellerCommission.commission_amount()
-                SellerCommission.objects.create(transaction=tx, seller=request.user, amount=com_amount)
+                if _can_award_commission(p):
+                    com_amount = SellerCommission.commission_amount()
+                    SellerCommission.objects.create(transaction=tx, seller=request.user, amount=com_amount)
 
-                # Consignment bo‘lsa due kartasi
                 if p.ownership == "consignment":
                     ConsignmentDue.objects.get_or_create(
                         product=p,
@@ -82,35 +88,26 @@ def sell_view(request):
     return render(request, "sales/sell.html", {"form": form, "product": p})
 
 
+
 # ====== RASHODLAR ======
 @login_required
 def expense_create(request):
     """
-    Telefon bilan bog‘liq yoki umumiy rashod kiritish.
-    Seller faqat o‘z do‘koni uchun (yoki product tanlagan bo‘lsa shu product),
-    Owner istalgan do‘kon uchun.
+    Yangi rashod: store/seller formdan talab qilinmaydi. Product tanlansa — shu productga bog'lanadi
+    (approved bo'lganda COGS ichida hisoblanadi, period expensega KIRMAYDI).
     """
     q = (request.GET.get("q") or "").strip()
-    products = []
-    picked = None
+    products, picked = [], None
 
     product_id = request.GET.get("product_id") or request.POST.get("product_id")
     if product_id:
-        picked = get_object_or_404(
-            Product.objects.select_related("brand", "model", "store"),
-            pk=product_id
-        )
+        picked = get_object_or_404(Product.objects.select_related("brand","model","store"), pk=product_id)
 
-    # Qidiruv (IMEI/brand/model)
     if q and not picked:
         base = Product.objects.select_related("brand", "model", "store").order_by("-created_at")
         products = list(base.filter(
-            Q(imei_full__icontains=q) |
-            Q(brand__name__icontains=q) |
-            Q(model__name__icontains=q)
+            Q(imei_full__icontains=q) | Q(brand__name__icontains=q) | Q(model__name__icontains=q)
         )[:50])
-
-
 
     if request.method == "POST":
         form = ExpenseForm(request.POST)
@@ -118,17 +115,11 @@ def expense_create(request):
             amount = Decimal(form.cleaned_data["amount"])
             note = form.cleaned_data.get("note", "").strip()
 
-            # store/product aniqlash
-            tx_store = None
-            tx_product = None
             if picked:
-                tx_store = picked.store
-                tx_product = picked
+                tx_store, tx_product = picked.store, picked
             else:
-                if getattr(request.user, "is_owner", False):
-                    tx_store = form.cleaned_data.get("store") or request.user.store
-                else:
-                    tx_store = request.user.store
+                tx_store = request.user.store if not getattr(request.user, "is_owner", False) else (request.user.store or Store.objects.first())
+                tx_product = None
 
             with db_txn.atomic():
                 Transaction.objects.create(
@@ -139,48 +130,96 @@ def expense_create(request):
                     created_by=request.user,
                     amount=amount,
                     note=note,
-                    is_approved=False,  # owner tasdiqlagach statistikaga kiradi
+                    is_approved=False,  # owner tasdiqlaydi
                 )
-            messages.success(request, _("Expense recorded. Waiting for approval."))
+            messages.success(request, "Expense recorded. Waiting for approval.")
             return redirect("expenses_list")
         else:
-            messages.error(request, _("Fix errors."))
+            messages.error(request, "Fix errors.")
     else:
-        initial = {"product_id": product_id}
-        form = ExpenseForm(initial=initial)
+        form = ExpenseForm(initial={"product_id": product_id})
 
-    return render(request, "sales/expense_form.html", {
-        "form": form, "q": q, "products": products, "picked": picked,
-    })
+    return render(request, "sales/expense_form.html", {"form": form, "q": q, "products": products, "picked": picked})
 
+
+from django.db.models.functions import TruncDate
 
 @login_required
 def expenses_list(request):
     """
-    - Seller: o‘zi kiritgan rashodlar
-    - Owner: barcha do‘konlar, store bo‘yicha filter
+    Ikki jadval: Approved va Pending (rejected – bu yerda delete).
+    Statistika: Today/7/30 kun – jami va kunlik bo‘linish.
+    Katta kartalar: Today Approved ($) vs Today Pending ($).
+    Filter: sana oralig‘i, store (owner), seller (owner), approved flag (ixtiyoriy).
     """
     store_id = (request.GET.get("store_id") or "").strip()
-    only_approved = (request.GET.get("approved") == "1")
+    seller_id = (request.GET.get("seller_id") or "").strip() if getattr(request.user, "is_owner", False) else ""
+    date_from = request.GET.get("date_from") or ""
+    date_to   = request.GET.get("date_to") or ""
 
-    qs = Transaction.objects.select_related("product", "store", "seller")\
-                            .filter(type="expense").order_by("-created_at")
+    def _pdate(s):
+        try: return datetime.strptime(s, "%Y-%m-%d").date()
+        except: return None
 
+    df = _pdate(date_from); dt = _pdate(date_to)
+
+    base = (Transaction.objects
+            .select_related("product","store","seller","expense_type","product__brand","product__model")
+            .filter(type="expense")
+            .order_by("-created_at"))
+
+    # Akses
     if getattr(request.user, "is_owner", False):
-        if store_id:
-            qs = qs.filter(store_id=store_id)
+        if store_id: base = base.filter(store_id=store_id)
+        if seller_id: base = base.filter(seller_id=seller_id)
     else:
-        qs = qs.filter(created_by=request.user)
+        base = base.filter(created_by=request.user)
 
-    if only_approved:
-        qs = qs.filter(is_approved=True)
+    if df: base = base.filter(created_at__date__gte=df)
+    if dt: base = base.filter(created_at__date__lte=dt)
+
+    approved_qs   = base.filter(is_approved=True)
+    pending_qs    = base.filter(is_approved=False)
+
+    # Katta kartalar – bugungi kunlik
+    today = dj_tz.now().date()
+    today_appr = approved_qs.filter(created_at__date=today).aggregate(s=Sum("amount"))["s"] or 0
+    today_pend = pending_qs.filter(created_at__date=today).aggregate(s=Sum("amount"))["s"] or 0
+
+    # Statistika (7 va 30 kun)
+    def _series(qs, days=7):
+        start = today - timedelta(days=days-1)
+        rows = (qs.filter(created_at__date__range=(start, today))
+                  .annotate(d=TruncDate("created_at")).values("d").annotate(s=Sum("amount")).order_by("d"))
+        by = {r["d"]: float(r["s"] or 0) for r in rows}
+        labels = [(start + timedelta(days=i)) for i in range(days)]
+        series = [by.get(d, 0.0) for d in labels]
+        return labels, series, sum(series)
+
+    labels7, appr7, total_appr7 = _series(approved_qs, 7)
+    _, pend7, total_pend7 = _series(pending_qs, 7)
+    labels30, appr30, total_appr30 = _series(approved_qs, 30)
+    _, pend30, total_pend30 = _series(pending_qs, 30)
 
     ctx = {
-        "rows": list(qs[:500]),
-        "store_id": store_id,
-        "only_approved": only_approved,
-        "stores": list(Store.objects.order_by("name").values("id", "name")) if getattr(request.user, "is_owner",
-                                                                                       False) else None,
+        "approved": list(approved_qs[:500]),
+        "pending": list(pending_qs[:500]),
+        "stores": list(Store.objects.order_by("name").values("id","name")) if getattr(request.user,"is_owner",False) else None,
+        "sellers": list(User.objects.order_by("username").values("id","username")) if getattr(request.user,"is_owner",False) else None,
+        "store_id": store_id, "seller_id": seller_id,
+        "date_from": date_from, "date_to": date_to,
+
+        # katta kartalar
+        "today_approved": today_appr,
+        "today_pending": today_pend,
+
+        # series/statistika
+        "labels7": [d.strftime("%Y-%m-%d") for d in labels7],
+        "appr7": appr7, "pend7": pend7,
+        "labels30": [d.strftime("%Y-%m-%d") for d in labels30],
+        "appr30": appr30, "pend30": pend30,
+        "total_appr7": total_appr7, "total_pend7": total_pend7,
+        "total_appr30": total_appr30, "total_pend30": total_pend30,
     }
     return render(request, "sales/expense_list.html", ctx)
 
@@ -592,18 +631,60 @@ def debt_reject(request, tx_id):
 
 @login_required
 def consignment_list(request):
-    qs = Transaction.objects.filter(type="consignment_payout").select_related("product","store","created_by")
+    """
+    Consignment payouts: filter + statistika.
+    """
+    from django.db.models.functions import TruncDate
+    store_id = request.GET.get("store_id") if getattr(request.user,"is_owner",False) else None
+    df = parse_date(request.GET.get("date_from") or "")
+    dt = parse_date(request.GET.get("date_to") or "")
+
+    qs = (Transaction.objects
+          .select_related("product","store","created_by")
+          .filter(type="consignment_payout")
+          .order_by("-created_at"))
+
     if not getattr(request.user,"is_owner",False):
-        qs = qs.filter(created_by=request.user)
+        qs = qs.filter(store_id=request.user.store_id)
+    elif store_id:
+        qs = qs.filter(store_id=store_id)
+
+    if df: qs = qs.filter(created_at__date__gte=df)
+    if dt: qs = qs.filter(created_at__date__lte=dt)
+
+    # Statistika (bugungi/7/30)
+    today = dj_tz.now().date()
+    today_sum = qs.filter(created_at__date=today, is_approved=True).aggregate(s=Sum("amount"))["s"] or 0
+
+    def _sum_days(days):
+        start = today - timedelta(days=days-1)
+        return qs.filter(created_at__date__range=(start,today), is_approved=True).aggregate(s=Sum("amount"))["s"] or 0
+
+    stats = {
+        "today": today_sum,
+        "week": _sum_days(7),
+        "month": _sum_days(30),
+    }
+
     rows = []
-    for t in qs.order_by("-created_at")[:400]:
+    for t in qs[:400]:
         rows.append({
-            "product_id": t.product_id,
-            "product_name": f"{getattr(t.product.brand, 'name', '')} {getattr(t.product.model, 'name', '')}" if t.product_id else "",
-            "store_name": t.store.name if t.store_id else "",
+            "id": t.id,
+            "approved": t.is_approved,
+            "created_at": t.created_at,
+            "store": t.store,
+            "product": t.product,
             "amount": t.amount,
+            "note": t.note or "",
         })
-    return render(request, "sales/consignment_list.html", {"rows": rows})
+
+    stores = Store.objects.order_by("name") if getattr(request.user,"is_owner",False) else None
+    return render(request, "sales/consignment_list.html", {
+        "rows": rows, "stores": stores, "store_id": store_id or "",
+        "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
+        "stats": stats,
+    })
+
 
 
 
@@ -730,6 +811,9 @@ def commissions_list(request):
         seller_id=seller_id, paid=paid, approved=approved,
         date_from=date_from, date_to=date_to,
     )
+    approved_rows = list(qs.filter(is_approved=True)[:500])
+    pending_rows = list(qs.filter(is_approved=False)[:500])
+    ctx.update({"approved_rows": approved_rows, "pending_rows": pending_rows})
     return render(request, "sales/commissions_list.html", ctx)
 
 
@@ -801,7 +885,6 @@ def sell_installment(request):
             profit = (total - cost)
 
             with db_txn.atomic():
-                # 1) Sotuv yozuvi (umumiy narx + kassaga tushgan qismi (upfront))
                 sale_tx = Transaction.objects.create(
                     type="sale",
                     product=p,
@@ -825,7 +908,6 @@ def sell_installment(request):
                 p.sold_at = dj_tz.now()
                 p.save(update_fields=["status","sold_at"])
 
-                # 2) Agar qoldiq bo'lsa -> debt_out (qarzdorlik), sale'ga bog'laymiz
                 if debt_amount > 0:
                     Transaction.objects.create(
                         type="debt_out",
@@ -838,14 +920,13 @@ def sell_installment(request):
                         debtor_phone=customer_phone or "",
                         note=note or "",
                         related_sale=sale_tx,
-                        is_approved=False,  # owner tasdiqlaydi
+                        is_approved=False,
                     )
 
-                # 3) Komissiya yozuvi (telefon qaytib kelsa, berilmaydi — pastda return view)
-                com_amount = SellerCommission.commission_amount()
-                SellerCommission.objects.create(transaction=sale_tx, seller=request.user, amount=com_amount)
+                if _can_award_commission(p):
+                    com_amount = SellerCommission.commission_amount()
+                    SellerCommission.objects.create(transaction=sale_tx, seller=request.user, amount=com_amount)
 
-                # 4) Consignment due (agar consignment)
                 if p.ownership == "consignment":
                     ConsignmentDue.objects.get_or_create(
                         product=p,
@@ -860,6 +941,7 @@ def sell_installment(request):
     else:
         form = InstallmentSaleForm(initial={"payment_type":"cash"})
     return render(request, "sales/sell_installment.html", {"form": form, "product": p})
+
 
 
 @login_required
@@ -901,6 +983,9 @@ def sale_return_by_tx(request, tx_id):
         messages.error(request, "Faqat do‘kon egasi sotuvni qaytara oladi.")
         return redirect("product_detail", pk=tx.product_id)
 
+    today = dj_tz.now().date()
+    sale_day = tx.created_at.date()
+
     with db_txn.atomic():
         tx.is_void = True
         tx.save(update_fields=["is_void"])
@@ -908,15 +993,23 @@ def sale_return_by_tx(request, tx_id):
         if p:
             p.status = "available"
             p.save(update_fields=["status"])
-        # komissiyani bloklash (to'lanmagan bo'lsa)
-        if hasattr(tx, "commission") and not tx.commission.is_paid:
-            tx.commission.is_approved = False
-            tx.commission.save(update_fields=["is_approved"])
-        # bog'liq tasdiqlanmagan qarz chiqimlarini ham void qilamiz
+
+        if hasattr(tx, "commission"):
+            com = tx.commission
+            if com.is_paid:
+                messages.warning(request, "Komissiya allaqachon to‘langan — qayta hisob talab etiladi.")
+            else:
+                if sale_day == today:
+                    com.delete()
+                    messages.info(request, "Bugungi qaytarish: $5 komissiya bekor qilindi.")
+                else:
+                    com.is_approved = False
+                    com.save(update_fields=["is_approved"])
+                    messages.info(request, "Kechagi/oldingi kun qaytarildi: keyingi sotuvda yangi komissiya berilmaydi.")
+
         Transaction.objects.filter(related_sale_id=tx.id, type="debt_out", is_approved=False).update(is_void=True)
 
-    messages.success(request, "Sotuv qaytarildi.")
-    return redirect("product_detail", pk=tx.product_id if tx.product_id else p.id)
+    return redirect("product_detail", pk=tx.product_id if tx.product_id else (p.id if p else 0))
 
 
 @login_required
@@ -941,4 +1034,103 @@ def sale_return_by_product(request, product_id):
         p.save(update_fields=["status"])
         messages.success(request, "Mahsulot qaytarildi (Transaction topilmadi, product holati tiklandi).")
     return redirect("product_detail", pk=p.id)
+
+
+class ConsignmentNewForm(forms.Form):
+    amount = forms.CharField()
+    note = forms.CharField(required=False)
+    def clean_amount(self): return parse_amount(self.cleaned_data["amount"])
+
+@login_required
+def consignment_new(request):
+    if request.method == "POST":
+        form = ConsignmentNewForm(request.POST)
+        if form.is_valid():
+            amount = form.cleaned_data["amount"]
+            note = form.cleaned_data.get("note") or ""
+            # store/seller avtomatik
+            store = request.user.store if not request.user.is_owner else (request.user.store or Store.objects.first())
+            with db_txn.atomic():
+                Transaction.objects.create(
+                    type="consignment_payout",
+                    store=store,
+                    seller=request.user,
+                    created_by=request.user,
+                    amount=amount,
+                    note=note,
+                    is_approved=False,  # tasdiqlanganda kassa/foydadan ayriladi
+                )
+            messages.success(request, _("Consignment payout created (awaiting approval)."))
+            return redirect("consignment_list")
+        messages.error(request, _("Fix errors."))
+    else:
+        form = ConsignmentNewForm()
+    return render(request, "sales/consignment_new.html", {"form": form})
+
+@login_required
+def consignment_approve(request, tx_id):
+    if not getattr(request.user, "is_owner", False):
+        messages.error(request, "Only owner can approve.")
+        return redirect("consignment_list")
+    tx = get_object_or_404(Transaction, pk=tx_id, type="consignment_payout")
+    if not tx.is_approved:
+        tx.is_approved = True
+        tx.approved_by = request.user
+        tx.approved_at = dj_tz.now()
+        tx.save(update_fields=["is_approved","approved_by","approved_at"])
+        messages.success(request, "Consignment payout approved.")
+    else:
+        messages.info(request, "Already approved.")
+    return redirect("consignment_list")
+
+@login_required
+def consignment_reject(request, tx_id):
+    if not getattr(request.user, "is_owner", False):
+        messages.error(request, "Only owner can reject.")
+        return redirect("consignment_list")
+    tx = get_object_or_404(Transaction, pk=tx_id, type="consignment_payout")
+    if tx.is_approved:
+        messages.error(request, "Approved payout cannot be rejected here.")
+    else:
+        tx.delete()
+        messages.success(request, "Consignment payout rejected (deleted).")
+    return redirect("consignment_list")
+
+
+
+@login_required
+def expense_unapprove(request, tx_id):
+    if not getattr(request.user, "is_owner", False):
+        messages.error(request, "Only owner can unapprove.")
+        return redirect("expenses_list")
+    tx = get_object_or_404(Transaction, pk=tx_id, type="expense")
+    if tx.is_approved:
+        tx.is_approved = False
+        tx.approved_by = None
+        tx.approved_at = None
+        tx.save(update_fields=["is_approved", "approved_by", "approved_at"])
+        messages.success(request, "Expense moved back to pending.")
+    else:
+        messages.info(request, "Expense is already pending.")
+    return redirect("expenses_list")
+
+@require_POST
+@login_required
+def commission_update_amount(request, pk):
+    if not getattr(request.user, "is_owner", False):
+        messages.error(request, "Only owner can edit commission.")
+        return redirect("commissions_list")
+    try:
+        amt = Decimal(request.POST.get("amount") or "0")
+        if amt <= 0: raise ValueError()
+    except Exception:
+        messages.error(request, "Invalid amount.")
+        return redirect("commissions_list")
+
+    c = get_object_or_404(SellerCommission.objects.select_related("transaction"), pk=pk)
+    c.amount = amt
+    c.save(update_fields=["amount"])
+    messages.success(request, "Commission amount updated.")
+    return redirect("commissions_list")
+
 
