@@ -1,7 +1,12 @@
 # sales/forms.py
 from django import forms
 from decimal import Decimal, InvalidOperation
+
+from django.core.exceptions import ValidationError
+from django.db.models import Sum
+
 from accounts.models import Store
+from sales.models import Transaction
 
 
 def parse_amount(val):
@@ -101,20 +106,53 @@ class DebtNewSimpleForm(forms.Form):
 
 
 class DebtPayForm(forms.Form):
-    payment_type = forms.ChoiceField(choices=PAYMENT_CHOICES, required=True)
-    cash_amount = forms.CharField(required=False)
-    card_amount = forms.CharField(required=False)
+    amount = forms.DecimalField(min_value=Decimal("0.01"), decimal_places=2)
+    payment_type = forms.ChoiceField(choices=(("cash","Naqd"),("card","Karta"),("mixed","Aralash")))
+    cash_amount = forms.DecimalField(required=False, decimal_places=2, min_value=Decimal("0"), initial=Decimal("0"))
+    card_amount = forms.DecimalField(required=False, decimal_places=2, min_value=Decimal("0"), initial=Decimal("0"))
+
+    def __init__(self, *args, **kwargs):
+        # group (UUID) keladi – qolgan balansni hisoblash uchun
+        self.group = kwargs.pop("group", None)
+        super().__init__(*args, **kwargs)
+
     def clean(self):
-        cd = super().clean()
-        p = cd.get("payment_type")
-        cash = parse_amount(cd.get("cash_amount"))
-        card = parse_amount(cd.get("card_amount"))
-        if p == "cash": card = Decimal("0")
-        elif p == "card": cash = Decimal("0")
-        if (cash + card) <= 0:
-            raise forms.ValidationError("To‘lov summasini kiriting")
-        cd["cash_amount"], cd["card_amount"], cd["amount"] = cash, card, cash+card
-        return cd
+        cleaned = super().clean()
+
+        amount = cleaned.get("amount") or Decimal("0")
+        ptype  = cleaned.get("payment_type")
+        cash   = cleaned.get("cash_amount") or Decimal("0")
+        card   = cleaned.get("card_amount") or Decimal("0")
+
+        # 1) payment_type ga mos summalar tekshiruvi
+        if ptype == "cash":
+            card = Decimal("0")
+            cleaned["card_amount"] = card
+        elif ptype == "card":
+            cash = Decimal("0")
+            cleaned["cash_amount"] = cash
+        # mixed bo'lsa, ikkalasi ham bo'lishi mumkin
+
+        # 2) cash+card = amount bo'lsin
+        if (cash + card) != amount:
+            raise ValidationError("Naqd + Karta summasi umumiy to‘lovga teng bo‘lishi kerak.")
+
+        # 3) Qolgan balansdan ortiq bo‘lmasin (server-side qoidasi)
+        if self.group:
+            out_total = (Transaction.objects
+                         .filter(type="debt_out", debtor_group=self.group, is_void=False)
+                         .aggregate(s=Sum("amount"))["s"] or Decimal("0"))
+            pay_total = (Transaction.objects
+                         .filter(type="debt_pay", debtor_group=self.group, is_void=False)
+                         .aggregate(s=Sum("amount"))["s"] or Decimal("0"))
+            # E’tibor: bu yerda APPROVED sharti qo‘ymayapmiz, chunki endi hammasi darhol approved bo‘ladi.
+            remaining = Decimal(out_total) - Decimal(pay_total)
+            if remaining < Decimal("0"):
+                remaining = Decimal("0")
+            if amount > remaining:
+                raise ValidationError(f"To‘lov summasi qolgan qarzdan oshib ketdi. Qolgan: ${remaining:.2f}")
+
+        return cleaned
 
 
 class ConsignmentPayoutForm(forms.Form):

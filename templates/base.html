@@ -51,19 +51,24 @@
           <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Inventory</li>
           <li><a class="navlink" href="{% url 'product_received_list' %}">📥 Olinganlar</a></li>
           <li><a class="navlink" href="{% url 'product_sold_list' %}">💸 Sotilganlar</a></li>
-          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Sales</li>
-          <li><a class="navlink" href="{% url 'expenses_list' %}">🧾 Rashodlar</a></li>
-          <li><a class="navlink" href="{% url 'debt_list' %}">👤 Qarzdorlar</a></li>
-          <li><a class="navlink" href="{% url 'consignment_list' %}">🤝 Do‘kon qarzlari</a></li>
-          <li><a class="navlink" href="{% url 'commissions_list' %}">🎯 Komissiyalar</a></li>
-          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Reports</li>
-          <li><a class="dropdown-item navlink" href="{% url 'profit_overview' %}">📈 Foyda</a></li>
-          <li><a class="navlink" href="{% url 'report_store' %}">🏪 Store report</a></li>
-          <li><a class="navlink" href="{% url 'report_network' %}">🌐 Network report</a></li>
-          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Reference</li>
-          <li><a class="navlink" href="{% url 'brand_list' %}">🏷️ Brendlar</a></li>
-          <li><a class="navlink" href="{% url 'model_list' %}">📱 Modellar</a></li>
-          <li><a class="navlink" href="{% url 'color_list' %}">🎨 Ranglar</a></li>
+            <li><a class="navlink" href="{% url 'expenses_list' %}">🧾 Rashodlar</a></li>
+            <li><a class="navlink" href="{% url 'debt_list' %}">👤 Qarzdorlar</a></li>
+            <li><a class="navlink" href="{% url 'consignment_list' %}">🤝 Do‘kon qarzlari</a></li>
+            <li><a class="navlink" href="{% url 'commissions_list' %}">🎯 Komissiyalar</a></li>
+            <li><a class="navlink" href="{% url 'owner_dashboard' %}">🏠 Dashboard</a></li>
+            <li><a class="navlink" href="{% url 'profit_overview' %}">📈 Foyda</a></li>
+
+            {% if request.user.is_owner %}
+              <li class="pt-2 text-xs ...">Reports</li>
+
+              <li><a class="navlink" href="{% url 'report_store' %}">🏪 Store report</a></li>
+              <li><a class="navlink" href="{% url 'report_network' %}">🌐 Network report</a></li>
+
+              <li class="pt-2 text-xs ...">Reference</li>
+              <li><a class="navlink" href="{% url 'brand_list' %}">🏷️ Brendlar</a></li>
+              <li><a class="navlink" href="{% url 'model_list' %}">📱 Modellar</a></li>
+              <li><a class="navlink" href="{% url 'color_list' %}">🎨 Ranglar</a></li>
+            {% endif %}
         </ul>
       </nav>
       <div class="mt-4 border-t border-neutral-200 pt-3 px-3 text-sm">

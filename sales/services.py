@@ -16,21 +16,16 @@ def get_commission_amount(amount=None) -> Decimal:
         return Decimal("5")
 
 def calc_product_cost(product: Product) -> Decimal:
-    """
-    Sotuv uchun 'cost' qiymati:
-      owned:       purchase_price + (shu telefonga bog'langan barcha expenses)
-      consignment: consignment_price + (shu telefonga bog'langan barcha expenses)
-    """
     base = Decimal("0")
     if product.ownership == "owned":
         base = Decimal(product.purchase_price or 0)
     else:
         base = Decimal(product.consignment_price or 0)
 
-    # Ushbu telefonga bog'langan barcha xarajatlar (Transaction.type='expense')
     exp_sum = Transaction.objects.filter(
         type="expense",
         product=product,
+        is_approved=True,        # <<< faqat tasdiqlangan rashodlar
     ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
 
     return base + exp_sum

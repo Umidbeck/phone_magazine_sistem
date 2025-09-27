@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "5f79067644326b54ff4e2987c93d03d932c0493d1978b255bae6346cc3c879af"
+            "sha256": "da9042e4954f212e4ee092a76258873d41197818e7a957982eb82f9cf0ba9dbb"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -455,6 +455,15 @@
             "markers": "python_version >= '3.9'",
             "version": "==4.60.0"
         },
+        "freezegun": {
+            "hashes": [
+                "sha256:ac7742a6cc6c25a2c35e9292dfd554b897b517d2dec26891a2e8debf205cb94a",
+                "sha256:cd557f4a75cf074e84bc374249b9dd491eaeacd61376b9eb3c423282211619d2"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.8'",
+            "version": "==1.5.5"
+        },
         "google-api-core": {
             "hashes": [
                 "sha256:8a2a56c1fef82987a524371f99f3bd0143702fecc670c72e600c1cda6bf8dbb7",
@@ -787,6 +796,14 @@
             "markers": "python_version >= '3.8'",
             "version": "==4.11.1"
         },
+        "python-dateutil": {
+            "hashes": [
+                "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3",
+                "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"
+            ],
+            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2'",
+            "version": "==2.9.0.post0"
+        },
         "requests": {
             "hashes": [
                 "sha256:2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6",
@@ -811,6 +828,14 @@
             "index": "pypi",
             "markers": "python_version >= '3.6'",
             "version": "==2.38.0"
+        },
+        "six": {
+            "hashes": [
+                "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+                "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"
+            ],
+            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2'",
+            "version": "==1.17.0"
         },
         "sqlparse": {
             "hashes": [

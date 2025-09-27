@@ -4,6 +4,10 @@ from uuid import uuid4
 from django.db import models
 from django.conf import settings
 from decimal import Decimal
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 from accounts.models import Store
 from inventory.models import Product
 from reference.models import ExpenseType, Config
@@ -115,3 +119,18 @@ class ConsignmentDue(models.Model):
 
     def __str__(self):
         return f"ConsDue {self.product_id} base={self.base_amount}"
+
+
+
+
+@receiver(post_save, sender=Transaction)
+def _ensure_commission_on_sale(sender, instance: Transaction, created, **kwargs):
+    if not created or instance.type != "sale" or instance.is_void:
+        return
+    if hasattr(instance, "commission"):
+        return
+    from decimal import Decimal
+    raw = SellerCommission.commission_amount()
+    amt = raw if isinstance(raw, Decimal) else Decimal(str(raw or "5"))
+    if amt <= 0: amt = Decimal("5.00")
+    SellerCommission.objects.create(transaction=instance, seller=instance.seller, amount=amt)

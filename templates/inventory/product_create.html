@@ -38,4 +38,27 @@
     {% if obj %}<a class="btn" href="{% url 'product_detail' obj.id %}">{% trans "Bekor qilish" %}</a>{% endif %}
   </div>
 </form>
+    {% block extra_js %}
+<script>
+(function(){
+  const brand = document.querySelector('select[name="brand"]');
+  const model = document.querySelector('select[name="model"]');
+  if(!brand || !model) return;
+
+  async function reloadModels() {
+    const bid = brand.value;
+    if(!bid) return;
+    model.innerHTML = '<option value="">…</option>';
+    try {
+      const res = await fetch(`/reference/brands/${bid}/models-json/`);
+      const data = await res.json();
+      model.innerHTML = '<option value=""></option>' + data.results
+        .map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+    } catch(e) { console.error(e); }
+  }
+  brand.addEventListener('change', reloadModels);
+})();
+</script>
+{% endblock %}
+
 {% endblock %}

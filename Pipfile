@@ -8,12 +8,13 @@ django = "*"
 pillow = "*"
 openpyxl = "*"
 weasyprint = "*"
-pytest = "*"
-pytest-django = "*"
 django-storages = "*"
 google-cloud-storage = "*"
 sentry-sdk = "*"
 django-widget-tweaks = "*"
+pytest = "*"
+pytest-django = "*"
+freezegun = "*"
 
 [dev-packages]
 

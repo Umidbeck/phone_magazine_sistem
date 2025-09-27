@@ -28,8 +28,13 @@ from .models import Transaction, SellerCommission, ConsignmentDue
 
 # ====== SOTUV ======
 def _can_award_commission(product: Product) -> bool:
-    # Produkt tarixida qachondir sale bo'lsa (hatto void bo'lsa ham), endi yangi komissiya bermaymiz
-    return not Transaction.objects.filter(type="sale", product_id=product.id).exists()
+    """
+    Bonus berish sharti: ushbu product uchun void EMAS sale hali mavjud bo‘lmasin.
+    (Qaytarilgandan keyin qayta sotilsa, komissiya yana beriladi.)
+    """
+    return not Transaction.objects.filter(
+        type="sale", product_id=product.id, is_void=False
+    ).exists()
 
 
 @login_required
@@ -40,8 +45,8 @@ def sell_view(request):
         form = SaleForm(request.POST)
         if form.is_valid():
             price = form.cleaned_data["price"]
-            cash = form.cleaned_data["cash_amount"]
-            card = form.cleaned_data["card_amount"]
+            cash  = form.cleaned_data["cash_amount"]
+            card  = form.cleaned_data["card_amount"]
             ptype = form.cleaned_data["payment_type"]
 
             cost = p.calc_cost()
@@ -60,18 +65,23 @@ def sell_view(request):
                     card_amount=card,
                     cost=cost,
                     profit=profit,
-                    is_approved=True if getattr(request.user,"is_owner",False) else False,
-                    approved_by=(request.user if getattr(request.user,"is_owner",False) else None),
-                    approved_at=(dj_tz.now() if getattr(request.user,"is_owner",False) else None),
+                    # <<< SIYOSAT: sotuv HAR DOIM approved
+                    is_approved=True,
+                    approved_by=request.user,
+                    approved_at=dj_tz.now(),
                 )
                 p.status = "sold"
                 p.sold_at = dj_tz.now()
                 p.save(update_fields=["status","sold_at"])
 
-                if _can_award_commission(p):
+                # Komissiya mavjudligiga kafolat (signal ham bor, lekin bu yerda ham)
+                if not hasattr(tx, "commission"):
                     com_amount = SellerCommission.commission_amount()
+                    if com_amount <= 0:
+                        com_amount = Decimal("5.00")
                     SellerCommission.objects.create(transaction=tx, seller=request.user, amount=com_amount)
 
+                # Consignment due avtomatik
                 if p.ownership == "consignment":
                     ConsignmentDue.objects.get_or_create(
                         product=p,
@@ -86,7 +96,6 @@ def sell_view(request):
     else:
         form = SaleForm(initial={"payment_type":"cash"})
     return render(request, "sales/sell.html", {"form": form, "product": p})
-
 
 
 # ====== RASHODLAR ======
@@ -264,17 +273,24 @@ def _debt_cache_key(user):
     return f"report:debts:{'all' if user.is_owner else user.store_id}"
 
 def _current_store_for(user):
-    """
-    Foydalanuvchidan do‘konni aniqlaydi.
-    Sellerlarda user.store bor. Ownerda bo‘lmasa — birinchi do‘konni olamiz.
-    """
     if getattr(user, "store_id", None):
         return user.store
     return Store.objects.first()
 
+def _approved_debt_totals(group):
+    """
+    Guruh bo‘yicha tasdiqlangan qarz/to‘lov yig‘indilari.
+    """
+    out_total = (Transaction.objects
+                 .filter(type="debt_out", debtor_group=group, is_approved=True)
+                 .aggregate(s=Sum("amount"))["s"] or Decimal("0"))
+    pay_total = (Transaction.objects
+                 .filter(type="debt_pay", debtor_group=group, is_approved=True)
+                 .aggregate(s=Sum("amount"))["s"] or Decimal("0"))
+    return (Decimal(out_total), Decimal(pay_total))
+
 
 def _debt_rows(user, store_id=None, seller_id=None, df=None, dt=None):
-    # Bazaviy queryset
     base = Transaction.objects.filter(is_void=False)
 
     # Akses
@@ -285,71 +301,91 @@ def _debt_rows(user, store_id=None, seller_id=None, df=None, dt=None):
 
     if seller_id:
         base = base.filter(seller_id=seller_id)
-    if df: base = base.filter(created_at__date__gte=df)
-    if dt: base = base.filter(created_at__date__lte=dt)
+    if df:
+        base = base.filter(created_at__date__gte=df)
+    if dt:
+        base = base.filter(created_at__date__lte=dt)
 
-    # Qarzni chiqarish (debt_out) — ko‘rsatish uchun hammasi
-    outs_all = base.filter(type="debt_out").values(
-        "debtor_group","debtor_name","debtor_phone","store_id","seller_id"
-    ).annotate(
-        total_all=Sum("amount"),
-        first_at=Min("created_at"),
-        last_out=Max("created_at"),
-    )
+    # ALL (approved + pending) — ko‘rinish uchun
+    outs_all = base.filter(type="debt_out").values("debtor_group","debtor_name","debtor_phone","store_id","seller_id") \
+                   .annotate(total_all=Sum("amount"),
+                             first_out=Min("created_at"),
+                             last_out=Max("created_at"))
+    pays_all = base.filter(type="debt_pay").values("debtor_group") \
+                   .annotate(paid_all=Sum("amount"),
+                             last_pay=Max("created_at"),
+                             cash_all=Sum("cash_amount"),
+                             card_all=Sum("card_amount"))
 
-    # Approved chiqargan qarz (jami)
-    outs_appr = base.filter(type="debt_out", is_approved=True).values("debtor_group").annotate(
-        total=Sum("amount")
-    )
-    out_map = {x["debtor_group"]: Decimal(x["total"] or 0) for x in outs_appr}
+    # APPROVED — metrikalar uchun
+    outs_appr = base.filter(type="debt_out", is_approved=True).values("debtor_group") \
+                    .annotate(total_appr=Sum("amount"))
+    pays_appr = base.filter(type="debt_pay", is_approved=True).values("debtor_group") \
+                    .annotate(paid_appr=Sum("amount"),
+                              cash_appr=Sum("cash_amount"),
+                              card_appr=Sum("card_amount"))
 
-    # To‘lovlar
-    pays_all = base.filter(type="debt_pay").values("debtor_group").annotate(
-        paid_all=Sum("amount"), last_pay=Max("created_at"),
-        cash_all=Sum("cash_amount"), card_all=Sum("card_amount"),
-    )
-    all_map = {x["debtor_group"]: x for x in pays_all}
+    out_all_map = {x["debtor_group"]: x for x in outs_all}
+    pay_all_map = {x["debtor_group"]: x for x in pays_all}
+    out_apr_map = {x["debtor_group"]: (x["total_appr"] or Decimal("0")) for x in outs_appr}
+    pay_apr_map = {x["debtor_group"]: x for x in pays_appr}
 
-    pays_appr = base.filter(type="debt_pay", is_approved=True).values("debtor_group").annotate(
-        paid=Sum("amount"), cash_paid=Sum("cash_amount"), card_paid=Sum("card_amount"),
-    )
-    appr_map = {x["debtor_group"]: x for x in pays_appr}
-
-    store_names = dict(Store.objects.values_list("id","name"))
+    store_names  = dict(Store.objects.values_list("id","name"))
     seller_names = dict(User.objects.values_list("id","username"))
 
+    keys = set(out_all_map.keys()) | set(pay_all_map.keys())
     rows = []
-    for o in outs_all:
-        gid = o["debtor_group"]
-        app_p = appr_map.get(gid, {}) or {}
-        all_p = all_map.get(gid, {}) or {}
+    for gid in keys:
+        oa = out_all_map.get(gid, {})
+        pa = pay_all_map.get(gid, {})
+        pp = pay_apr_map.get(gid, {})
 
-        total = out_map.get(gid, Decimal("0"))
-        paid = Decimal(app_p.get("paid") or 0)
-        balance = total - paid
+        total = out_apr_map.get(gid, Decimal("0"))
+        paid  = Decimal(pp.get("paid_appr") or 0)
+        cash  = Decimal(pp.get("cash_appr") or 0)
+        card  = Decimal(pp.get("card_appr") or 0)
+        balance = (total - paid)
+        if balance < 0:
+            balance = Decimal("0.00")
 
-        rows.append({
+        row = {
             "group": gid,
-            "debtor_name": o["debtor_name"] or "Qarzdor",
-            "debtor_phone": o["debtor_phone"] or "",
-            "store_name": store_names.get(o["store_id"], "-"),
-            "seller_name": seller_names.get(o["seller_id"], "-"),
-            "total": total,                      # Jami (approved debt_out)
-            "paid": paid,                        # To‘langan (approved debt_pay)
-            "balance": balance,                  # Qolgan
-            "cash_paid": app_p.get("cash_paid") or 0,
-            "card_paid": app_p.get("card_paid") or 0,
-            "total_all": o["total_all"] or 0,    # Ko‘rsatilish uchun
-            "paid_all": all_p.get("paid_all") or 0,
-            "cash_all": all_p.get("cash_all") or 0,
-            "card_all": all_p.get("card_all") or 0,
-            "last_at": all_p.get("last_pay") or o["last_out"],
-        })
+            "debtor_name": oa.get("debtor_name") or "Qarzdor",
+            "debtor_phone": oa.get("debtor_phone") or "",
+            "store_id": oa.get("store_id"), "store_name": store_names.get(oa.get("store_id"), "-") if oa else "-",
+            "seller_id": oa.get("seller_id"), "seller_name": seller_names.get(oa.get("seller_id"), "-") if oa else "-",
 
-    # Qatorlar tartibi
-    rows.sort(key=lambda r: (r["balance"], r["last_at"]), reverse=True)
+            # ALL (ko‘rinish)
+            "total_all": oa.get("total_all") or 0,
+            "paid_all":  pa.get("paid_all") or 0,
+            "cash_all":  pa.get("cash_all") or 0,
+            "card_all":  pa.get("card_all") or 0,
+
+            # APPROVED (metrika)
+            "total": total,
+            "paid": paid,
+            "cash_paid": cash,
+            "card_paid": card,
+            "balance": balance,
+
+            "first_at": oa.get("first_out"),
+            "last_at":  pa.get("last_pay") or oa.get("last_out"),
+        }
+
+        # UI fallback: approved 0 ko‘rinmasin, lekin real yozuv bor bo‘lsa — all bilan ko‘rsatamiz
+        if (row["total"] == 0 and row["paid"] == 0) and (row["total_all"] or row["paid_all"]):
+            row.update({
+                "total": Decimal(row["total_all"] or 0),
+                "paid":  Decimal(row["paid_all"] or 0),
+                "cash_paid": Decimal(row["cash_all"] or 0),
+                "card_paid": Decimal(row["card_all"] or 0),
+                "balance": Decimal(row["total_all"] or 0) - Decimal(row["paid_all"] or 0),
+            })
+
+        rows.append(row)
+
+    rows.sort(key=lambda r: (r["balance"], r["last_at"] or r["first_at"]), reverse=True)
     return rows
-
 
 def debt_balance_qs(base_qs):
     """
@@ -471,46 +507,61 @@ def debt_rows_qs(user, store_id=None, seller_id=None, status=None, date_from=Non
 def debt_list(request):
     store_id = request.GET.get("store_id") if getattr(request.user,"is_owner",False) else None
     seller_id = request.GET.get("seller_id") or None
+    from django.utils.dateparse import parse_date
     df = parse_date(request.GET.get("date_from") or "")
     dt = parse_date(request.GET.get("date_to") or "")
+
     rows = _debt_rows(request.user, store_id, seller_id, df, dt)
+
+    # umumiy kollektor (approved metrika bo‘yicha)
+    s_total = sum([r["total"] for r in rows], start=Decimal("0"))
+    s_paid  = sum([r["paid"]  for r in rows], start=Decimal("0"))
+    s_cash  = sum([r["cash_paid"] for r in rows], start=Decimal("0"))
+    s_card  = sum([r["card_paid"] for r in rows], start=Decimal("0"))
+    s_bal   = (s_total - s_paid)
+
     return render(request, "sales/debt_list.html", {
         "rows": rows,
         "stores": Store.objects.order_by("name") if getattr(request.user,"is_owner",False) else None,
         "sellers": User.objects.order_by("username") if getattr(request.user,"is_owner",False) else None,
-        "store_id": store_id or "", "seller_id": seller_id or "",
+        "store_id": str(store_id or ""), "seller_id": str(seller_id or ""),
         "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
+        "sum_total": s_total, "sum_paid": s_paid, "sum_cash": s_cash, "sum_card": s_card, "sum_balance": s_bal,
     })
+
 
 @login_required
 def debt_new_simple(request):
-    # Yangi qarz: store MUST NOT NULL + debtor_group MUST NOT NULL
     if request.method == "POST":
         form = DebtNewSimpleForm(request.POST)
         if form.is_valid():
             store = _current_store_for(request.user)
-            if store is None:
-                messages.error(request, "Do‘kon topilmadi. Iltimos, avval kamida bitta do‘kon yarating.")
+            if not store:
+                messages.error(request, "Do‘kon topilmadi.")
                 return redirect("debt_list")
             with db_txn.atomic():
                 Transaction.objects.create(
                     type="debt_out",
-                    store=store,                # <<<<<< MUHIM
-                    seller=request.user,        # <<<<<< MUHIM (avtomatik)
+                    store=store,
+                    seller=request.user,
                     created_by=request.user,
                     amount=form.cleaned_data["amount"],
-                    note=form.cleaned_data.get("note") or "",
+                    note=(form.cleaned_data.get("note") or ""),
                     debtor_name="",
                     debtor_phone="",
-                    debtor_group=uuid4(),       # <<<<<< MUHIM: keyingi to‘lovlar bir guruhda yig‘iladi
-                    is_approved=False,          # egasi tasdiqlaydi
+                    debtor_group=uuid4(),
+                    # <<< DARHOL tasdiqlangan
+                    is_approved=True,
+                    approved_by=request.user,
+                    approved_at=dj_tz.now(),
                 )
-            messages.success(request, "Yangi qarz saqlandi (tasdiq kutilmoqda).")
+            messages.success(request, "Qarz yozildi.")
             return redirect("debt_list")
-        messages.error(request, "Xatolarni tuzating.")
     else:
         form = DebtNewSimpleForm()
     return render(request, "sales/debt_new_simple.html", {"form": form})
+
+
 
 
 
@@ -519,39 +570,47 @@ def debt_new(request):
     if request.method == "POST":
         form = DebtNewForm(request.POST)
         if form.is_valid():
-            debtor = form.cleaned_data["debtor_name"].strip()
-            amount: Decimal = form.cleaned_data["amount"]
-            group_id = uuid4()
-
-            Transaction.objects.create(
-                store=(request.user.store if not request.user.is_owner else request.user.store),
-                # owner ham odatda o'z store'iga yozadi; agar ko'p store bo'lsa, alohida form bilan tanlov qo'shishingiz mumkin
-                seller=request.user,
-                created_by=request.user,
-                type="debt_out",
-                amount=amount,
-                debtor_name=debtor,
-                debtor_group=group_id,
-                is_approved=False,
-            )
-            messages.success(request, _("Debt recorded (awaiting approval)."))
+            store = _current_store_for(request.user)
+            if not store:
+                messages.error(request, "Do‘kon topilmadi.")
+                return redirect("debt_list")
+            with db_txn.atomic():
+                Transaction.objects.create(
+                    type="debt_out",
+                    store=store,
+                    seller=request.user,
+                    created_by=request.user,
+                    amount=form.cleaned_data["amount"],
+                    debtor_name=form.cleaned_data["debtor_name"].strip(),
+                    debtor_phone=(form.cleaned_data.get("debtor_phone") or "").strip(),
+                    note=(form.cleaned_data.get("note") or "").strip(),
+                    debtor_group=uuid4(),
+                    # <<< APPROVE bosqichi yo‘q – darhol kassa/hisobotga kiradi
+                    is_approved=True,
+                    approved_by=request.user,
+                    approved_at=dj_tz.now(),
+                )
+            messages.success(request, "Qarz yozildi.")
             return redirect("debt_list")
-        else:
-            messages.error(request, _("Invalid debt data."))
     else:
         form = DebtNewForm()
     return render(request, "sales/debt_new.html", {"form": form})
 
 
+
+
+
+
 @login_required
 def debt_pay(request, group):
-    # group — UUID bo‘lishi kerak
+    # UUID tekshiruvi
     try:
         UUID(str(group))
     except Exception:
         messages.error(request, "Noto‘g‘ri identifikator.")
         return redirect("debt_list")
 
+    # Qarzdor ma’lumotini topamiz (ko‘rinish uchun)
     rows = _debt_rows(request.user)
     row = next((r for r in rows if str(r["group"]) == str(group)), None)
     if not row:
@@ -559,16 +618,18 @@ def debt_pay(request, group):
         return redirect("debt_list")
 
     if request.method == "POST":
-        form = DebtPayForm(request.POST)
+        # <<< MUHIM: group ni formga uzatamiz – validatsiya shu asosida ishlaydi
+        form = DebtPayForm(request.POST, group=group)
         if form.is_valid():
             store = _current_store_for(request.user)
-            if store is None:
+            if not store:
                 messages.error(request, "Do‘kon topilmadi.")
                 return redirect("debt_list")
+
             with db_txn.atomic():
                 Transaction.objects.create(
                     type="debt_pay",
-                    store=store,                 # <<<<<< MUHIM
+                    store=store,
                     seller=request.user,
                     created_by=request.user,
                     amount=form.cleaned_data["amount"],
@@ -577,21 +638,30 @@ def debt_pay(request, group):
                     card_amount=form.cleaned_data["card_amount"],
                     debtor_name=row["debtor_name"],
                     debtor_phone=row["debtor_phone"],
-                    debtor_group=group,          # to‘g‘ri guruhga qo‘shilsin
-                    is_approved=False,           # egasi tasdiqlasa statistikaga kiradi
+                    debtor_group=group,
+                    # <<< DARHOL tasdiqlangan
+                    is_approved=True,
+                    approved_by=request.user,
+                    approved_at=dj_tz.now(),
                 )
-            messages.success(request, "To‘lov saqlandi (tasdiq kutilmoqda).")
+            messages.success(request, "To‘lov kiritildi.")
             return redirect("debt_list")
-        messages.error(request, "Xatolarni tuzating.")
-    else:
-        form = DebtPayForm(initial={"payment_type":"cash"})
 
+        # Form xatolarida shu yerga tushadi
+        messages.error(request, "Xatolarni tuzating.")
+        return render(request, "sales/debt_pay.html", {
+            "form": form,
+            "debtor_label": f"{row['debtor_name']} — {row['store_name']} / {row['seller_name']}",
+            "balance": row["balance"],
+        })
+
+    # GET
+    form = DebtPayForm(initial={"payment_type":"cash"}, group=group)
     return render(request, "sales/debt_pay.html", {
         "form": form,
         "debtor_label": f"{row['debtor_name']} — {row['store_name']} / {row['seller_name']}",
-        "balance": row["balance"]
+        "balance": row["balance"],  # ko‘rinish uchun (qolgan)
     })
-
 
 
 
@@ -601,16 +671,25 @@ def debt_approve(request, tx_id):
     if not getattr(request.user, "is_owner", False):
         messages.error(request, _("Only owner can approve."))
         return redirect("debt_list")
+
     tx = get_object_or_404(Transaction, pk=tx_id, type__in=["debt_out","debt_pay"])
-    if not tx.is_approved:
-        tx.is_approved = True
-        tx.approved_by = request.user
-        tx.approved_at = dj_tz.now()
-        tx.save(update_fields=["is_approved","approved_by","approved_at"])
-        messages.success(request, _("Debt entry approved."))
-    else:
+    if tx.is_approved:
         messages.info(request, _("Already approved."))
+        return redirect("debt_list")
+
+    if tx.type == "debt_pay":
+        out_total, pay_total = _approved_debt_totals(tx.debtor_group)
+        if (pay_total + tx.amount) > out_total:
+            messages.error(request, "Tasdiq rad: tasdiqlangan qarz yetarli emas. Avval tegishli qarz(lar)ni tasdiqlang.")
+            return redirect("debt_list")
+
+    tx.is_approved = True
+    tx.approved_by = request.user
+    tx.approved_at = dj_tz.now()
+    tx.save(update_fields=["is_approved","approved_by","approved_at"])
+    messages.success(request, _("Debt entry approved."))
     return redirect("debt_list")
+
 
 
 @login_required
@@ -870,61 +949,43 @@ def sell_installment(request):
     if request.method == "POST":
         form = InstallmentSaleForm(request.POST)
         if form.is_valid():
-            total = form.cleaned_data["total_price"]
+            total        = form.cleaned_data["total_price"]
             upfront_cash = form.cleaned_data["upfront_cash"]
             upfront_card = form.cleaned_data["upfront_card"]
-            ptype = form.cleaned_data["payment_type"]
-            upfront_total = form.cleaned_data["upfront_total"]
-            debt_amount = form.cleaned_data["debt_amount"]
-
-            customer_name = form.cleaned_data["customer_name"]
+            ptype        = form.cleaned_data["payment_type"]
+            customer_name  = form.cleaned_data["customer_name"]
             customer_phone = form.cleaned_data["customer_phone"]
-            note = form.cleaned_data["note"]
+            note           = form.cleaned_data["note"]
+            upfront_total  = form.cleaned_data["upfront_total"]
+            debt_amount    = form.cleaned_data["debt_amount"]
 
-            cost = p.calc_cost()
-            profit = (total - cost)
+            cost = p.calc_cost(); profit = (total - cost)
 
             with db_txn.atomic():
                 sale_tx = Transaction.objects.create(
                     type="sale",
-                    product=p,
-                    store=p.store,
-                    seller=request.user,
-                    created_by=request.user,
-                    amount=total,
-                    payment_type=ptype,
-                    cash_amount=upfront_cash,
-                    card_amount=upfront_card,
-                    cost=cost,
-                    profit=profit,
-                    is_approved=True if getattr(request.user,"is_owner",False) else False,
-                    approved_by=(request.user if getattr(request.user,"is_owner",False) else None),
-                    approved_at=(dj_tz.now() if getattr(request.user,"is_owner",False) else None),
-                    debtor_name=customer_name,
-                    debtor_phone=customer_phone or "",
-                    note=note or "",
+                    product=p, store=p.store, seller=request.user, created_by=request.user,
+                    amount=total, payment_type=ptype, cash_amount=upfront_cash, card_amount=upfront_card,
+                    cost=cost, profit=profit,
+                    debtor_name=customer_name, debtor_phone=customer_phone or "", note=note or "",
+                    # <<< SIYOSAT: sotuv approved
+                    is_approved=True, approved_by=request.user, approved_at=dj_tz.now(),
                 )
-                p.status = "sold"
-                p.sold_at = dj_tz.now()
+                p.status = "sold"; p.sold_at = dj_tz.now()
                 p.save(update_fields=["status","sold_at"])
 
                 if debt_amount > 0:
                     Transaction.objects.create(
-                        type="debt_out",
-                        product=p,
-                        store=p.store,
-                        seller=request.user,
-                        created_by=request.user,
-                        amount=debt_amount,
-                        debtor_name=customer_name,
-                        debtor_phone=customer_phone or "",
-                        note=note or "",
-                        related_sale=sale_tx,
-                        is_approved=False,
+                        type="debt_out", product=p, store=p.store, seller=request.user, created_by=request.user,
+                        amount=debt_amount, debtor_name=customer_name, debtor_phone=customer_phone or "",
+                        note=note or "", related_sale=sale_tx,
+                        is_approved=False,  # qarz — siyosat bo‘yicha owner approve
                     )
 
-                if _can_award_commission(p):
+                if not hasattr(sale_tx, "commission"):
                     com_amount = SellerCommission.commission_amount()
+                    if com_amount <= 0:
+                        com_amount = Decimal("5.00")
                     SellerCommission.objects.create(transaction=sale_tx, seller=request.user, amount=com_amount)
 
                 if p.ownership == "consignment":
@@ -941,6 +1002,7 @@ def sell_installment(request):
     else:
         form = InstallmentSaleForm(initial={"payment_type":"cash"})
     return render(request, "sales/sell_installment.html", {"form": form, "product": p})
+
 
 
 
@@ -978,9 +1040,13 @@ def sale_return(request, tx_id):
 
 @login_required
 def sale_return_by_tx(request, tx_id):
-    tx = get_object_or_404(Transaction.objects.select_related("product"), pk=tx_id, type="sale", is_void=False)
-    if not getattr(request.user,"is_owner",False):
-        messages.error(request, "Faqat do‘kon egasi sotuvni qaytara oladi.")
+    tx = get_object_or_404(Transaction.objects.select_related("product", "store"),
+                           pk=tx_id, type="sale", is_void=False)
+
+    # <<< RUXSAT: egasi yoki o'sha do'kon sotuvchisi
+    if not (getattr(request.user, "is_owner", False) or
+            (getattr(request.user, "store_id", None) == tx.store_id)):
+        messages.error(request, "Siz faqat o‘zingizning do‘koningizdagi sotuvni qaytara olasiz.")
         return redirect("product_detail", pk=tx.product_id)
 
     today = dj_tz.now().date()
@@ -989,6 +1055,7 @@ def sale_return_by_tx(request, tx_id):
     with db_txn.atomic():
         tx.is_void = True
         tx.save(update_fields=["is_void"])
+
         p = tx.product
         if p:
             p.status = "available"
@@ -996,32 +1063,37 @@ def sale_return_by_tx(request, tx_id):
 
         if hasattr(tx, "commission"):
             com = tx.commission
-            if com.is_paid:
-                messages.warning(request, "Komissiya allaqachon to‘langan — qayta hisob talab etiladi.")
+            if sale_day == today and not com.is_approved:
+                com.delete()
+                messages.info(request, "$5 komissiya bekor qilindi (bugungi sotuv).")
             else:
-                if sale_day == today:
-                    com.delete()
-                    messages.info(request, "Bugungi qaytarish: $5 komissiya bekor qilindi.")
-                else:
-                    com.is_approved = False
-                    com.save(update_fields=["is_approved"])
-                    messages.info(request, "Kechagi/oldingi kun qaytarildi: keyingi sotuvda yangi komissiya berilmaydi.")
+                # Hamma davrlardagi statistikadan chiqadi
+                com.is_approved = False
+                com.approved_by = None
+                com.approved_at = None
+                com.save(update_fields=["is_approved", "approved_by", "approved_at"])
+                messages.info(request, "Komissiya statistikadan chiqarildi.")
 
-        Transaction.objects.filter(related_sale_id=tx.id, type="debt_out", is_approved=False).update(is_void=True)
+        # Shu sotuvga bog'langan pending debt_out larni ham bekor qilamiz
+        Transaction.objects.filter(related_sale_id=tx.id, type="debt_out", is_approved=False)\
+                           .update(is_void=True)
 
     return redirect("product_detail", pk=tx.product_id if tx.product_id else (p.id if p else 0))
 
 
+
+
 @login_required
 def sale_return_by_product(request, product_id):
-    p = get_object_or_404(Product, pk=product_id, status="sold")
-    if not getattr(request.user,"is_owner",False):
-        messages.error(request, "Faqat do‘kon egasi qaytara oladi.")
+    p = get_object_or_404(Product.objects.select_related("store"), pk=product_id, status="sold")
+
+    # <<< RUXSAT: egasi yoki o'sha do'kon sotuvchisi
+    if not (getattr(request.user, "is_owner", False) or
+            (getattr(request.user, "store_id", None) == p.store_id)):
+        messages.error(request, "Siz faqat o‘zingizning do‘koningizdagi sotuvni qaytara olasiz.")
         return redirect("product_detail", pk=p.id)
 
-    # Agar tranzaksiya topilmasa ham, mahsulotni qayta available qilamiz
     with db_txn.atomic():
-        # so'nggi sale tx ni topishga urinib ko'ramiz
         tx = (Transaction.objects
               .filter(type="sale", product_id=p.id, is_void=False)
               .order_by("-created_at")
@@ -1029,11 +1101,12 @@ def sale_return_by_product(request, product_id):
         if tx:
             return sale_return_by_tx(request, tx.id)
 
-        # tx yo'q — minimal rollback
+        # Safety: tx topilmasa ham productni tiklaymiz
         p.status = "available"
         p.save(update_fields=["status"])
         messages.success(request, "Mahsulot qaytarildi (Transaction topilmadi, product holati tiklandi).")
     return redirect("product_detail", pk=p.id)
+
 
 
 class ConsignmentNewForm(forms.Form):

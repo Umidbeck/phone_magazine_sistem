@@ -37,7 +37,7 @@ urlpatterns = [
     path("commissions/<int:commission_id>/mark-paid/", commission_mark_paid, name="commission_mark_paid"),
     path("commissions/<int:commission_id>/approve/", commission_approve, name="commission_approve"),
     path("commissions/<int:commission_id>/reject/", commission_reject, name="commission_reject"),
-    path("commissions/<int:commission_id>/update-amount/", commission_update_amount, name="commission_update_amount"),
+    path("commissions/<int:pk>/update-amount/", commission_update_amount, name="commission_update_amount"),
 
     path("sale/<int:tx_id>/return/", sale_return_by_tx, name="sale_return_tx"),
     path("sale/product/<int:product_id>/return/", sale_return_by_product, name="sale_return_product"),
