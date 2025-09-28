@@ -81,6 +81,24 @@
           <a href="{% url 'login' %}" class="px-3 py-2 rounded-xl bg-brand text-white text-sm block text-center">Kirish</a>
         {% endif %}
       </div>
+    <!-- ACCOUNT SECTION -->
+        <div class="mt-6">
+          <div class="px-3 text-xs uppercase tracking-wide text-neutral-500 mb-2">Account</div>
+          <nav class="space-y-1">
+
+            {% if request.user.is_owner %}
+              <a href="{% url 'store_list' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">Stores</a>
+              <a href="{% url 'seller_list' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">Sellers</a>
+              <a href="{% url 'owner_dashboard' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">Owner Dashboard</a>
+            {% endif %}
+
+            <a href="{% url 'account_dashboard' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Account</a>
+            <a href="{% url 'my_sales' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Sales</a>
+            <a href="{% url 'my_commissions' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Commissions</a>
+            <a href="{% url 'my_acquisitions' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Acquisitions</a>
+            <a href="{% url 'my_stats' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Stats</a>
+          </nav>
+        </div>
     </aside>
 
     <!-- Content area -->

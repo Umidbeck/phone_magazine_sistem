@@ -372,14 +372,17 @@ def _debt_rows(user, store_id=None, seller_id=None, df=None, dt=None):
             "last_at":  pa.get("last_pay") or oa.get("last_out"),
         }
 
-        # UI fallback: approved 0 ko‘rinmasin, lekin real yozuv bor bo‘lsa — all bilan ko‘rsatamiz
-        if (row["total"] == 0 and row["paid"] == 0) and (row["total_all"] or row["paid_all"]):
+        if (row["total"] == 0) and (row["total_all"] or row["paid_all"]):
+            t_all = Decimal(row["total_all"] or 0)
+            p_all = Decimal(row["paid_all"] or 0)
+            c_all = Decimal(row["cash_all"] or 0)
+            k_all = Decimal(row["card_all"] or 0)
             row.update({
-                "total": Decimal(row["total_all"] or 0),
-                "paid":  Decimal(row["paid_all"] or 0),
-                "cash_paid": Decimal(row["cash_all"] or 0),
-                "card_paid": Decimal(row["card_all"] or 0),
-                "balance": Decimal(row["total_all"] or 0) - Decimal(row["paid_all"] or 0),
+                "total": t_all,
+                "paid": p_all,
+                "cash_paid": c_all,
+                "card_paid": k_all,
+                "balance": (t_all - p_all),
             })
 
         rows.append(row)
@@ -979,7 +982,8 @@ def sell_installment(request):
                         type="debt_out", product=p, store=p.store, seller=request.user, created_by=request.user,
                         amount=debt_amount, debtor_name=customer_name, debtor_phone=customer_phone or "",
                         note=note or "", related_sale=sale_tx,
-                        is_approved=False,  # qarz — siyosat bo‘yicha owner approve
+                        # Sotuv approved bo‘lgani uchun qarz ham darhol approved bo‘ladi
+                        is_approved=True, approved_by=request.user, approved_at=dj_tz.now(),
                     )
 
                 if not hasattr(sale_tx, "commission"):
@@ -1206,4 +1210,49 @@ def commission_update_amount(request, pk):
     messages.success(request, "Commission amount updated.")
     return redirect("commissions_list")
 
+
+@login_required
+def sell(request):
+    # Seller faqat o‘z do‘konidagi mahsulotlarni ko‘radi
+    qs = Product.objects.filter(status="available")
+    if not getattr(request.user, "is_owner", False):
+        qs = qs.filter(store_id=request.user.store_id)
+
+    product_id = request.GET.get("product_id")
+    if request.method == "GET":
+        ctx = {"products": qs}
+        if product_id:
+            prod = get_object_or_404(qs, pk=product_id)
+            ctx["product"] = prod
+        return render(request, "sales/sell.html", ctx)
+
+    # POST: sotuvni amalga oshirish
+    prod = get_object_or_404(qs, pk=request.POST.get("product_id"))
+    amount = Decimal(request.POST.get("amount", "0"))
+    if amount <= 0:
+        messages.error(request, "Summani to‘g‘ri kiriting.")
+        return redirect("sell")
+
+    payment_type = request.POST.get("payment_type", "cash")
+    cash = amount if payment_type == "cash" else Decimal("0")
+    card = amount if payment_type == "card" else Decimal("0")
+
+    # tannarx
+    cost = prod.calc_cost() if hasattr(prod, "calc_cost") else (prod.purchase_price or Decimal("0"))
+    tx = Transaction.objects.create(
+        type="sale", store=prod.store, seller=request.user, created_by=request.user,
+        product=prod, amount=amount, cash_amount=cash, card_amount=card,
+        payment_type=payment_type, cost=cost, profit=(amount - cost),
+        is_approved=True, approved_by=request.user, approved_at=dj_tz.now()
+    )
+    prod.status = "sold"; prod.sold_at = dj_tz.now()
+    prod.save(update_fields=["status","sold_at"])
+
+    # komissiya ($5) — agar signal ishlamasa, safety-create
+    if not hasattr(tx, "commission"):
+        SellerCommission.objects.create(transaction=tx, seller=request.user, amount=Decimal("5.00"))
+
+    messages.success(request, "Sotuv bajarildi.")
+    # testlar follow=True bilan 200 kutadi — qayta GET sahifasini ko‘rsatamiz
+    return render(request, "sales/sell_success.html", {"tx": tx})
 

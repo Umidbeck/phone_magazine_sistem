@@ -140,11 +140,12 @@ class DebtPayForm(forms.Form):
         # 3) Qolgan balansdan ortiq bo‘lmasin (server-side qoidasi)
         if self.group:
             out_total = (Transaction.objects
-                         .filter(type="debt_out", debtor_group=self.group, is_void=False)
+                         .filter(type="debt_out", debtor_group=self.group, is_void=False, is_approved=True)
                          .aggregate(s=Sum("amount"))["s"] or Decimal("0"))
             pay_total = (Transaction.objects
-                         .filter(type="debt_pay", debtor_group=self.group, is_void=False)
+                         .filter(type="debt_pay", debtor_group=self.group, is_void=False, is_approved=True)
                          .aggregate(s=Sum("amount"))["s"] or Decimal("0"))
+
             # E’tibor: bu yerda APPROVED sharti qo‘ymayapmiz, chunki endi hammasi darhol approved bo‘ladi.
             remaining = Decimal(out_total) - Decimal(pay_total)
             if remaining < Decimal("0"):

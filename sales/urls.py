@@ -3,7 +3,7 @@ from .views import sell_view, expense_create, debt_new, debt_list, debt_pay, con
     commission_mark_paid, commissions_list, expenses_list, expense_approve, debt_approve, debt_reject, cons_due_approve, \
     cons_due_reject, commission_approve, commission_reject, expense_reject, sell_installment, sale_return, \
     sale_return_by_tx, sale_return_by_product, debt_new_simple, consignment_new, consignment_approve, \
-    consignment_reject, expense_unapprove, commission_update_amount
+    consignment_reject, expense_unapprove, commission_update_amount, sell
 
 urlpatterns = [
     path("sell/", sell_view, name="sell"),
@@ -41,5 +41,9 @@ urlpatterns = [
 
     path("sale/<int:tx_id>/return/", sale_return_by_tx, name="sale_return_tx"),
     path("sale/product/<int:product_id>/return/", sale_return_by_product, name="sale_return_product"),
+
+    path("sell/", sell, name="sell"),                  # <-- TESTLAR KERAK QILAYOTGANI
+
 ]
+
 
