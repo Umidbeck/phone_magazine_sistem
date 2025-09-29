@@ -1,101 +1,106 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n money %}
+
+{% block header_title %}{% trans "Consignment payouts" %}{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto p-4 space-y-6">
-  <div class="flex items-center justify-between">
-    <h1 class="text-2xl font-semibold">🤝 {% trans "Do‘kon qarzlari (Consignment payouts)" %}</h1>
-    <a href="{% url 'consignment_new' %}" class="px-4 py-2 rounded-xl bg-black text-white">+ Yangi payout</a>
+
+<!-- TOP CARDS -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white border rounded-2xl p-4">
+    <div class="text-xs text-neutral-500">{% trans "Total count" %}</div>
+    <div class="mt-1 text-2xl font-semibold">{{ total_cnt }}</div>
+  </div>
+  <div class="bg-white border rounded-2xl p-4">
+    <div class="text-xs text-neutral-500">{% trans "Total amount" %}</div>
+    <div class="mt-1 text-2xl font-semibold">{{ total_sum|usd }}</div>
+  </div>
+  <div class="bg-white border rounded-2xl p-4">
+    <div class="text-xs text-neutral-500">{% trans "Approved (count/amount)" %}</div>
+    <div class="mt-1 text-sm"><span class="font-semibold">{{ appr_cnt }}</span> / {{ appr_sum|usd }}</div>
+  </div>
+  <div class="bg-white border rounded-2xl p-4">
+    <div class="text-xs text-neutral-500">{% trans "Pending (count/amount)" %}</div>
+    <div class="mt-1 text-sm"><span class="font-semibold">{{ pend_cnt }}</span> / {{ pend_sum|usd }}</div>
+  </div>
+</div>
+
+<!-- CHART (last 30 days) -->
+<div class="bg-white border rounded-2xl p-4 mb-6">
+  <div class="text-sm font-medium mb-2">{% trans "Approved payouts: last 30 days" %}</div>
+  <canvas id="cns30"></canvas>
+  <script type="application/json" id="cnsLabels">{{ chart_labels }}</script>
+  <script type="application/json" id="cnsSeries">{{ chart_series }}</script>
+</div>
+
+<!-- TABLE -->
+<div class="bg-white border rounded-2xl overflow-hidden">
+  <div class="px-4 py-3 border-b flex items-center justify-between">
+    <div class="font-semibold">{% trans "Payouts list" %}</div>
+    {% comment %} Yangi payout yaratish tugmasi (agar viewingizda bor bo‘lsa) {% endcomment %}
+    <a href="{% url 'consignment_new' %}" class="px-3 py-2 rounded-xl border hover:bg-neutral-50">
+      {% trans "New payout" %}
+    </a>
   </div>
 
-  <!-- Filters -->
-  <form method="get" class="grid md:grid-cols-4 gap-3 bg-white border border-neutral-200 rounded-2xl p-4">
-    {% if stores %}
-    <div>
-      <label class="text-xs text-neutral-500">Do‘kon</label>
-      <select name="store_id" class="w-full rounded-xl border p-2">
-        <option value="">Hammasi</option>
-        {% for s in stores %}
-          <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    {% endif %}
-    <div>
-      <label class="text-xs text-neutral-500">Sana — dan</label>
-      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border p-2">
-    </div>
-    <div>
-      <label class="text-xs text-neutral-500">Sana — gacha</label>
-      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border p-2">
-    </div>
-    <div class="md:col-span-4 flex justify-end">
-      <button class="px-4 py-2 rounded-xl bg-black text-white">Filtrlash</button>
-      <a href="{% url 'consignment_list' %}" class="ml-2 px-4 py-2 rounded-xl border">Reset</a>
-    </div>
-  </form>
-
-  <!-- Stats -->
-  <div class="grid sm:grid-cols-3 gap-4">
-    <div class="rounded-2xl border bg-white p-4"><div class="text-xs text-neutral-500">Bugun</div><div class="text-2xl font-semibold">{{ stats.today }}</div></div>
-    <div class="rounded-2xl border bg-white p-4"><div class="text-xs text-neutral-500">7 kun</div><div class="text-2xl font-semibold">{{ stats.week }}</div></div>
-    <div class="rounded-2xl border bg-white p-4"><div class="text-xs text-neutral-500">30 kun</div><div class="text-2xl font-semibold">{{ stats.month }}</div></div>
-  </div>
-
-  <!-- Rows -->
-  <div class="rounded-2xl border overflow-x-auto bg-white">
+  <div class="overflow-x-auto">
     <table class="min-w-full text-sm">
       <thead class="bg-neutral-50 text-neutral-600">
         <tr>
-          <th class="text-left px-4 py-2">Sana</th>
-          <th class="text-left px-4 py-2">Do‘kon</th>
-          <th class="text-left px-4 py-2">Telefon</th>
-          <th class="text-right px-4 py-2">Summa</th>
-          <th class="text-left px-4 py-2">Izoh</th>
-          <th class="text-right px-4 py-2">Holat</th>
-          <th class="text-right px-4 py-2">Amal</th>
+          <th class="text-left px-3 py-2">#</th>
+          <th class="text-left px-3 py-2">{% trans "Date" %}</th>
+          <th class="text-left px-3 py-2">{% trans "Store" %}</th>
+          <th class="text-left px-3 py-2">{% trans "Product" %}</th>
+          <th class="text-right px-3 py-2">{% trans "Amount" %}</th>
+          <th class="text-left px-3 py-2">{% trans "Note" %}</th>
+          <th class="text-left px-3 py-2">{% trans "Status / Action" %}</th>
         </tr>
       </thead>
       <tbody>
-        {% for r in rows %}
-          <tr class="border-t">
-            <td class="px-4 py-2">{{ r.created_at|date:"Y-m-d H:i" }}</td>
-            <td class="px-4 py-2">{{ r.store.name }}</td>
-            <td class="px-4 py-2">
-              {% if r.product %}{{ r.product.brand.name }} {{ r.product.model.name }} • {{ r.product.imei_full|slice:"-4:" }}{% else %}-{% endif %}
-            </td>
-            <td class="px-4 py-2 text-right font-medium">{{ r.amount }}</td>
-            <td class="px-4 py-2">{{ r.note|default:"" }}</td>
-            <td class="px-4 py-2 text-right">
-              {% if r.approved %}
-                <span class="text-emerald-700 font-medium">Tasdiqlangan</span>
+        {% for row in rows %}
+        <tr class="border-b last:border-0">
+          <td class="px-3 py-2">{{ row.id }}</td>
+          <td class="px-3 py-2">{{ row.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="px-3 py-2">{{ row.store_name }}</td>
+          <td class="px-3 py-2">{{ row.product_name|default:"—" }}</td>
+          <td class="px-3 py-2 text-right">{{ row.amount|usd }}</td>
+          <td class="px-3 py-2">{{ row.note }}</td>
+          <td class="px-3 py-2">
+            {% if row.id %}
+              {% if not row.approved %}
+                <a class="inline-block px-3 py-1 rounded-lg border hover:bg-neutral-50"
+                   href="{% url 'consignment_approve' row.id %}">{% trans "Approve" %}</a>
+                <a class="inline-block px-3 py-1 rounded-lg border hover:bg-neutral-50 ml-2"
+                   href="{% url 'consignment_reject' row.id %}">{% trans "Reject" %}</a>
               {% else %}
-                <span class="text-amber-600 font-medium">Pending</span>
+                <span class="inline-flex items-center px-2 py-1 rounded-md text-emerald-700 bg-emerald-50 border border-emerald-200">
+                  {% trans "Approved" %}
+                </span>
               {% endif %}
-            </td>
-            <td class="px-4 py-2 text-right">
-              {% if request.user.is_owner %}
-                {% if not r.approved %}
-                  <form method="post" action="{% url 'consignment_approve' r.id %}" class="inline">{% csrf_token %}
-                    <button class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white">Tasdiqlash</button>
-                  </form>
-                  <form method="post" action="{% url 'consignment_reject' r.id %}" class="inline" onsubmit="return confirm('O‘chirilsinmi?')">{% csrf_token %}
-                    <button class="px-3 py-1.5 rounded-lg border">Bekor qilish</button>
-                  </form>
-                {% else %}
-                  <span class="text-neutral-400">–</span>
-                {% endif %}
-              {% else %}
-                <span class="text-neutral-400">Owner tasdiqlaydi</span>
-              {% endif %}
-            </td>
-          </tr>
+            {% else %}
+              <span class="text-neutral-400">—</span>
+            {% endif %}
+          </td>
+        </tr>
         {% empty %}
-          <tr><td colspan="7" class="px-4 py-6 text-center text-neutral-500">Ma’lumot yo‘q</td></tr>
+        <tr><td class="px-3 py-6 text-neutral-500" colspan="7">{% trans "No payouts" %}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-
 </div>
+
+<!-- Chart.js faqat shu sahifada -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function(){
+  const L = JSON.parse(document.getElementById('cnsLabels').textContent);
+  const S = JSON.parse(document.getElementById('cnsSeries').textContent);
+  new Chart(document.getElementById('cns30').getContext('2d'), {
+    type: 'line',
+    data: { labels: L, datasets: [{ label: 'Payouts', data: S, tension: .25 }] }
+  });
+})();
+</script>
+
 {% endblock %}

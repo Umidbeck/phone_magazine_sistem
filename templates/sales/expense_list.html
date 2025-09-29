@@ -49,6 +49,60 @@
     </div>
   </form>
 
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Bugun approved</div>
+        <div class="mt-2 text-2xl font-semibold">${{ today_approved|floatformat:2 }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Bugun pending</div>
+        <div class="mt-2 text-2xl font-semibold">${{ today_pending|floatformat:2 }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">7 kun approved</div>
+        <div class="mt-2 text-2xl font-semibold">${{ total_appr7|floatformat:2 }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">30 kun approved</div>
+        <div class="mt-2 text-2xl font-semibold">${{ total_appr30|floatformat:2 }}</div>
+      </div>
+  </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500 mb-2">7 kun: Approved vs Pending</div>
+        <canvas id="exp7"></canvas>
+        <script id="labels7" type="application/json">{{ labels7_json }}</script>
+        <script id="appr7" type="application/json">{{ appr7_json }}</script>
+        <script id="pend7" type="application/json">{{ pend7_json }}</script>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500 mb-2">30 kun: Approved vs Pending</div>
+        <canvas id="exp30"></canvas>
+        <script id="labels30" type="application/json">{{ labels30_json }}</script>
+        <script id="appr30" type="application/json">{{ appr30_json }}</script>
+        <script id="pend30" type="application/json">{{ pend30_json }}</script>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    (function(){
+      function mk(idL,idA,idB,canvas,type='bar'){
+        const L = JSON.parse(document.getElementById(idL).textContent);
+        const A = JSON.parse(document.getElementById(idA).textContent);
+        const B = JSON.parse(document.getElementById(idB).textContent);
+        new Chart(document.getElementById(canvas).getContext('2d'), {
+          type,
+          data: { labels: L, datasets: [{label:'Approved',data:A,stack:'x'},{label:'Pending',data:B,stack:'x'}] }
+        });
+      }
+      mk('labels7','appr7','pend7','exp7');
+      mk('labels30','appr30','pend30','exp30');
+    })();
+    </script>
+
+
   <!-- Big cards -->
   <div class="grid sm:grid-cols-2 gap-4">
     <div class="rounded-2xl border bg-white p-4">

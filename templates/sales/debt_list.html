@@ -71,6 +71,41 @@
     </div>
   </form>
 
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Ochiq (balans > 0)</div>
+        <div class="mt-1 text-2xl font-semibold">{{ open_count }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Yopilgan</div>
+        <div class="mt-1 text-2xl font-semibold">{{ closed_count }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Ochiq balans (jami)</div>
+        <div class="mt-1 text-2xl font-semibold">${{ open_balance_total|floatformat:2 }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white border rounded-2xl p-4 mb-6">
+      <div class="text-xs text-neutral-500 mb-2">Oxirgi 30 kun: Debt pay kirimi</div>
+      <canvas id="dp30"></canvas>
+      <script id="dpLabels" type="application/json">{{ dp_labels }}</script>
+      <script id="dpSeries" type="application/json">{{ dp_series }}</script>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    (function(){
+      const L = JSON.parse(document.getElementById('dpLabels').textContent);
+      const S = JSON.parse(document.getElementById('dpSeries').textContent);
+      new Chart(document.getElementById('dp30').getContext('2d'), {
+        type: 'line',
+        data: { labels: L, datasets: [{ label: 'Debt pay', data: S, tension: .25 }] }
+      });
+    })();
+    </script>
+
+
   <!-- Table -->
   <div class="rounded-2xl border overflow-x-auto bg-white">
     <table class="min-w-full text-sm">

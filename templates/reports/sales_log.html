@@ -20,7 +20,11 @@
     <input type="date" name="date_from" value="{{ date_from }}" class="border rounded-lg px-3 py-2">
     <input type="date" name="date_to" value="{{ date_to }}" class="border rounded-lg px-3 py-2">
     <button class="bg-black text-white rounded-lg px-3 py-2">{% trans "Apply" %}</button>
+    <li><a class="px-3 py-2 rounded-xl border hover:bg-neutral-50"
+        href="{% url 'export_sales_csv' %}?{{ request.GET.urlencode }}">Export CSV</a>
+    </li>
   </form>
+
 
   <div class="bg-white border rounded-xl p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
     <div><span class="text-gray-500">{% trans "Total amount" %}:</span> <strong>{{ total_amount }}</strong></div>

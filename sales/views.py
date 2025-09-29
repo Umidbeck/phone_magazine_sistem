@@ -1,4 +1,5 @@
 # sales/views.py
+import json
 from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4, UUID
@@ -10,6 +11,7 @@ from django.db import transaction as db_txn
 from django.db.models import Q, Sum, Max, Min
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from django.utils import timezone as dj_tz
 from django.views.decorators.http import require_POST
@@ -230,6 +232,15 @@ def expenses_list(request):
         "total_appr7": total_appr7, "total_pend7": total_pend7,
         "total_appr30": total_appr30, "total_pend30": total_pend30,
     }
+
+    ctx.update({
+        "labels7_json": mark_safe(json.dumps(ctx["labels7"])),
+        "appr7_json": mark_safe(json.dumps(ctx["appr7"])),
+        "pend7_json": mark_safe(json.dumps(ctx["pend7"])),
+        "labels30_json": mark_safe(json.dumps(ctx["labels30"])),
+        "appr30_json": mark_safe(json.dumps(ctx["appr30"])),
+        "pend30_json": mark_safe(json.dumps(ctx["pend30"])),
+    })
     return render(request, "sales/expense_list.html", ctx)
 
 
@@ -515,6 +526,21 @@ def debt_list(request):
     dt = parse_date(request.GET.get("date_to") or "")
 
     rows = _debt_rows(request.user, store_id, seller_id, df, dt)
+    open_rows = [r for r in rows if r["balance"] > 0]
+    closed_rows = [r for r in rows if r["balance"] <= 0]
+    open_balance_total = sum([r["balance"] for r in open_rows], start=Decimal("0"))
+
+    # Oxirgi 30 kun: debt pay (approved) kirimi trendi
+    today = dj_tz.now().date()
+    start = today - timedelta(days=29)
+    pay = (Transaction.objects.filter(type="debt_pay", is_approved=True, is_void=False,
+                                      created_at__date__range=(start, today)))
+    if not getattr(request.user, "is_owner", False):
+        pay = pay.filter(store_id=request.user.store_id)
+    rows30 = (pay.annotate(d=TruncDate("created_at")).values("d").annotate(s=Sum("amount")).order_by("d"))
+    by = {r["d"]: float(r["s"] or 0) for r in rows30}
+    labels = [(start + timedelta(days=i)) for i in range(30)]
+    series = [by.get(d, 0.0) for d in labels]
 
     # umumiy kollektor (approved metrika bo‘yicha)
     s_total = sum([r["total"] for r in rows], start=Decimal("0"))
@@ -530,6 +556,11 @@ def debt_list(request):
         "store_id": str(store_id or ""), "seller_id": str(seller_id or ""),
         "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
         "sum_total": s_total, "sum_paid": s_paid, "sum_cash": s_cash, "sum_card": s_card, "sum_balance": s_bal,
+        "open_count": len(open_rows),
+        "closed_count": len(closed_rows),
+        "open_balance_total": open_balance_total,
+        "dp_labels": mark_safe(json.dumps([d.strftime("%Y-%m-%d") for d in labels])),
+        "dp_series": mark_safe(json.dumps(series)),
     })
 
 
@@ -713,59 +744,61 @@ def debt_reject(request, tx_id):
 
 @login_required
 def consignment_list(request):
-    """
-    Consignment payouts: filter + statistika.
-    """
-    from django.db.models.functions import TruncDate
-    store_id = request.GET.get("store_id") if getattr(request.user,"is_owner",False) else None
-    df = parse_date(request.GET.get("date_from") or "")
-    dt = parse_date(request.GET.get("date_to") or "")
-
     qs = (Transaction.objects
-          .select_related("product","store","created_by")
-          .filter(type="consignment_payout")
+          .select_related("store", "product__brand", "product__model")
+          .filter(type="consignment_payout", is_void=False)
           .order_by("-created_at"))
 
-    if not getattr(request.user,"is_owner",False):
+    # scope
+    if not getattr(request.user, "is_owner", False):
         qs = qs.filter(store_id=request.user.store_id)
-    elif store_id:
-        qs = qs.filter(store_id=store_id)
 
-    if df: qs = qs.filter(created_at__date__gte=df)
-    if dt: qs = qs.filter(created_at__date__lte=dt)
+    # top stats
+    total_cnt = qs.count()
+    total_sum = qs.aggregate(s=Sum("amount"))["s"] or 0
+    appr_qs = qs.filter(is_approved=True)
+    pend_qs = qs.filter(is_approved=False)
+    appr_cnt = appr_qs.count()
+    appr_sum = appr_qs.aggregate(s=Sum("amount"))["s"] or 0
+    pend_cnt = pend_qs.count()
+    pend_sum = pend_qs.aggregate(s=Sum("amount"))["s"] or 0
 
-    # Statistika (bugungi/7/30)
+    # 30 kunlik trend (approved)
     today = dj_tz.now().date()
-    today_sum = qs.filter(created_at__date=today, is_approved=True).aggregate(s=Sum("amount"))["s"] or 0
+    start = today - dj_tz.timedelta(days=29)
+    rows = (appr_qs.filter(created_at__date__range=(start, today))
+                  .annotate(d=TruncDate("created_at"))
+                  .values("d")
+                  .annotate(s=Sum("amount"))
+                  .order_by("d"))
+    by = {r["d"]: float(r["s"] or 0) for r in rows}
+    labels = [(start + dj_tz.timedelta(days=i)) for i in range(30)]
+    series = [by.get(d, 0.0) for d in labels]
 
-    def _sum_days(days):
-        start = today - timedelta(days=days-1)
-        return qs.filter(created_at__date__range=(start,today), is_approved=True).aggregate(s=Sum("amount"))["s"] or 0
-
-    stats = {
-        "today": today_sum,
-        "week": _sum_days(7),
-        "month": _sum_days(30),
-    }
-
-    rows = []
-    for t in qs[:400]:
-        rows.append({
+    # jadval uchun satrlar (yengil)
+    rows_tbl = []
+    for t in qs[:500]:
+        prod = t.product
+        rows_tbl.append({
             "id": t.id,
             "approved": t.is_approved,
             "created_at": t.created_at,
-            "store": t.store,
-            "product": t.product,
+            "store_name": t.store.name if t.store_id else "",
+            "product_name": (f"{getattr(getattr(prod,'brand',None),'name','')}"
+                             f" {getattr(getattr(prod,'model',None),'name','')}".strip()) if prod else "",
             "amount": t.amount,
             "note": t.note or "",
         })
 
-    stores = Store.objects.order_by("name") if getattr(request.user,"is_owner",False) else None
-    return render(request, "sales/consignment_list.html", {
-        "rows": rows, "stores": stores, "store_id": store_id or "",
-        "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
-        "stats": stats,
-    })
+    ctx = {
+        "rows": rows_tbl,
+        "total_cnt": total_cnt, "total_sum": total_sum,
+        "appr_cnt": appr_cnt, "appr_sum": appr_sum,
+        "pend_cnt": pend_cnt, "pend_sum": pend_sum,
+        "chart_labels": mark_safe(json.dumps([d.strftime("%Y-%m-%d") for d in labels])),
+        "chart_series": mark_safe(json.dumps(series)),
+    }
+    return render(request, "sales/consignment_list.html", ctx)
 
 
 
@@ -884,6 +917,15 @@ def commissions_list(request):
     if getattr(request.user, "is_owner", False):
         sellers = list(User.objects.filter(is_active=True).order_by("username").values("id","username"))
 
+    today = dj_tz.now().date()
+    start = today - timedelta(days=29)
+    appr = qs.filter(is_approved=True, transaction__created_at__date__range=(start, today))
+    rows = (appr.annotate(d=TruncDate("transaction__created_at"))
+            .values("d").annotate(s=Sum("amount")).order_by("d"))
+    by = {r["d"]: float(r["s"] or 0) for r in rows}
+    labels = [(start + timedelta(days=i)) for i in range(30)]
+    ser = [by.get(d, 0.0) for d in labels]
+
     ctx = dict(
         rows=list(qs[:500]),
         total_amount=totals.get("total_amount") or 0,
@@ -893,6 +935,13 @@ def commissions_list(request):
         seller_id=seller_id, paid=paid, approved=approved,
         date_from=date_from, date_to=date_to,
     )
+
+    ctx.update({
+        "c_labels": mark_safe(json.dumps([d.strftime("%Y-%m-%d") for d in labels])),
+        "c_series": mark_safe(json.dumps(ser)),
+    })
+
+
     approved_rows = list(qs.filter(is_approved=True)[:500])
     pending_rows = list(qs.filter(is_approved=False)[:500])
     ctx.update({"approved_rows": approved_rows, "pending_rows": pending_rows})

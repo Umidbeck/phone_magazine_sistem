@@ -55,6 +55,41 @@
     </div>
   </form>
 
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Jami</div>
+        <div class="mt-1 text-2xl font-semibold">${{ total_amount|floatformat:2 }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">To‘langan</div>
+        <div class="mt-1 text-2xl font-semibold">${{ paid_amount|floatformat:2 }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Qoldiq</div>
+        <div class="mt-1 text-2xl font-semibold">${{ unpaid_amount|floatformat:2 }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white border rounded-2xl p-4 mb-6">
+      <div class="text-xs text-neutral-500 mb-2">Oxirgi 30 kun: Approved komissiya</div>
+      <canvas id="com30"></canvas>
+      <script id="cLabels" type="application/json">{{ c_labels }}</script>
+      <script id="cSeries" type="application/json">{{ c_series }}</script>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    (function(){
+      const L = JSON.parse(document.getElementById('cLabels').textContent);
+      const S = JSON.parse(document.getElementById('cSeries').textContent);
+      new Chart(document.getElementById('com30').getContext('2d'), {
+        type: 'bar',
+        data: { labels: L, datasets: [{ label: 'Commission', data: S }] }
+      });
+    })();
+    </script>
+
+
   <!-- Summary -->
   <div class="grid sm:grid-cols-3 gap-4">
     <div class="rounded-2xl border bg-white p-4">

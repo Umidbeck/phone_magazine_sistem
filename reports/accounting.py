@@ -216,3 +216,39 @@ def monthly_profit_compare(user, start_month: date, months: int, store_id: Optio
         else:
             month -= 1
     return list(reversed(res))
+
+
+def monthly_breakdown(user, start_month: date, months: int, store_id: Optional[int] = None):
+    """
+    Oyma-oy kengaytirilgan KPI: savdo, gross, period expense, commission, consignment payouts,
+    cash_in, card_in, kassa_total, net_profit.
+    start_month: oyning 1-sanasiga tekislangan sanani bering (masalan, today.replace(day=1))
+    months: nechta oy orqaga (masalan, 24)
+    """
+    res = []
+    y, m = start_month.year, start_month.month
+    for _ in range(months):
+        df = date(y, m, 1)
+        if m == 12:
+            dt = date(y, 12, 31)
+        else:
+            dt = date(y, m + 1, 1) - timedelta(days=1)
+
+        k = compute_kpi(user, df, dt, store_id)
+        res.append({
+            "year": y, "month": m,
+            "total_sales": k.total_sales,
+            "gross_profit": k.gross_profit,
+            "total_expense": k.total_expense,
+            "total_commission": k.total_commission,
+            "total_cons_payouts": k.total_cons_payouts,
+            "cash_in": k.cash_in, "card_in": k.card_in,
+            "kassa_total": k.kassa_total, "net_profit": k.net_profit,
+        })
+
+        # oldingi oyga o‘tamiz
+        if m == 1:
+            m = 12; y -= 1
+        else:
+            m -= 1
+    return list(reversed(res))

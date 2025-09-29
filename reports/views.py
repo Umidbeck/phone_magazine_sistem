@@ -1,22 +1,27 @@
 # reports/views.py
 # reports/views.py  — FULL REPLACE
-
+import csv
+import io
+import zipfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from dateutil.utils import today
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import render
 from django.utils.dateparse import parse_date
 from django.utils import timezone as dj_tz, cache
 
 from accounts.models import User, Store
 from reports.accounting import compute_kpi, compute_debts_total, compute_incoming, daily_kassa_series, \
-    monthly_profit_compare
+    monthly_profit_compare, monthly_breakdown
 from reports.metrics import _date, kpi_block
 from sales.models import Transaction, SellerCommission
 from inventory.models import Product
+
+from django.core.cache import cache
 
 
 # ---- Helperlar (qisqa yo'l) ----
@@ -411,3 +416,331 @@ def expenses_log(request):
         "commission_total": commission_total,
     }
     return render(request, "reports/expenses_log.html", ctx)
+
+
+# ---- Analytics 2.0 (24 oylik) ----
+@login_required
+def analytics_overview(request):
+    """
+    24 oylik konsolidatsiyalangan grafiklar (owner va seller scope).
+    Filtr: months (default 24), store_id (owner uchun ixtiyoriy).
+    """
+    today = dj_tz.now().date()
+    start = today.replace(day=1)
+    months = int(request.GET.get("months") or "24")
+
+    store_id = None
+    stores = None
+    if getattr(request.user, "is_owner", False):
+        stores = Store.objects.order_by("name")
+        store_id = int(request.GET.get("store_id")) if (request.GET.get("store_id") or "").isdigit() else None
+
+    series = monthly_breakdown(request.user, start, months, store_id)
+
+    # front uchun soddalashtirilgan massivlar
+    labels = [f"{row['year']:04d}-{row['month']:02d}" for row in series]
+    net_profit = [float(row["net_profit"] or 0) for row in series]
+    kassa_total = [float(row["kassa_total"] or 0) for row in series]
+    sales = [float(row["total_sales"] or 0) for row in series]
+    gross = [float(row["gross_profit"] or 0) for row in series]
+    expense = [float(row["total_expense"] or 0) for row in series]
+    comm = [float(row["total_commission"] or 0) for row in series]
+    cons = [float(row["total_cons_payouts"] or 0) for row in series]
+    cash_in = [float(row["cash_in"] or 0) for row in series]
+    card_in = [float(row["card_in"] or 0) for row in series]
+
+    ctx = {
+        "labels": labels,
+        "series": {
+            "net_profit": net_profit,
+            "kassa_total": kassa_total,
+            "sales": sales,
+            "gross": gross,
+            "expense": expense,
+            "comm": comm,
+            "cons": cons,
+            "cash_in": cash_in,
+            "card_in": card_in,
+        },
+        "months": months,
+        "stores": stores,
+        "store_id": str(store_id or ""),
+    }
+    return render(request, "reports/analytics_overview.html", ctx)
+
+def _range_from_request(request):
+    df = parse_date(request.GET.get("date_from") or "")
+    dt = parse_date(request.GET.get("date_to") or "")
+    return df, dt
+
+def _store_id_from_request(request):
+    s = (request.GET.get("store_id") or "").strip()
+    return int(s) if s.isdigit() else None
+
+def _tx_base(user):
+    # Faqat select_related: .only() YO‘Q (FieldError’ning oldini olamiz)
+    qs = (Transaction.objects
+          .select_related("store", "seller", "product__brand", "product__model"))
+    if not getattr(user, "is_owner", False):
+        qs = qs.filter(store_id=user.store_id)
+    return qs
+
+def _apply_range(qs, df, dt, date_field="created_at__date"):
+    if df: qs = qs.filter(**{f"{date_field}__gte": df})
+    if dt: qs = qs.filter(**{f"{date_field}__lte": dt})
+    return qs
+
+def _apply_store(qs, store_id):
+    return qs.filter(store_id=store_id) if store_id else qs
+
+@login_required
+def export_all_bundle(request):
+    # faqat owner
+    if not getattr(request.user, "is_owner", False):
+        return HttpResponseForbidden("Only owner can export.")
+
+    df, dt = _range_from_request(request)
+    store_id = _store_id_from_request(request)
+
+    # --- Querylar: .only() YO‘Q ---
+    sales = (_apply_store(
+                _apply_range(
+                    _tx_base(request.user).filter(type="sale", is_void=False), df, dt
+                ),
+                store_id
+             )
+             .order_by("created_at"))
+
+    expenses = (_apply_store(
+                    _apply_range(
+                        _tx_base(request.user)
+                        .filter(type="expense")
+                        .select_related("expense_type"),  # bu yerda zarur
+                        df, dt
+                    ),
+                    store_id
+                )
+                .order_by("created_at"))
+
+    commissions = (SellerCommission.objects
+                   .select_related("transaction", "seller",
+                                   "transaction__store",
+                                   "transaction__product__brand",
+                                   "transaction__product__model"))
+    # owner scope allaqachon, lekin store/date bo‘yicha ham cheklaymiz:
+    if df: commissions = commissions.filter(transaction__created_at__date__gte=df)
+    if dt: commissions = commissions.filter(transaction__created_at__date__lte=dt)
+    if store_id: commissions = commissions.filter(transaction__store_id=store_id)
+    commissions = commissions.order_by("transaction__created_at")
+
+    cons_payouts = (_apply_store(
+                        _apply_range(
+                            _tx_base(request.user).filter(type="consignment_payout"), df, dt
+                        ),
+                        store_id
+                    )
+                    .order_by("created_at"))
+
+    debt_pay = (_apply_store(
+                    _apply_range(
+                        _tx_base(request.user).filter(type="debt_pay"), df, dt
+                    ),
+                    store_id
+                )
+                .order_by("created_at"))
+
+    # --- XLSXga urinib ko‘ramiz ---
+    buf = io.BytesIO()
+    try:
+        from openpyxl import Workbook
+        wb = Workbook()
+
+        # Sales
+        ws = wb.active; ws.title = "Sales"
+        ws.append(["id","date","store","seller","product","amount","cash","card","cost","profit"])
+        for t in sales:
+            prod = t.product
+            pname = ""
+            if prod:
+                b = getattr(prod, "brand", None); m = getattr(prod, "model", None)
+                pname = f"{b.name if b else ''} {m.name if m else ''}".strip()
+            ws.append([t.id, t.created_at.strftime("%Y-%m-%d %H:%M"),
+                       t.store.name if t.store_id else "",
+                       t.seller.username if t.seller_id else "",
+                       pname,
+                       float(t.amount or 0), float(t.cash_amount or 0), float(t.card_amount or 0),
+                       float(t.cost or 0), float(t.profit or 0)])
+
+        # Expenses
+        ws = wb.create_sheet("Expenses")
+        ws.append(["id","date","approved","store","seller","product","expense_type","amount","note"])
+        for t in expenses:
+            prod = t.product
+            pname = ""
+            if prod:
+                b = getattr(prod, "brand", None); m = getattr(prod, "model", None)
+                pname = f"{b.name if b else ''} {m.name if m else ''}".strip()
+            et = t.expense_type.name if t.expense_type_id else ""
+            ws.append([t.id, t.created_at.strftime("%Y-%m-%d %H:%M"),
+                       int(bool(t.is_approved)),
+                       t.store.name if t.store_id else "",
+                       t.seller.username if t.seller_id else "",
+                       pname, et,
+                       float(t.amount or 0), (t.note or "")])
+
+        # Commissions
+        ws = wb.create_sheet("Commissions")
+        ws.append(["id","date","approved","paid","seller","store","product","amount"])
+        for c in commissions:
+            t = c.transaction
+            prod = t.product if t else None
+            pname = ""
+            if prod:
+                b = getattr(prod, "brand", None); m = getattr(prod, "model", None)
+                pname = f"{b.name if b else ''} {m.name if m else ''}".strip()
+            ws.append([c.id,
+                       t.created_at.strftime("%Y-%m-%d %H:%M") if t else "",
+                       int(bool(c.is_approved)), int(bool(c.is_paid)),
+                       c.seller.username if c.seller_id else "",
+                       t.store.name if (t and t.store_id) else "",
+                       pname, float(c.amount or 0)])
+
+        # Consignment payouts
+        ws = wb.create_sheet("ConsignmentPayouts")
+        ws.append(["id","date","approved","store","product","amount","note"])
+        for t in cons_payouts:
+            prod = t.product
+            pname = ""
+            if prod:
+                b = getattr(prod, "brand", None); m = getattr(prod, "model", None)
+                pname = f"{b.name if b else ''} {m.name if m else ''}".strip()
+            ws.append([t.id, t.created_at.strftime("%Y-%m-%d %H:%M"),
+                       int(bool(t.is_approved)),
+                       t.store.name if t.store_id else "",
+                       pname, float(t.amount or 0), (t.note or "")])
+
+        # Debt payments
+        ws = wb.create_sheet("DebtPayments")
+        ws.append(["id","date","approved","store","seller","debtor","phone","amount","cash","card"])
+        for t in debt_pay:
+            ws.append([t.id, t.created_at.strftime("%Y-%m-%d %H:%M"),
+                       int(bool(t.is_approved)),
+                       t.store.name if t.store_id else "",
+                       t.seller.username if t.seller_id else "",
+                       (t.debtor_name or ""), (t.debtor_phone or ""),
+                       float(t.amount or 0), float(t.cash_amount or 0), float(t.card_amount or 0)])
+
+        wb.save(buf)
+        buf.seek(0)
+        resp = HttpResponse(buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        # fayl nomiga filtrlarni ham qo‘shish mumkin (istalsa)
+        resp["Content-Disposition"] = 'attachment; filename="export_bundle.xlsx"'
+        return resp
+
+    except Exception:
+        # Fallback: ZIP of CSVs
+        zbuf = io.BytesIO()
+        with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
+            def add_csv(name, header, rows_iter):
+                sio = io.StringIO(); w = csv.writer(sio)
+                w.writerow(header)
+                for row in rows_iter: w.writerow(row)
+                z.writestr(name, sio.getvalue())
+
+            # Sales
+            def sales_rows():
+                for t in sales:
+                    prod = t.product
+                    pname = ""
+                    if prod:
+                        b = getattr(prod, "brand", None); m = getattr(prod, "model", None)
+                        pname = f"{b.name if b else ''} {m.name if m else ''}".strip()
+                    yield [
+                        t.id, t.created_at.strftime("%Y-%m-%d %H:%M"),
+                        t.store.name if t.store_id else "",
+                        t.seller.username if t.seller_id else "",
+                        pname, t.amount, t.cash_amount, t.card_amount, t.cost, t.profit
+                    ]
+            add_csv("sales.csv",
+                ["id","date","store","seller","product","amount","cash","card","cost","profit"],
+                sales_rows())
+
+            # Expenses
+            def exp_rows():
+                for t in expenses:
+                    prod = t.product
+                    pname = ""
+                    if prod:
+                        b = getattr(prod, "brand", None); m = getattr(prod, "model", None)
+                        pname = f"{b.name if b else ''} {m.name if m else ''}".strip()
+                    et = t.expense_type.name if t.expense_type_id else ""
+                    yield [
+                        t.id, t.created_at.strftime("%Y-%m-%d %H:%M"),
+                        int(bool(t.is_approved)),
+                        t.store.name if t.store_id else "",
+                        t.seller.username if t.seller_id else "",
+                        pname, et, t.amount, (t.note or "")
+                    ]
+            add_csv("expenses.csv",
+                ["id","date","approved","store","seller","product","expense_type","amount","note"],
+                exp_rows())
+
+            # Commissions
+            def com_rows():
+                for c in commissions:
+                    t = c.transaction
+                    prod = t.product if t else None
+                    pname = ""
+                    if prod:
+                        b = getattr(prod, "brand", None); m = getattr(prod, "model", None)
+                        pname = f"{b.name if b else ''} {m.name if m else ''}".strip()
+                    yield [
+                        c.id,
+                        t.created_at.strftime("%Y-%m-%d %H:%M") if t else "",
+                        int(bool(c.is_approved)), int(bool(c.is_paid)),
+                        c.seller.username if c.seller_id else "",
+                        t.store.name if (t and t.store_id) else "",
+                        pname, c.amount
+                    ]
+            add_csv("commissions.csv",
+                ["id","date","approved","paid","seller","store","product","amount"],
+                com_rows())
+
+            # Consignment payouts
+            def cns_rows():
+                for t in cons_payouts:
+                    prod = t.product
+                    pname = ""
+                    if prod:
+                        b = getattr(prod, "brand", None); m = getattr(prod, "model", None)
+                        pname = f"{b.name if b else ''} {m.name if m else ''}".strip()
+                    yield [
+                        t.id, t.created_at.strftime("%Y-%m-%d %H:%M"),
+                        int(bool(t.is_approved)),
+                        t.store.name if t.store_id else "",
+                        pname, t.amount, (t.note or "")
+                    ]
+            add_csv("consignment_payouts.csv",
+                ["id","date","approved","store","product","amount","note"],
+                cns_rows())
+
+            # Debt payments
+            def debt_rows():
+                for t in debt_pay:
+                    yield [
+                        t.id, t.created_at.strftime("%Y-%m-%d %H:%M"),
+                        int(bool(t.is_approved)),
+                        t.store.name if t.store_id else "",
+                        t.seller.username if t.seller_id else "",
+                        (t.debtor_name or ""), (t.debtor_phone or ""),
+                        t.amount, t.cash_amount, t.card_amount
+                    ]
+            add_csv("debt_payments.csv",
+                ["id","date","approved","store","seller","debtor","phone","amount","cash","card"],
+                debt_rows())
+
+        zbuf.seek(0)
+        resp = HttpResponse(zbuf.getvalue(), content_type="application/zip")
+        resp["Content-Disposition"] = 'attachment; filename="export_bundle.zip"'
+        return resp

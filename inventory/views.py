@@ -2,6 +2,7 @@
 import csv
 import datetime
 import io
+import json
 from decimal import Decimal, InvalidOperation
 
 import pandas as pd
@@ -9,12 +10,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q, Model, Sum, When, Case, F
-from django.db.models.functions import Right, Coalesce
+from django.db.models import Q, Model, Sum, When, Case, F, OuterRef, Exists, Count
+from django.db.models.functions import Right, Coalesce, TruncDate
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils.dateparse import parse_date
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from openpyxl import load_workbook
 from weasyprint import HTML
@@ -31,6 +33,8 @@ from .forms import (
 from .mixins import can_edit_product
 from .models import Product, ProductImage
 from .search_utils import product_search_queryset
+
+from django.utils import timezone as dj_tz
 
 
 def digits_only(s: str) -> str:
@@ -50,14 +54,10 @@ def product_list(request):
 
     base_qs = Product.objects.select_related("brand", "model", "store").order_by("-created_at")
 
-    qs = product_search_queryset(
-        request.user,
-        q,
-        base_qs=base_qs,
-        for_sale=False,
-        include_archived=include_archived,
-        store_id=store_id,
-    )
+    qs = (Product.objects
+          .select_related("brand", "model", "store")
+          .filter(status="sold")
+          .order_by("-sold_at"))
 
     if status:
         qs = qs.filter(status=status)
@@ -71,7 +71,22 @@ def product_list(request):
         "include_archived": include_archived,
         "result_count": qs.count(),
     }
-    return render(request, "inventory/product_list.html", ctx)
+    if not getattr(request.user, "is_owner", False):
+        qs = qs.filter(store_id=request.user.store_id)
+
+    installment_exists = Transaction.objects.filter(
+        type="debt_out", product_id=OuterRef("pk"), is_void=False
+    )
+    qs = qs.annotate(is_installment=Exists(installment_exists))
+
+    # Ikki ro‘yxat
+    installment_rows = list(qs.filter(is_installment=True)[:500])
+    full_rows = list(qs.filter(is_installment=False)[:500])
+
+    return render(request, "inventory/product_sold_list.html", {
+        "installment_rows": installment_rows,
+        "full_rows": full_rows,
+    })
 
 
 @login_required
@@ -805,6 +820,27 @@ def product_received_list(request):
     if date_to:
         qs = qs.filter(created_at__date__lte=date_to)
 
+    today = dj_tz.now().date()
+    start = today - datetime.timedelta(days=29)
+
+    def series(q):
+        rows = (q.filter(created_at__date__range=(start, today))
+                .annotate(d=TruncDate("created_at"))
+                .values("d").annotate(cnt=Count("id")).order_by("d"))
+        by = {r["d"]: int(r["cnt"] or 0) for r in rows}
+        labels = [(start + datetime.timedelta(days=i)) for i in range(30)]
+        return labels, [by.get(d, 0) for d in labels]
+
+    labels, cnt_all = series(qs)
+    labels_s = [d.strftime("%Y-%m-%d") for d in labels]
+
+    def sum_value(q, field):
+        return float(q.aggregate(s=Sum(field))["s"] or 0)
+
+    owned_30 = qs.filter(ownership="owned", created_at__date__range=(start, today))
+    cons_30 = qs.filter(ownership="consignment", created_at__date__range=(start, today))
+    total_value_30 = sum_value(owned_30, "purchase_price") + sum_value(cons_30, "consignment_price")
+
     # Ro‘yxatlar
     stores = Store.objects.filter(is_active=True).order_by("name")
     brands = Brand.objects.filter(is_active=True).order_by("name")
@@ -817,6 +853,9 @@ def product_received_list(request):
         "ownership": ownership, "status": status,
         "is_new_val": is_new, "has_docs_val": has_docs,
         "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
+        "rec_labels_json": mark_safe(json.dumps(labels_s)),
+        "rec_counts_json": mark_safe(json.dumps(cnt_all)),
+        "rec_total_value_30": total_value_30,
     }
     return render(request, "inventory/product_received_list.html", ctx)
 
@@ -826,72 +865,61 @@ def product_received_list(request):
 @login_required
 def product_sold_list(request):
     """
-    Sotilganlar: Transaction(type='sale') + fallback Product(status='sold').
-    Kuchli filterlar: store, seller, brand, model, date_from, date_to.
+    Sotilgan mahsulotlar: bo‘lib to‘lash (installment) bo‘lganlarini alohida ajratamiz
+    VA 30 kunlik mini-analitikani chiqaramiz.
+    Mezoni: shu product uchun type='debt_out' (is_void=False) mavjud bo‘lsa -> installment.
     """
-    from django.core.paginator import Paginator
-    df = parse_date(request.GET.get("date_from") or "")
-    dt = parse_date(request.GET.get("date_to") or "")
-    store_id = request.GET.get("store_id") if getattr(request.user, "is_owner", False) else None
-    seller_id = request.GET.get("seller_id") or ""
-    brand_id = request.GET.get("brand") or ""
-    model_id = request.GET.get("model") or ""
+    qs = (Product.objects
+          .select_related("brand","model","store")
+          .filter(status="sold")
+          .order_by("-sold_at"))
 
-    tx_qs = (Transaction.objects
-             .select_related("product", "product__brand", "product__model", "store", "seller")
-             .filter(type="sale", is_void=False, product__isnull=False))
-    p_qs = (Product.objects.select_related("brand", "model", "store").filter(status="sold"))
-
-    # Akses
+    # Seller scope
     if not getattr(request.user, "is_owner", False):
-        tx_qs = tx_qs.filter(store_id=request.user.store_id)
-        p_qs = p_qs.filter(store_id=request.user.store_id)
-    elif store_id:
-        tx_qs = tx_qs.filter(store_id=store_id)
-        p_qs = p_qs.filter(store_id=store_id)
+        qs = qs.filter(store_id=request.user.store_id)
 
-    # Seller
-    if seller_id:
-        tx_qs = tx_qs.filter(seller_id=seller_id)
+    installment_exists = Transaction.objects.filter(
+        type="debt_out", product_id=OuterRef("pk"), is_void=False
+    )
+    qs = qs.annotate(is_installment=Exists(installment_exists))
 
-    # Brand/Model
-    if brand_id:
-        tx_qs = tx_qs.filter(product__brand_id=brand_id)
-        p_qs = p_qs.filter(brand_id=brand_id)
-    if model_id:
-        tx_qs = tx_qs.filter(product__model_id=model_id)
-        p_qs = p_qs.filter(model_id=model_id)
+    installment_rows = list(qs.filter(is_installment=True)[:500])
+    full_rows = list(qs.filter(is_installment=False)[:500])
 
-    # Sana
-    if df:
-        tx_qs = tx_qs.filter(created_at__date__gte=df)
-        p_qs = p_qs.filter(sold_at__date__gte=df)
-    if dt:
-        tx_qs = tx_qs.filter(created_at__date__lte=dt)
-        p_qs = p_qs.filter(sold_at__date__lte=dt)
+    # --- MINI ANALITIKA (oxirgi 30 kun) ---
+    today = dj_tz.now().date()
+    start = today - datetime.timedelta(days=29)
 
-    # Birlashtirish (tx bo‘lganlari + fallback)
-    tx_map = {t.product_id: t for t in tx_qs}
-    rows = [{"p": t.product, "tx": t} for t in tx_qs]
-    rows += [{"p": p, "tx": None} for p in p_qs.exclude(id__in=tx_map.keys())]
+    # Sotuvlar bo‘yicha summa (Transaction)
+    tx = Transaction.objects.filter(
+        type="sale", is_void=False, is_approved=True,
+        created_at__date__range=(start, today)
+    )
+    if not getattr(request.user, "is_owner", False):
+        tx = tx.filter(store_id=request.user.store_id)
 
-    # Sort va paginate
-    rows.sort(key=lambda r: (r["tx"].created_at if r["tx"] else (r["p"].sold_at or r["p"].updated_at)), reverse=True)
-    paginator = Paginator(rows, 30)
-    page = paginator.get_page(request.GET.get("page"))
+    tx_daily = (tx.annotate(d=TruncDate("created_at"))
+                  .values("d")
+                  .annotate(amount=Sum("amount"))
+                  .order_by("d"))
+    by = {r["d"]: float(r["amount"] or 0) for r in tx_daily}
+    labels = [(start + datetime.timedelta(days=i)) for i in range(30)]
+    sales_amounts = [by.get(d, 0.0) for d in labels]
 
-    stores = Store.objects.order_by("name") if getattr(request.user, "is_owner", False) else None
-    sellers = User.objects.filter(is_active=True).order_by("username") if getattr(request.user, "is_owner", False) else None
-    brands  = Brand.objects.filter(is_active=True).order_by("name")
-    models  = ModelName.objects.filter(is_active=True).order_by("brand__name","name")
+    # Ownership bo‘yicha soni (sold products)
+    owned_cnt = qs.filter(ownership="owned").count()
+    cons_cnt  = qs.filter(ownership="consignment").count()
 
-    return render(request, "inventory/product_sold_list.html", {
-        "page": page,
-        "stores": stores, "sellers": sellers, "brands": brands, "models": models,
-        "store_id": store_id or "", "seller_id": seller_id or "",
-        "brand_id": brand_id or "", "model_id": model_id or "",
-        "date_from": request.GET.get("date_from") or "", "date_to": request.GET.get("date_to") or "",
-    })
+    ctx = {
+        "installment_rows": installment_rows,
+        "full_rows": full_rows,
+        # mini-analytics
+        "sold_labels_json": mark_safe(json.dumps([d.strftime("%Y-%m-%d") for d in labels])),
+        "sold_amounts_json": mark_safe(json.dumps(sales_amounts)),
+        "sold_owned_cnt": owned_cnt,
+        "sold_cons_cnt": cons_cnt,
+    }
+    return render(request, "inventory/product_sold_list.html", ctx)
 
 
 

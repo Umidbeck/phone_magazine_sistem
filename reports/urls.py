@@ -2,7 +2,7 @@ from django.urls import path
 
 from sales.views import commission_update_amount
 from .views import store_report, network_report, owner_dashboard, sales_log, expenses_log, profit_overview, daily_cash, \
-    profit_compare
+    profit_compare, analytics_overview, export_all_bundle
 
 urlpatterns = [
     path("store/", store_report, name="report_store"),
@@ -18,4 +18,7 @@ urlpatterns = [
     path("profit-compare/", profit_compare, name="profit_compare"),
     path("commissions/<int:pk>/update-amount/", commission_update_amount, name="commission_update_amount"),
 
+    path("analytics/", analytics_overview, name="analytics_overview"),
+
+    path("export/all", export_all_bundle, name="export_all_bundle"),
 ]

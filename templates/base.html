@@ -57,12 +57,15 @@
             <li><a class="navlink" href="{% url 'commissions_list' %}">🎯 Komissiyalar</a></li>
             <li><a class="navlink" href="{% url 'owner_dashboard' %}">🏠 Dashboard</a></li>
             <li><a class="navlink" href="{% url 'profit_overview' %}">📈 Foyda</a></li>
+            <li><a href="{% url 'analytics_overview' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">Analytics (2.0)</a></li>
 
             {% if request.user.is_owner %}
               <li class="pt-2 text-xs ...">Reports</li>
 
               <li><a class="navlink" href="{% url 'report_store' %}">🏪 Store report</a></li>
               <li><a class="navlink" href="{% url 'report_network' %}">🌐 Network report</a></li>
+              <li><a class="px-4 py-2 rounded-xl border hover:bg-neutral-50"
+                href="{% url 'export_all_bundle' %}?{{ request.GET.urlencode }}">Export All</a></li>
 
               <li class="pt-2 text-xs ...">Reference</li>
               <li><a class="navlink" href="{% url 'brand_list' %}">🏷️ Brendlar</a></li>

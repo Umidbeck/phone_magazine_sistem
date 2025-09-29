@@ -7,6 +7,7 @@
     <h1 class="text-xl font-semibold">Olingan telefonlar</h1>
   </div>
 
+
   <form method="get" class="grid md:grid-cols-6 gap-3 mb-4">
     {% if request.user.is_owner %}
       <div class="md:col-span-2">
@@ -73,6 +74,31 @@
       <button class="btn btn-ghost">Filter</button>
     </div>
   </form>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <div class="bg-white border rounded-2xl p-4">
+            <div class="text-xs text-neutral-500">Oxirgi 30 kun: kirim soni</div>
+            <canvas id="recChart"></canvas>
+            <script type="application/json" id="recLabels">{{ rec_labels_json }}</script>
+            <script type="application/json" id="recCounts">{{ rec_counts_json }}</script>
+          </div>
+          <div class="bg-white border rounded-2xl p-4">
+            <div class="text-xs text-neutral-500">Oxirgi 30 kun: umumiy qiymat</div>
+            <div class="mt-3 text-2xl font-semibold">${{ rec_total_value_30|floatformat:2 }}</div>
+          </div>
+   </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    (function(){
+      const L = JSON.parse(document.getElementById('recLabels').textContent);
+      const C = JSON.parse(document.getElementById('recCounts').textContent);
+      new Chart(document.getElementById('recChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: L, datasets: [{ label: 'Received count', data: C }] }
+      });
+    })();
+    </script>
 
   <div class="divide-y divide-neutral-200">
     {% for p in rows %}
