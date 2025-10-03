@@ -1,0 +1,21 @@
+# components/_bottom_nav.html
+{% load i18n %}
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200">
+  <div class="grid grid-cols-5 text-xs">
+    <a href="{% url 'home_feed' %}" class="py-2 text-center hover:bg-neutral-50 flex flex-col items-center">
+      <svg class="w-5 h-5"><use href="#i-home"/></svg><span>Home</span>
+    </a>
+    <a href="{% url 'inventory_search' %}" class="py-2 text-center hover:bg-neutral-50 flex flex-col items-center">
+      <svg class="w-5 h-5"><use href="#i-search"/></svg><span>{% trans "Search" %}</span>
+    </a>
+    <a href="{% url 'product_create' %}" class="py-2 text-center bg-neutral-900 text-white flex flex-col items-center">
+      <svg class="w-5 h-5"><use href="#i-plus"/></svg><span>{% trans "Add" %}</span>
+    </a>
+    <a href="{% url 'owner_dashboard' %}" class="py-2 text-center hover:bg-neutral-50 flex flex-col items-center">
+      <svg class="w-5 h-5"><use href="#i-pie"/></svg><span>{% trans "Reports" %}</span>
+    </a>
+    <a href="{% url 'account_dashboard' %}" class="py-2 text-center hover:bg-neutral-50 flex flex-col items-center">
+      <svg class="w-5 h-5"><use href="#i-user"/></svg><span>{% trans "Account" %}</span>
+    </a>
+  </div>
+</nav>

@@ -1,0 +1,21 @@
+# accounts/seller_form.html
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Seller" %}{% endblock %}
+{% block content %}
+<div class="p-4">
+  <form method="post" class="bg-white border rounded-xl p-4 space-y-3">
+    {% csrf_token %}
+    <div><label class="text-sm">{% trans "Username" %}</label> {{ form.username }}</div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="text-sm">{% trans "First name" %}</label> {{ form.first_name }}</div>
+      <div><label class="text-sm">{% trans "Last name" %}</label> {{ form.last_name }}</div>
+    </div>
+    <div><label class="text-sm">{% trans "Store" %}</label> {{ form.store }}</div>
+    {% if form.password %}
+      <div><label class="text-sm">{% trans "Password (optional)" %}</label> {{ form.password }}</div>
+    {% endif %}
+    <div class="flex items-center gap-2">{{ form.is_active }} <span class="text-sm">{% trans "Active" %}</span></div>
+    <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Save" %}</button>
+  </form>
+</div>
+{% endblock %}

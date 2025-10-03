@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load money %} {# <<< YANGI: $ format filtri #}
+
+{% block content %}
+<div class="max-w-7xl mx-auto p-4 space-y-6">
+  <h1 class="text-2xl font-semibold">🎯 {% trans "Komissiyalar" %}</h1>
+
+  <!-- Filters -->
+  <form method="get" class="grid md:grid-cols-5 gap-3 bg-white border border-neutral-200 rounded-2xl p-4">
+    {% if sellers %}
+      <div>
+        <label class="text-xs text-neutral-500">Sotuvchi</label>
+        <select name="seller_id" class="w-full rounded-xl border p-2">
+          <option value="">Hammasi</option>
+          {% for s in sellers %}
+            <option value="{{ s.id }}" {% if seller_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
+              {{ s.username }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+
+    <div>
+      <label class="text-xs text-neutral-500">To‘langan?</label>
+      <select name="paid" class="w-full rounded-xl border p-2">
+        <option value="" {% if paid == "" %}selected{% endif %}>Hammasi</option>
+        <option value="1" {% if paid == "1" %}selected{% endif %}>Ha</option>
+        <option value="0" {% if paid == "0" %}selected{% endif %}>Yo‘q</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="text-xs text-neutral-500">Tasdiqlangan?</label>
+      <select name="approved" class="w-full rounded-xl border p-2">
+        <option value="" {% if approved == "" %}selected{% endif %}>Hammasi</option>
+        <option value="1" {% if approved == "1" %}selected{% endif %}>Ha</option>
+        <option value="0" {% if approved == "0" %}selected{% endif %}>Yo‘q</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="text-xs text-neutral-500">Sana — dan</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border p-2">
+    </div>
+    <div>
+      <label class="text-xs text-neutral-500">Sana — gacha</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border p-2">
+    </div>
+
+    <div class="md:col-span-5 flex justify-end gap-2">
+      <button class="px-4 py-2 rounded-xl bg-black text-white">Filtrlash</button>
+      <a href="{% url 'commissions_list' %}" class="px-4 py-2 rounded-xl border">Reset</a>
+    </div>
+  </form>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Jami</div>
+        <div class="mt-1 text-2xl font-semibold">${{ total_amount|floatformat:2 }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">To‘langan</div>
+        <div class="mt-1 text-2xl font-semibold">${{ paid_amount|floatformat:2 }}</div>
+      </div>
+      <div class="bg-white border rounded-2xl p-4">
+        <div class="text-xs text-neutral-500">Qoldiq</div>
+        <div class="mt-1 text-2xl font-semibold">${{ unpaid_amount|floatformat:2 }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white border rounded-2xl p-4 mb-6">
+      <div class="text-xs text-neutral-500 mb-2">Oxirgi 30 kun: Approved komissiya</div>
+      <canvas id="com30"></canvas>
+      <script id="cLabels" type="application/json">{{ c_labels }}</script>
+      <script id="cSeries" type="application/json">{{ c_series }}</script>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    (function(){
+      const L = JSON.parse(document.getElementById('cLabels').textContent);
+      const S = JSON.parse(document.getElementById('cSeries').textContent);
+      new Chart(document.getElementById('com30').getContext('2d'), {
+        type: 'bar',
+        data: { labels: L, datasets: [{ label: 'Commission', data: S }] }
+      });
+    })();
+    </script>
+
+
+  <!-- Summary -->
+  <div class="grid sm:grid-cols-3 gap-4">
+    <div class="rounded-2xl border bg-white p-4">
+      <div class="text-xs text-neutral-500">Jami</div>
+      <div class="text-2xl font-semibold">{{ total_amount|usd }}</div>
+    </div>
+    <div class="rounded-2xl border bg-white p-4">
+      <div class="text-xs text-neutral-500">To‘langan</div>
+      <div class="text-2xl font-semibold text-emerald-700">{{ paid_amount|usd }}</div>
+    </div>
+    <div class="rounded-2xl border bg-white p-4">
+      <div class="text-xs text-neutral-500">To‘lanmagan</div>
+      <div class="text-2xl font-semibold text-amber-600">{{ unpaid_amount|usd }}</div>
+    </div>
+  </div>
+
+  <!-- Pending approvals -->
+  <div class="rounded-2xl border overflow-x-auto bg-white">
+    <div class="px-4 py-3 text-sm font-semibold border-b bg-amber-50">⏳ Tasdiqlash kutilmoqda</div>
+    <table class="min-w-full text-sm">
+      <thead class="bg-neutral-50 text-neutral-600">
+        <tr>
+          <th class="text-left px-4 py-2">Sana</th>
+          <th class="text-left px-4 py-2">Sotuvchi</th>
+          <th class="text-left px-4 py-2">Telefon</th>
+          <th class="text-right px-4 py-2">Komissiya</th>
+          <th class="text-right px-4 py-2">Amal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in pending_rows %}
+        <tr class="border-t">
+          <td class="px-4 py-2">{{ c.transaction.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="px-4 py-2">{{ c.seller.username }}</td>
+          <td class="px-4 py-2">
+            {% if c.transaction.product %}
+              {{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}
+              • {{ c.transaction.product.imei_full|slice:"-4:" }}
+            {% else %}-{% endif %}
+          </td>
+          <td class="px-4 py-2 text-right font-medium">{{ c.amount|usd }}</td>
+          <td class="px-4 py-2 text-right">
+            {% if request.user.is_owner %}
+              <form method="post" action="{% url 'commission_update_amount' c.id %}" class="inline">
+                {% csrf_token %}
+                <input name="amount" type="number" step="0.01" min="0.01" value="{{ c.amount }}"
+                       class="w-28 rounded-lg border px-2 py-1 text-right">
+                <button class="ml-1 px-3 py-1.5 rounded-lg border">Saqlash</button>
+              </form>
+              <form method="post" action="{% url 'commission_approve' c.id %}" class="inline">
+                {% csrf_token %}
+                <button class="ml-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white">Tasdiqlash</button>
+              </form>
+              <form method="post" action="{% url 'commission_reject' c.id %}" class="inline" onsubmit="return confirm('O‘chirilsinmi?')">
+                {% csrf_token %}
+                <button class="ml-1 px-3 py-1.5 rounded-lg border">Bekor qilish</button>
+              </form>
+            {% else %}
+              <span class="text-neutral-400">Owner tasdiqlaydi</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+          <tr><td colspan="5" class="px-4 py-6 text-center text-neutral-500">Pending yo‘q</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Approved list -->
+  <div class="rounded-2xl border overflow-x-auto bg-white">
+    <div class="px-4 py-3 text-sm font-semibold border-b bg-emerald-50">✅ Tasdiqlangan</div>
+    <table class="min-w-full text-sm">
+      <thead class="bg-neutral-50 text-neutral-600">
+        <tr>
+          <th class="text-left px-4 py-2">Sana</th>
+          <th class="text-left px-4 py-2">Sotuvchi</th>
+          <th class="text-left px-4 py-2">Telefon</th>
+          <th class="text-right px-4 py-2">Komissiya</th>
+          <th class="text-right px-4 py-2">To‘langanmi</th>
+          <th class="text-right px-4 py-2">Amal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in approved_rows %}
+        <tr class="border-t">
+          <td class="px-4 py-2">{{ c.transaction.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="px-4 py-2">{{ c.seller.username }}</td>
+          <td class="px-4 py-2">
+            {% if c.transaction.product %}
+              {{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}
+              • {{ c.transaction.product.imei_full|slice:"-4:" }}
+            {% else %}-{% endif %}
+          </td>
+          <td class="px-4 py-2 text-right font-medium">{{ c.amount|usd }}</td>
+          <td class="px-4 py-2 text-right">
+            {% if c.is_paid %}
+              <span class="text-emerald-700 font-medium">Ha</span>
+            {% else %}
+              <span class="text-amber-600 font-medium">Yo‘q</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2 text-right">
+            {% if request.user.is_owner and not c.is_paid %}
+              <form method="post" action="{% url 'commission_mark_paid' c.id %}">{% csrf_token %}
+                <button class="px-3 py-1.5 rounded-lg border">To‘langan deb belgilash</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+          <tr><td colspan="6" class="px-4 py-6 text-center text-neutral-500">Hech narsa yo‘q</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

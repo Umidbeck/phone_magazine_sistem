@@ -1,0 +1,67 @@
+# reports/sales_log.htm
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Sales log" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-3">
+
+  <form method="get" class="bg-white border rounded-xl p-3 grid grid-cols-1 md:grid-cols-5 gap-2">
+    <select name="store_id" class="border rounded-lg px-3 py-2">
+      <option value="">{% trans "All stores" %}</option>
+      {% for s in stores %}
+        <option value="{{ s.id }}" {% if store_id == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="seller_id" class="border rounded-lg px-3 py-2">
+      <option value="">{% trans "All sellers" %}</option>
+      {% for u in sellers %}
+        <option value="{{ u.id }}" {% if seller_id == u.id|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
+      {% endfor %}
+    </select>
+    <input type="date" name="date_from" value="{{ date_from }}" class="border rounded-lg px-3 py-2">
+    <input type="date" name="date_to" value="{{ date_to }}" class="border rounded-lg px-3 py-2">
+    <button class="bg-black text-white rounded-lg px-3 py-2">{% trans "Apply" %}</button>
+    <li><a class="px-3 py-2 rounded-xl border hover:bg-neutral-50"
+        href="{% url 'export_sales_csv' %}?{{ request.GET.urlencode }}">Export CSV</a>
+    </li>
+  </form>
+
+
+  <div class="bg-white border rounded-xl p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+    <div><span class="text-gray-500">{% trans "Total amount" %}:</span> <strong>{{ total_amount }}</strong></div>
+    <div><span class="text-gray-500">{% trans "Total profit" %}:</span> <strong>{{ total_profit }}</strong></div>
+  </div>
+
+  <div class="bg-white border rounded-xl overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="p-2">{% trans "Date" %}</th>
+          <th class="p-2">{% trans "Product" %}</th>
+          <th class="p-2">{% trans "Origin store" %}</th>
+          <th class="p-2">{% trans "Seller" %}</th>
+          <th class="p-2">{% trans "Amount" %}</th>
+          <th class="p-2">{% trans "Profit" %}</th>
+          <th class="p-2">{% trans "Payment" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr class="border-b">
+            <td class="p-2">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="p-2">{{ r.product.brand.name }} {{ r.product.model.name }} — {{ r.product.imei_full }}</td>
+            <td class="p-2">{{ r.store.name }}</td>
+            <td class="p-2">{{ r.seller.username }}</td>
+            <td class="p-2">{{ r.amount }}</td>
+            <td class="p-2">{{ r.profit }}</td>
+            <td class="p-2">{{ r.payment_type }}</td>
+          </tr>
+        {% empty %}
+          <tr><td class="p-3 text-sm text-gray-500" colspan="7">{% trans "No sales" %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="h-24"></div>
+</div>
+{% endblock %}

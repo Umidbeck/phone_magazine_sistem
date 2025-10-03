@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="uz" class="h-full bg-neutral-50">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}PhoneStore{% endblock %}</title>
+  <!-- Tailwind Play CDN (dev uchun) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#0095f6' } // Instagram ko‘kiga yaqin
+          }
+        }
+      }
+    }
+  </script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full text-neutral-900">
+  <!-- Navbar (mobile) -->
+  <header class="md:hidden sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-200">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="text-2xl font-extrabold tracking-tight">Phone<span class="text-brand">Store</span></a>
+      <div class="flex items-center gap-3">
+        <a href="{% url 'inventory_search' %}" class="p-2 rounded hover:bg-neutral-100">🔎</a>
+        {% if request.user.is_authenticated %}
+          <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm">Chiqish</a>
+        {% else %}
+          <a href="{% url 'login' %}" class="px-3 py-1.5 rounded-lg bg-brand text-white text-sm">Kirish</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto w-full grid md:grid-cols-[250px_1fr] gap-6 md:gap-10 px-3 md:px-6 py-4 md:py-8">
+    <!-- Left rail (Instagram sidebar) -->
+    <aside class="hidden md:flex md:flex-col md:sticky md:top-6 h-max bg-white rounded-2xl border border-neutral-200 p-3">
+      <a href="/" class="flex items-center gap-2 px-3 py-2">
+        <span class="text-2xl font-extrabold">Phone<span class="text-brand">Store</span></span>
+      </a>
+      <nav class="mt-2">
+        <ul class="space-y-1">
+          <li>
+            <a href="{% url 'owner_dashboard' %}" class="navlink">
+              <span>🏠</span><span>Dashboard</span>
+            </a>
+          </li>
+          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Inventory</li>
+          <li><a class="navlink" href="{% url 'product_received_list' %}">📥 Olinganlar</a></li>
+          <li><a class="navlink" href="{% url 'product_sold_list' %}">💸 Sotilganlar</a></li>
+            <li><a class="navlink" href="{% url 'expenses_list' %}">🧾 Rashodlar</a></li>
+            <li><a class="navlink" href="{% url 'debt_list' %}">👤 Qarzdorlar</a></li>
+            <li><a class="navlink" href="{% url 'consignment_list' %}">🤝 Do‘kon qarzlari</a></li>
+            <li><a class="navlink" href="{% url 'commissions_list' %}">🎯 Komissiyalar</a></li>
+            <li><a class="navlink" href="{% url 'owner_dashboard' %}">🏠 Dashboard</a></li>
+            <li><a class="navlink" href="{% url 'profit_overview' %}">📈 Foyda</a></li>
+            <li><a href="{% url 'analytics_overview' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">Analytics (2.0)</a></li>
+
+            {% if request.user.is_owner %}
+              <li class="pt-2 text-xs ...">Reports</li>
+
+              <li><a class="navlink" href="{% url 'report_store' %}">🏪 Store report</a></li>
+              <li><a class="navlink" href="{% url 'report_network' %}">🌐 Network report</a></li>
+              <li><a class="px-4 py-2 rounded-xl border hover:bg-neutral-50"
+                href="{% url 'export_all_bundle' %}?{{ request.GET.urlencode }}">Export All</a></li>
+
+              <li class="pt-2 text-xs ...">Reference</li>
+              <li><a class="navlink" href="{% url 'brand_list' %}">🏷️ Brendlar</a></li>
+              <li><a class="navlink" href="{% url 'model_list' %}">📱 Modellar</a></li>
+              <li><a class="navlink" href="{% url 'color_list' %}">🎨 Ranglar</a></li>
+            {% endif %}
+        </ul>
+      </nav>
+
+    <!-- ACCOUNT SECTION -->
+        <div class="mt-6">
+          <div class="px-3 text-xs uppercase tracking-wide text-neutral-500 mb-2">Account</div>
+          <nav class="space-y-1">
+
+            {% if request.user.is_owner %}
+              <a href="{% url 'store_list' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">Stores</a>
+              <a href="{% url 'seller_list' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">Sellers</a>
+              <a href="{% url 'owner_dashboard' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">Owner Dashboard</a>
+            {% endif %}
+
+            <a href="{% url 'account_dashboard' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Account</a>
+            <a href="{% url 'my_sales' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Sales</a>
+            <a href="{% url 'my_commissions' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Commissions</a>
+            <a href="{% url 'my_acquisitions' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Acquisitions</a>
+            <a href="{% url 'my_stats' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Stats</a>
+          </nav>
+        </div>
+        <div class="mt-4 border-t border-neutral-200 pt-3 px-3 text-sm">
+            {% if request.user.is_authenticated %}
+              <div class="flex items-center justify-between">
+                <div class="font-medium">👤 {{ request.user.username }}</div>
+                <a href="{% url 'logout' %}" class="text-brand hover:underline">Chiqish</a>
+              </div>
+            {% else %}
+              <a href="{% url 'login' %}" class="px-3 py-2 rounded-xl bg-brand text-white text-sm block text-center">Kirish</a>
+            {% endif %}
+          </div>
+    </aside>
+
+    <!-- Content area -->
+    <main class="min-w-0">
+      {% if messages %}
+        <div class="space-y-2 mb-4">
+          {% for m in messages %}
+            <div class="rounded-xl border {% if m.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-900{% elif m.tags == 'error' %}border-rose-200 bg-rose-50 text-rose-900{% elif m.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-900{% else %}border-neutral-200 bg-white text-neutral-900{% endif %} px-4 py-3">
+              {{ m }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <style>
+    .navlink{
+      @apply flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm text-neutral-700 hover:bg-neutral-100;
+    }
+    .card {
+      @apply bg-white border border-neutral-200 rounded-2xl shadow-sm;
+    }
+    .btn {
+      @apply inline-flex items-center justify-center px-3 py-2 rounded-xl text-sm font-medium;
+    }
+    .btn-primary { @apply bg-brand text-white hover:opacity-90; }
+    .btn-ghost { @apply bg-neutral-100 text-neutral-900 hover:bg-neutral-200; }
+    .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+    .badge-ok { @apply bg-emerald-100 text-emerald-900; }
+    .badge-draft { @apply bg-neutral-200 text-neutral-700; }
+    .badge-warn { @apply bg-amber-100 text-amber-900; }
+    .badge-danger { @apply bg-rose-100 text-rose-900; }
+    .tbl { @apply w-full text-sm; }
+    .th { @apply text-left text-neutral-500 font-medium pb-2; }
+    .td { @apply py-3 border-t border-neutral-100 align-top; }
+    .td-num { @apply text-right; }
+  </style>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

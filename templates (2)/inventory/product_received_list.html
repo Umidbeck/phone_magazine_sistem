@@ -1,0 +1,137 @@
+# inventor/product_received_list.html
+{% extends "base.html" %}
+{% block title %}Olingan telefonlar · PhoneStore{% endblock %}
+{% block content %}
+<div class="card p-4">
+  <div class="flex items-center justify-between mb-3">
+    <h1 class="text-xl font-semibold">Olingan telefonlar</h1>
+  </div>
+
+
+  <form method="get" class="grid md:grid-cols-6 gap-3 mb-4">
+    {% if request.user.is_owner %}
+      <div class="md:col-span-2">
+        <label class="block text-xs text-neutral-500 mb-1">Do‘kon</label>
+        <select name="store_id" class="w-full rounded-xl border-neutral-300">
+          <option value="">Barchasi</option>
+          {% for s in stores %}
+            <option value="{{ s.id }}" {% if store_id == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Brend</label>
+      <select name="brand" class="w-full rounded-xl border-neutral-300">
+        <option value="">Barchasi</option>
+        {% for b in brands %}
+          <option value="{{ b.id }}" {% if brand_id == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Model</label>
+      <select name="model" class="w-full rounded-xl border-neutral-300">
+        <option value="">Barchasi</option>
+        {% for m in models %}
+          <option value="{{ m.id }}" {% if model_id == m.id|stringformat:"s" %}selected{% endif %}>{{ m.brand.name }} {{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Ownership</label>
+      <select name="ownership" class="w-full rounded-xl border-neutral-300">
+        <option value="">Barchasi</option>
+        <option value="owned" {% if ownership == "owned" %}selected{% endif %}>Owned</option>
+        <option value="consignment" {% if ownership == "consignment" %}selected{% endif %}>Consignment</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">Status</label>
+      <select name="status" class="w-full rounded-xl border-neutral-300">
+        <option value="">Barchasi</option>
+        <option value="available" {% if status == "available" %}selected{% endif %}>Available</option>
+        <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>On Repair</option>
+      </select>
+    </div>
+    <div class="flex items-center gap-4">
+      <label class="inline-flex items-center gap-2 mt-6">
+        <input class="rounded" type="checkbox" name="is_new" value="1" {% if is_new_val %}checked{% endif %}><span>Yangi</span>
+      </label>
+      <label class="inline-flex items-center gap-2 mt-6">
+        <input class="rounded" type="checkbox" name="has_documents" value="1" {% if has_docs_val %}checked{% endif %}><span>Hujjatli</span>
+      </label>
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">From</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border-neutral-300">
+    </div>
+    <div>
+      <label class="block text-xs text-neutral-500 mb-1">To</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border-neutral-300">
+    </div>
+    <div class="md:col-span-6">
+      <button class="btn btn-ghost">Filter</button>
+    </div>
+  </form>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <div class="bg-white border rounded-2xl p-4">
+            <div class="text-xs text-neutral-500">Oxirgi 30 kun: kirim soni</div>
+            <canvas id="recChart"></canvas>
+            <script type="application/json" id="recLabels">{{ rec_labels_json }}</script>
+            <script type="application/json" id="recCounts">{{ rec_counts_json }}</script>
+          </div>
+          <div class="bg-white border rounded-2xl p-4">
+            <div class="text-xs text-neutral-500">Oxirgi 30 kun: umumiy qiymat</div>
+            <div class="mt-3 text-2xl font-semibold">${{ rec_total_value_30|floatformat:2 }}</div>
+          </div>
+   </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    (function(){
+      const L = JSON.parse(document.getElementById('recLabels').textContent);
+      const C = JSON.parse(document.getElementById('recCounts').textContent);
+      new Chart(document.getElementById('recChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: L, datasets: [{ label: 'Received count', data: C }] }
+      });
+    })();
+    </script>
+
+  <div class="divide-y divide-neutral-200">
+    {% for p in rows %}
+      <article class="py-4 flex items-start justify-between gap-4">
+        <div>
+          <div class="text-sm text-neutral-500">{{ p.created_at|date:"Y-m-d H:i" }} · {{ p.store.name }}</div>
+          <div class="font-semibold">{{ p.brand.name }} {{ p.model.name }} · {{ p.imei_full }}</div>
+          <div class="mt-1 flex flex-wrap gap-2">
+            {% if p.ownership == "owned" %}
+              <span class="badge bg-neutral-900 text-white">Owned</span>
+            {% else %}
+              <span class="badge badge-warn">Consignment</span>
+            {% endif %}
+            {% if p.is_new %}<span class="badge badge-ok">New</span>{% endif %}
+            {% if p.has_documents %}<span class="badge bg-sky-100 text-sky-900">Docs</span>{% endif %}
+            {% if p.status == "available" %}
+              <span class="badge bg-emerald-100 text-emerald-900">Available</span>
+            {% elif p.status == "on_repair" %}
+              <span class="badge badge-danger">On Repair</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-neutral-500">Baza narx</div>
+          <div class="font-semibold">
+            {% if p.ownership == "owned" %}{{ p.purchase_price }}{% else %}{{ p.consignment_price }}{% endif %}
+          </div>
+          <a href="{% url 'product_detail' p.id %}" class="btn btn-ghost mt-2">Ochilish</a>
+        </div>
+      </article>
+    {% empty %}
+      <div class="py-10 text-neutral-500 text-center">Ma’lumot yo‘q</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+# reference/color_list.html
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "Colors" %}{% endblock %}
+{% block content %}
+<div class="p-3 space-y-3">
+  <a href="{% url 'color_new' %}" class="px-3 py-2 rounded bg-black text-white">{% trans "Add color" %}</a>
+  <div class="bg-white border rounded-xl">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b">
+        <th class="p-2">{% trans "Name" %}</th><th class="p-2">{% trans "Hex" %}</th><th class="p-2">{% trans "Active" %}</th><th class="p-2"></th>
+      </tr></thead>
+      <tbody>
+        {% for c in items %}
+          <tr class="border-b">
+            <td class="p-2">{{ c.name }}</td>
+            <td class="p-2">{{ c.hex_code }}</td>
+            <td class="p-2">{{ c.is_active }}</td>
+            <td class="p-2"><a class="text-xs px-2 py-1 border rounded" href="{% url 'color_edit' c.id %}">{% trans "Edit" %}</a></td>
+          </tr>
+        {% empty %}
+          <tr><td class="p-2 text-sm text-gray-500" colspan="4">{% trans "No items" %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="h-24"></div>
+</div>
+{% endblock %}

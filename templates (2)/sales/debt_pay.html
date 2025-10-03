@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load money %}
+
+{% block content %}
+<div class="max-w-xl mx-auto p-4 space-y-4">
+  <h1 class="text-xl font-semibold">💵 {% trans "Qarzdor to‘lovini kiritish" %}</h1>
+
+  <div class="rounded-2xl border bg-white p-4">
+    <div class="text-sm text-neutral-500">Qarzdor</div>
+    <div class="font-medium">{{ debtor_label }}</div>
+    <div class="mt-2 text-sm">Qolgan qarz: <span class="font-semibold">{{ balance|usd }}</span></div>
+  </div>
+
+  <form method="post" class="rounded-2xl border bg-white p-4 space-y-3" oninput="syncTotals()">
+    {% csrf_token %}
+    <div>
+      <label class="text-sm">Umumiy to‘lov</label>
+      <input id="id_amount" name="amount" type="number" step="0.01" min="0.01"
+             max="{{ balance }}" class="w-full rounded-xl border p-2" required>
+      <div class="text-xs text-neutral-500">Maksimum: {{ balance|usd }}</div>
+    </div>
+
+    <div>
+      <label class="text-sm">To‘lov turi</label>
+      <select id="id_payment_type" name="payment_type" class="w-full rounded-xl border p-2">
+        <option value="cash">Naqd</option>
+        <option value="card">Karta</option>
+        <option value="mixed">Aralash</option>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="text-sm">Naqd</label>
+        <input id="id_cash_amount" name="cash_amount" type="number" step="0.01" min="0" value="0"
+               class="w-full rounded-xl border p-2">
+      </div>
+      <div>
+        <label class="text-sm">Karta</label>
+        <input id="id_card_amount" name="card_amount" type="number" step="0.01" min="0" value="0"
+               class="w-full rounded-xl border p-2">
+      </div>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="text-red-600 text-sm">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="flex justify-end">
+      <button class="px-4 py-2 rounded-xl bg-black text-white">Saqlash</button>
+    </div>
+  </form>
+</div>
+
+<script>
+function syncTotals(){
+  const ptype = document.getElementById('id_payment_type').value;
+  const amount = parseFloat(document.getElementById('id_amount').value || 0);
+  const cashEl = document.getElementById('id_cash_amount');
+  const cardEl = document.getElementById('id_card_amount');
+  let cash = parseFloat(cashEl.value || 0);
+  let card = parseFloat(cardEl.value || 0);
+
+  if (ptype === 'cash'){
+    cash = amount; card = 0;
+    cashEl.value = (isFinite(cash)? cash.toFixed(2): '0.00');
+    cardEl.value = '0.00';
+    cashEl.readOnly = true; cardEl.readOnly = true;
+  } else if (ptype === 'card'){
+    cash = 0; card = amount;
+    cashEl.value = '0.00';
+    cardEl.value = (isFinite(card)? card.toFixed(2): '0.00');
+    cashEl.readOnly = true; cardEl.readOnly = true;
+  } else {
+    // mixed
+    cashEl.readOnly = false; cardEl.readOnly = false;
+    const sum = (parseFloat(cashEl.value || 0) + parseFloat(cardEl.value || 0));
+    if (Math.abs(sum - amount) > 0.009){
+      // muvofiqlashtirish: naqdni avtomatik moslaymiz
+      const newCash = Math.max(amount - (parseFloat(cardEl.value || 0)), 0);
+      cashEl.value = newCash.toFixed(2);
+    }
+  }
+
+  // amount maxdan oshmasin (balance ni max sifatida berdik)
+  const max = parseFloat(document.getElementById('id_amount').max || 0);
+  if (amount > max){
+    document.getElementById('id_amount').value = (isFinite(max)? max.toFixed(2): document.getElementById('id_amount').value);
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,49 @@
+# accounts/my_commissions.html
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "My commissions (daily)" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-3">
+
+  <form method="get" class="bg-white border rounded-xl p-3 flex items-center gap-2">
+    <label class="text-sm">{% trans "Days" %}</label>
+    <select name="days" class="border rounded-lg px-3 py-2">
+      <option value="7" {% if days == 7 %}selected{% endif %}>7</option>
+      <option value="30" {% if days == 30 %}selected{% endif %}>30</option>
+      <option value="90" {% if days == 90 %}selected{% endif %}>90</option>
+    </select>
+    <button class="px-3 py-2 bg-black text-white rounded-lg">{% trans "Apply" %}</button>
+  </form>
+
+  <div class="bg-white border rounded-xl p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+    <div><span class="text-gray-500">{% trans "From" %}:</span> <strong>{{ date_from }}</strong></div>
+    <div><span class="text-gray-500">{% trans "To" %}:</span> <strong>{{ date_to }}</strong></div>
+    <div><span class="text-gray-500">{% trans "Total sales" %}:</span> <strong>{{ grand_count }}</strong></div>
+    <div><span class="text-gray-500">{% trans "Total commission" %}:</span> <strong>{{ grand_total }}</strong></div>
+  </div>
+
+  <div class="bg-white border rounded-xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="p-2">{% trans "Date" %}</th>
+          <th class="p-2">{% trans "Sales count" %}</th>
+          <th class="p-2">{% trans "Commission total" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr class="border-b">
+            <td class="p-2">{{ r.d }}</td>
+            <td class="p-2">{{ r.count }}</td>
+            <td class="p-2">{{ r.total }}</td>
+          </tr>
+        {% empty %}
+          <tr><td class="p-3 text-sm text-gray-500" colspan="3">{% trans "No data" %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="h-24"></div>
+</div>
+{% endblock %}

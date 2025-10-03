@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto p-4 space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-semibold">💵 Har kunlik kassa</h1>
+  </div>
+
+  <form method="get" class="grid md:grid-cols-5 gap-3 bg-white border rounded-2xl p-4">
+    {% if stores %}
+    <div>
+      <label class="text-xs text-neutral-500">Do‘kon</label>
+      <select name="store_id" class="w-full rounded-xl border p-2">
+        <option value="">Hammasi</option>
+        {% for s in stores %}
+          <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div>
+      <label class="text-xs text-neutral-500">Sana — dan</label>
+      <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" class="w-full rounded-xl border p-2">
+    </div>
+    <div>
+      <label class="text-xs text-neutral-500">Sana — gacha</label>
+      <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}" class="w-full rounded-xl border p-2">
+    </div>
+    <div class="md:col-span-5 flex justify-end">
+      <button class="px-4 py-2 rounded-xl bg-black text-white">Ko‘rsat</button>
+    </div>
+  </form>
+
+  <div class="rounded-2xl border overflow-x-auto bg-white">
+    <table class="min-w-full text-sm">
+      <thead class="bg-neutral-50 text-neutral-600">
+        <tr>
+          <th class="text-left px-4 py-2">Sana</th>
+          <th class="text-right px-4 py-2">Naqd</th>
+          <th class="text-right px-4 py-2">Karta</th>
+          <th class="text-right px-4 py-2">Kassa</th>
+          <th class="text-right px-4 py-2">Net profit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="border-t">
+          <td class="px-4 py-2">{{ r.date|date:"Y-m-d" }}</td>
+          <td class="px-4 py-2 text-right">{{ r.cash_in }}</td>
+          <td class="px-4 py-2 text-right">{{ r.card_in }}</td>
+          <td class="px-4 py-2 text-right font-medium">{{ r.kassa }}</td>
+          <td class="px-4 py-2 text-right">{{ r.net_profit }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="border-t bg-neutral-50">
+          <td class="px-4 py-2 text-right font-medium" colspan="3">Jami</td>
+          <td class="px-4 py-2 text-right font-semibold">{{ sum_kassa }}</td>
+          <td class="px-4 py-2 text-right font-semibold">{{ sum_profit }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+# accounts/my_sales.html
+{% extends "base.html" %}{% load i18n %}
+{% block header_title %}{% trans "My sold phones" %}{% endblock %}
+{% block content %}
+<div class="p-4 space-y-3">
+
+  <form method="get" class="bg-white border rounded-xl p-3">
+    <select name="period" class="border rounded-lg px-3 py-2">
+      <option value="day" {% if period == "day" %}selected{% endif %}>{% trans "Day" %}</option>
+      <option value="week" {% if period == "week" %}selected{% endif %}>{% trans "Week" %}</option>
+      <option value="month" {% if period == "month" %}selected{% endif %}>{% trans "Month" %}</option>
+      <option value="year" {% if period == "year" %}selected{% endif %}>{% trans "Year" %}</option>
+    </select>
+    <button class="bg-black text-white rounded-lg px-3 py-2">{% trans "Apply" %}</button>
+  </form>
+
+  <div class="bg-white border rounded-xl p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+    <div><span class="text-gray-500">{% trans "Total amount" %}:</span> <strong>{{ total_amount }}</strong></div>
+    <div><span class="text-gray-500">{% trans "Total profit" %}:</span> <strong>{{ total_profit }}</strong></div>
+    <div class="text-xs text-gray-500 md:col-span-2">
+      {% trans "From" %} {{ date_from }} {% trans "to" %} {{ date_to }}
+    </div>
+  </div>
+
+  <div class="bg-white border rounded-xl overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="p-2">{% trans "Date" %}</th>
+          <th class="p-2">{% trans "Product" %}</th>
+          <th class="p-2">{% trans "Origin store" %}</th>
+          <th class="p-2">{% trans "Amount" %}</th>
+          <th class="p-2">{% trans "Profit" %}</th>
+          <th class="p-2">{% trans "Bonus" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr class="border-b">
+            <td class="p-2">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="p-2">{{ r.product.brand.name }} {{ r.product.model.name }} — {{ r.product.imei_full }}</td>
+            <td class="p-2">{{ r.store.name }}</td>
+            <td class="p-2">{{ r.amount }}</td>
+            <td class="p-2">{{ r.profit }}</td>
+            <td class="p-2">
+              {% if r.commission %}
+                {% if r.commission.is_paid %}
+                  <span class="text-xs px-2 py-1 rounded bg-green-200 text-green-800">{% trans "Paid" %}</span>
+                {% else %}
+                  <span class="text-xs px-2 py-1 rounded bg-yellow-200 text-yellow-800">{% trans "Unpaid" %}</span>
+                {% endif %}
+              {% else %}-{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td class="p-3 text-sm text-gray-500" colspan="6">{% trans "No sales yet" %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
