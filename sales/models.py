@@ -50,6 +50,14 @@ class Transaction(models.Model):
     # Xarajatlar uchun:
     expense_type = models.ForeignKey(ExpenseType, null=True, blank=True, on_delete=models.SET_NULL)
 
+    # Kross-do'kon savdosi uchun
+    sold_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name="sales_made",
+                                help_text="Savdo qilgan sotuvchi (kim sotdi)")
+    sold_in_store = models.ForeignKey("accounts.Store", on_delete=models.SET_NULL, null=True, blank=True,
+                                      related_name="sales_on_site",
+                                      help_text="Savdo qaysi do'konda amalga oshirildi (fizik joy)")
+
     # Tasdiqlash oqimi
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="transactions_created",
                                    on_delete=models.PROTECT, null=True, blank=True)

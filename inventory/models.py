@@ -34,7 +34,20 @@ class Product(models.Model):
     imei_full = models.CharField(max_length=32, unique=True)  # faqat raqam saqlaymiz
     imei_last4 = models.CharField(max_length=4, db_index=True, default='0000')
 
-    has_documents = models.BooleanField(default=False)
+    # Document presence
+    has_documents = models.BooleanField(
+        default=False,
+        help_text="Telefonning hujjatlari bor-yo‘qligini belgilang.",
+    )
+    # Agar istasangiz: hujjat rasmi bitta fayl ko‘rinishida
+    document_image = models.ImageField(
+        upload_to="docs/",
+        blank=True,
+        null=True,
+        help_text="Agar hujjat rasmi bo‘lsa, bitta rasm yuklang (ixtiyoriy)."
+    )
+
+
     is_new = models.BooleanField(default=False)
     defect = models.CharField(max_length=120, blank=True)
     battery_pct = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -105,10 +118,20 @@ class Product(models.Model):
     def __str__(self): return f"{self.brand} {self.model} {self.imei_full[-4:]}"
 
 class ProductImage(models.Model):
-    TYPE = (("doc","Document"),("cond","Condition"),("other","Other"))
+    """Gallery images (up to 7). Optional."""
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images")
-    image = models.ImageField(upload_to="stores/%Y/%m/%d")
+    image = models.ImageField(upload_to="products/")
+    order = models.PositiveIntegerField(default=0)
+    TYPE = (("doc","Document"),("cond","Condition"),("other","Other"))
     kind = models.CharField(max_length=8, choices=TYPE, default="other")
-    is_primary = models.BooleanField(default=False)
-    checksum = models.CharField(max_length=64, db_index=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+
+
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"Image #{self.order} for {self.product_id}"
+
+
+

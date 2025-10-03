@@ -1,5 +1,5 @@
 # reports/metrics.py
-from datetime import datetime
+from datetime import datetime, timezone, time, timedelta
 from decimal import Decimal
 from django.db.models import Sum, Q
 from django.utils import timezone as dj_tz
@@ -101,4 +101,40 @@ def kpi_block(user, df, dt):
         "kassa_total": kassa_total,
 
         "net_profit": net_profit,
+    }
+
+def _day_bounds(day=None, tz=None):
+    tz = tz or timezone.get_current_timezone()
+    today = day or timezone.localdate()  # tz aware
+    start = timezone.make_aware(datetime.combine(today, time.min), tz)
+    end = start + timedelta(days=1)
+    return start, end
+
+def get_today_sales_stats(*, user=None, store=None, day=None):
+    # NOTE: sozlang: "price" -> "amount" bo‘lsa, moslang
+    from sales.models import Transaction
+
+    start, end = _day_bounds(day)
+    qs = Transaction.objects.filter(
+        type="sale",
+        is_approved=True,
+        is_void=False,
+        created_at__gte=start,
+        created_at__lt=end,
+    )
+    # Filial/seller bo‘yicha cheklash
+    if store is not None:
+        qs = qs.filter(store=store)
+    elif user is not None and not getattr(user, "is_owner", False):
+        qs = qs.filter(store=user.store)
+
+    agg = qs.aggregate(
+        total_sales=Sum("price"),   # <-- price nomi boshqacha bo‘lsa moslang
+        total_cost=Sum("cost"),
+        total_profit=Sum("profit"),
+    )
+    return {
+        "today_sales": agg["total_sales"] or 0,
+        "today_cost": agg["total_cost"] or 0,
+        "today_profit": agg["total_profit"] or 0,
     }

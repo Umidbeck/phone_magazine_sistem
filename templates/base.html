@@ -67,23 +67,44 @@
               <li><a class="px-4 py-2 rounded-xl border hover:bg-neutral-50"
                 href="{% url 'export_all_bundle' %}?{{ request.GET.urlencode }}">Export All</a></li>
 
+
+
               <li class="pt-2 text-xs ...">Reference</li>
               <li><a class="navlink" href="{% url 'brand_list' %}">🏷️ Brendlar</a></li>
               <li><a class="navlink" href="{% url 'model_list' %}">📱 Modellar</a></li>
               <li><a class="navlink" href="{% url 'color_list' %}">🎨 Ranglar</a></li>
             {% endif %}
+            <!-- Finance (Yangi bo‘lim) -->
+          <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Finance</li>
+          {% url 'finance:dashboard' as finance_dashboard %}
+          {% if finance_dashboard %}<li><a class="navlink" href="{{ finance_dashboard }}">🏠 Finance Dashboard</a></li>{% endif %}
+
+          {% url 'finance:investment_list' as finance_investments %}
+          {% if finance_investments %}<li><a class="navlink" href="{{ finance_investments }}">💼 Investitsiyalar</a></li>{% endif %}
+
+          {% url 'finance:arap_report' as finance_arap %}
+          {% if finance_arap %}<li><a class="navlink" href="{{ finance_arap }}">👥 AR / AP</a></li>{% endif %}
+
+          {% url 'finance:commission_report' as finance_commission %}
+          {% if finance_commission %}<li><a class="navlink" href="{{ finance_commission }}">🎯 Komissiya</a></li>{% endif %}
+
+            <li class="pt-2 text-xs uppercase tracking-wider text-neutral-400 px-3">Reports</li>
+
+            {% url 'report_store' as report_store %}
+            {% if report_store %}<li><a class="navlink" href="{{ report_store }}">🏪 Store report</a></li>{% endif %}
+
+            {% url 'report_network' as report_network %}
+            {% if report_network %}<li><a class="navlink" href="{{ report_network }}">🌐 Network report</a></li>{% endif %}
+
+            {% url 'export_all_bundle' as export_all_bundle %}
+            {% if export_all_bundle %}
+            <li>
+              <a class="px-4 py-2 rounded-xl border hover:bg-neutral-50" href="{{ export_all_bundle }}?{{ request.GET.urlencode }}">Export All</a>
+            </li>
+          {% endif %}
         </ul>
       </nav>
-      <div class="mt-4 border-t border-neutral-200 pt-3 px-3 text-sm">
-        {% if request.user.is_authenticated %}
-          <div class="flex items-center justify-between">
-            <div class="font-medium">👤 {{ request.user.username }}</div>
-            <a href="{% url 'logout' %}" class="text-brand hover:underline">Chiqish</a>
-          </div>
-        {% else %}
-          <a href="{% url 'login' %}" class="px-3 py-2 rounded-xl bg-brand text-white text-sm block text-center">Kirish</a>
-        {% endif %}
-      </div>
+
     <!-- ACCOUNT SECTION -->
         <div class="mt-6">
           <div class="px-3 text-xs uppercase tracking-wide text-neutral-500 mb-2">Account</div>
@@ -102,6 +123,16 @@
             <a href="{% url 'my_stats' %}" class="block px-3 py-2 rounded-xl hover:bg-neutral-100">My Stats</a>
           </nav>
         </div>
+        <div class="mt-4 border-t border-neutral-200 pt-3 px-3 text-sm">
+            {% if request.user.is_authenticated %}
+              <div class="flex items-center justify-between">
+                <div class="font-medium">👤 {{ request.user.username }}</div>
+                <a href="{% url 'logout' %}" class="text-brand hover:underline">Chiqish</a>
+              </div>
+            {% else %}
+              <a href="{% url 'login' %}" class="px-3 py-2 rounded-xl bg-brand text-white text-sm block text-center">Kirish</a>
+            {% endif %}
+          </div>
     </aside>
 
     <!-- Content area -->

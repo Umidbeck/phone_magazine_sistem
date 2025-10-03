@@ -3,6 +3,7 @@ from .views import product_list, product_create, move_to_repair, mark_available,
     export_sales_csv, export_products_pdf, import_excel, home_feed, inventory_search, product_detail, product_edit, \
     my_acquisitions, my_stats, product_sold_list, product_received_list
 
+
 urlpatterns = [
     path("products/", product_list, name="product_list"),
     path("products/received/", product_received_list, name="product_received_list"),  # <-- YANGI
@@ -14,7 +15,8 @@ urlpatterns = [
 
     path("export/products.csv", export_products_csv, name="export_products_csv"),
     path("export/sales.csv", export_sales_csv, name="export_sales_csv"),
-    path("export/products.pdf", export_products_pdf, name="export_products_pdf"),
+    path("exp"
+         "ort/products.pdf", export_products_pdf, name="export_products_pdf"),
 
     path("products/import-excel/", import_excel, name="import_excel"),
     path("products/<int:pk>/edit/", product_edit, name="product_edit"),
@@ -25,4 +27,5 @@ urlpatterns = [
     path("feed/", home_feed, name="home_feed"),
     path("search/", inventory_search, name="inventory_search"),
     path("product/<int:pk>/", product_detail, name="product_detail"),
+
 ]

@@ -1,11 +1,13 @@
 from decimal import Decimal
 
 from django import forms
+from django.forms import inlineformset_factory
 from django.forms.widgets import ClearableFileInput
 
 from accounts.models import Store
 from .models import Product, ProductImage, BatchIntake
 from reference.models import Brand, ModelName, Color
+from django.utils.translation import gettext_lazy as _
 
 # --- YANGI: ko‘p faylga ruxsat beradigan widget ---
 class MultipleFileInput(forms.ClearableFileInput):
@@ -120,3 +122,134 @@ class ImportExcelForm(forms.Form):
     file = forms.FileField()
     store = forms.ModelChoiceField(queryset=Store.objects.filter(is_active=True))
 
+
+class ProductForm(forms.ModelForm):
+    images = forms.FileField(
+        required=False,
+        widget=MultipleFileInput(  # ← o‘z multiple widget
+            attrs={
+                "class": "w-full rounded-xl border p-2",
+                "accept": "image/*",
+            }
+        ),
+        help_text="0–7 ta rasm yuklang (ixtiyoriy)."
+    )
+
+    # Hujjat uchun bitta rasm – ImageField, multiple emas
+    document_image = forms.ImageField(
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={
+                "class": "w-full rounded-xl border p-2",
+                "accept": "image/*",
+            }
+        ),
+        help_text="Hujjat rasmi (ixtiyoriy, faqat 1 ta)."
+    )
+    class Meta:
+        model = Product
+        fields = [
+            "store", "brand", "model", "color", "year",
+            "ownership", "purchase_price", "consignment_price",
+            "imei_full", "has_documents", "is_new",
+            "owner_name", "owner_phone",
+            "defect", "battery_pct","document_image",
+        ]
+        widgets = {
+            "purchase_date": forms.DateInput(attrs={"type": "date"}),
+            "store": forms.Select(attrs={"class": "w-full rounded-xl border p-2"}),
+            "brand": forms.Select(attrs={"class": "w-full rounded-xl border p-2"}),
+            "model": forms.Select(attrs={"class": "w-full rounded-xl border p-2"}),
+            "color": forms.Select(attrs={"class": "w-full rounded-xl border p-2"}),
+            "year": forms.NumberInput(attrs={"class": "w-full rounded-xl border p-2", "min": 2000, "max": 2100}),
+            "ownership": forms.Select(attrs={"class": "w-full rounded-xl border p-2"}),
+            "purchase_price": forms.NumberInput(attrs={"class": "w-full rounded-xl border p-2", "step": "0.01"}),
+            "consignment_price": forms.NumberInput(attrs={"class": "w-full rounded-xl border p-2", "step": "0.01"}),
+            "imei_full": forms.TextInput(attrs={"class": "w-full rounded-xl border p-2"}),
+            "has_documents": forms.CheckboxInput(attrs={"class": "rounded"}),
+            "is_new": forms.CheckboxInput(attrs={"class": "rounded"}),
+            "owner_name": forms.TextInput(attrs={"class": "w-full rounded-xl border p-2"}),
+            "owner_phone": forms.TextInput(attrs={"class": "w-full rounded-xl border p-2"}),
+            "defect": forms.Textarea(attrs={"class": "w-full rounded-xl border p-2", "rows": 2}),
+            "battery_pct": forms.NumberInput(attrs={"class": "w-full rounded-xl border p-2", "min": 0, "max": 100}),
+        }
+        labels = {
+            "store": _("Do‘kon"),
+            "brand": _("Brend"),
+            "model": _("Model"),
+            "color": _("Rang"),
+            "year":  _("Yil"),
+            "ownership": _("Egalik turi"),
+            "purchase_price": _("Xarid narxi"),
+            "consignment_price": _("Konsignatsiya narxi"),
+            "imei_full": _("IMEI"),
+            "has_documents": _("Hujjatlari bor"),
+            "is_new": _("Yangi holat"),
+            "owner_name": _("Egasi (F.I.Sh)"),
+            "owner_phone": _("Telefon raqami"),
+            "defect": _("Nuqson"),
+            "battery_pct": _("Batareya (%)"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+        # faqat aktiv ma’lumotnomalar
+        self.fields["store"].queryset = Store.objects.filter(is_active=True).order_by("name")
+        self.fields["brand"].queryset = Brand.objects.filter(is_active=True).order_by("name")
+        self.fields["model"].queryset = ModelName.objects.filter(is_active=True).order_by("name")
+        self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
+
+        # seller bo‘lsa do‘kon maydoni qulflanadi
+        if user and not getattr(user, "is_owner", False) and getattr(user, "store_id", None):
+            self.fields["store"].initial = user.store_id
+            self.fields["store"].disabled = True
+
+        self.fields["document_image"].required = False
+
+        # Seller bo‘lsa store’ni ko‘rsatamiz, lekin tahrirlatmaymiz
+        if user and not getattr(user, "is_owner", False):
+            self.fields["store"].initial = getattr(user, "store", None)
+            self.fields["store"].disabled = True
+
+    def clean_imei_full(self):
+        v = digits_only(self.cleaned_data.get("imei_full") or "")
+        if len(v) < 4:
+            raise forms.ValidationError(_("IMEI kamida 4 raqam bo‘lishi kerak."))
+        return v
+
+    def clean(self):
+        cleaned = super().clean()
+        ownership = cleaned.get("ownership")
+        pp = cleaned.get("purchase_price") or Decimal("0")
+        cp = cleaned.get("consignment_price") or Decimal("0")
+        if ownership == "owned" and pp <= 0:
+            self.add_error("purchase_price", _("Owned bo‘lsa xarid narxi shart."))
+        if ownership == "consignment" and cp <= 0:
+            self.add_error("consignment_price", _("Consignment bo‘lsa konsignatsiya narxi shart."))
+        return cleaned
+
+
+class ProductImageForm(forms.ModelForm):
+    class Meta:
+        model = ProductImage
+        # MUHIM: modeldagi nom 'kind', 'type' emas
+        fields = ["image", "kind"]
+        widgets = {
+            "image": forms.ClearableFileInput(attrs={"class": "w-full rounded-xl border p-2", "accept": "image/*"}),
+            "kind": forms.Select(attrs={"class": "w-full rounded-xl border p-2"}),
+        }
+        labels = {
+            "image": _("Rasm"),
+            "kind":  _("Turi (doc/cond/other)"),
+        }
+
+
+ProductImageFormSet = inlineformset_factory(
+    parent_model=Product,
+    model=ProductImage,
+    form=ProductImageForm,
+    extra=7,
+    max_num=7,
+    can_delete=True,
+)

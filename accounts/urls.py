@@ -4,6 +4,7 @@ from django.urls import path
 from inventory.views import my_acquisitions, my_stats
 from .views import login_view, logout_view, home, store_list, store_form, store_delete, seller_list, seller_new, \
     seller_edit, seller_delete, seller_reset_password, account_dashboard, account_stats_user, my_sales, my_commissions
+from .views_commission import commission_settings
 
 urlpatterns = [
     # path("", account_dashboard, name="account_dashboard"),
@@ -31,4 +32,6 @@ urlpatterns = [
 
     path("account/", account_dashboard, name="account_dashboard"),
     path("account/stats/", account_stats_user, name="account_stats_user"),
+
+    path("settings/commission/", commission_settings, name="commission_settings"),
 ]

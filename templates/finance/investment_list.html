@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Investitsiyalar{% endblock %}
+{% block content %}
+<div class="card p-4">
+  <h2 class="text-xl font-semibold mb-3">Investitsiyalar</h2>
+  <form method="post" class="grid gap-3 mb-4">
+    {% csrf_token %}
+    <div class="grid md:grid-cols-3 gap-3">
+      <div>{{ form.date.label_tag }} {{ form.date }}</div>
+      <div>{{ form.amount.label_tag }} {{ form.amount }}</div>
+      <div>{{ form.note.label_tag }} {{ form.note }}</div>
+    </div>
+    <button class="btn btn-primary">Qo‘shish</button>
+  </form>
+
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th class="th">Sana</th>
+        <th class="th">Miqdor</th>
+        <th class="th">Izoh</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+        <tr>
+          <td class="td">{{ it.date }}</td>
+          <td class="td td-num">{{ it.amount }}</td>
+          <td class="td">{{ it.note }}</td>
+        </tr>
+      {% empty %}
+        <tr><td class="td" colspan="3">Hali yozuv yo‘q.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

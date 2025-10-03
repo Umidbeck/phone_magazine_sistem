@@ -7,8 +7,9 @@ from uuid import uuid4, UUID
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction as db_txn
+from django.db import transaction as db_txn, transaction
 from django.db.models import Q, Sum, Max, Min
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
 from django.utils.safestring import mark_safe
@@ -26,9 +27,25 @@ from .forms import (
     ConsignmentPayoutForm, InstallmentSaleForm, DebtNewSimpleForm, parse_amount,
 )
 from .models import Transaction, SellerCommission, ConsignmentDue
+from .services import get_commission_amount
 
 
 # ====== SOTUV ======
+def _has_approved_consignment_payout(product_id: int) -> bool:
+    return Transaction.objects.filter(
+        type="consignment_payout", product_id=product_id, is_approved=True, is_void=False
+    ).exists()
+
+def _delete_pending_cons_due(product_id: int):
+    # ConsignmentDue pending bo‘lsa, qaytarishda tozalaymiz
+    from .models import ConsignmentDue
+    try:
+        due = ConsignmentDue.objects.get(product_id=product_id)
+        if not due.is_approved:
+            due.delete()
+    except ConsignmentDue.DoesNotExist:
+        pass
+
 def _can_award_commission(product: Product) -> bool:
     """
     Bonus berish sharti: ushbu product uchun void EMAS sale hali mavjud bo‘lmasin.
@@ -1074,7 +1091,8 @@ def sale_return(request, tx_id):
         p = tx.product
         if p:
             p.status = "available"
-            p.save(update_fields=["status"])
+            p.sold_at = None
+            p.save(update_fields=["status", "sold_at"])
 
         # Komissiya bo‘lsa, tasdiqlanmagan qilib/yo‘q qilish
         if hasattr(tx, "commission"):
@@ -1091,59 +1109,77 @@ def sale_return(request, tx_id):
     messages.success(request, "Sotuv qaytarildi (statistikadan chiqarildi).")
     return redirect("product_detail", pk=tx.product_id)
 
+# sales/views.py  (mavjud view'ni to'liq ALMASHTIRING)
 @login_required
 def sale_return_by_tx(request, tx_id):
     tx = get_object_or_404(Transaction.objects.select_related("product", "store"),
                            pk=tx_id, type="sale", is_void=False)
 
-    # <<< RUXSAT: egasi yoki o'sha do'kon sotuvchisi
+    # Ruxsat: owner yoki o‘sha do‘kon sotuvchisi
     if not (getattr(request.user, "is_owner", False) or
             (getattr(request.user, "store_id", None) == tx.store_id)):
         messages.error(request, "Siz faqat o‘zingizning do‘koningizdagi sotuvni qaytara olasiz.")
+        return redirect("product_detail", pk=tx.product_id)
+
+    # Agar konsignatsiya payout allaqachon tasdiqlangan bo‘lsa — blok
+    if tx.product_id and _has_approved_consignment_payout(tx.product_id):
+        messages.error(request, "Bu mahsulot bo‘yicha konsignatsiya to‘lovi tasdiqlangan. Avval uni bekor/yeching.")
         return redirect("product_detail", pk=tx.product_id)
 
     today = dj_tz.now().date()
     sale_day = tx.created_at.date()
 
     with db_txn.atomic():
+        # sale'ni statistikadan chiqaramiz
         tx.is_void = True
         tx.save(update_fields=["is_void"])
 
+        # Productni qayta sotishga ochamiz
         p = tx.product
         if p:
             p.status = "available"
-            p.save(update_fields=["status"])
+            p.sold_at = None
+            p.save(update_fields=["status", "sold_at"])
 
+        # Komissiya: bugungi va tasdiqlanmagan bo‘lsa – o‘chirib yuboramiz, aks holda statistikadan chiqaramiz
         if hasattr(tx, "commission"):
             com = tx.commission
             if sale_day == today and not com.is_approved:
                 com.delete()
                 messages.info(request, "$5 komissiya bekor qilindi (bugungi sotuv).")
             else:
-                # Hamma davrlardagi statistikadan chiqadi
                 com.is_approved = False
                 com.approved_by = None
                 com.approved_at = None
                 com.save(update_fields=["is_approved", "approved_by", "approved_at"])
                 messages.info(request, "Komissiya statistikadan chiqarildi.")
 
-        # Shu sotuvga bog'langan pending debt_out larni ham bekor qilamiz
-        Transaction.objects.filter(related_sale_id=tx.id, type="debt_out", is_approved=False)\
-                           .update(is_void=True)
+        # Bog‘langan PENDING debt_out (bo‘lib to‘lash qoldig‘i) yozuvlarini bekor qilamiz
+        Transaction.objects.filter(
+            related_sale_id=tx.id, type="debt_out", is_approved=False
+        ).update(is_void=True)
 
-    return redirect("product_detail", pk=tx.product_id if tx.product_id else (p.id if p else 0))
+        # Konsignatsiya due (pending) bo‘lsa – tozalaymiz
+        if p and p.ownership == "consignment":
+            _delete_pending_cons_due(p.id)
+
+    return redirect("product_detail", pk=(tx.product_id or (p.id if p else 0)))
 
 
-
-
+# sales/views.py  (mavjud view'ni to'liq ALMASHTIRING)
 @login_required
 def sale_return_by_product(request, product_id):
     p = get_object_or_404(Product.objects.select_related("store"), pk=product_id, status="sold")
 
-    # <<< RUXSAT: egasi yoki o'sha do'kon sotuvchisi
+    # Ruxsat: owner yoki o‘sha do‘kon sotuvchisi
     if not (getattr(request.user, "is_owner", False) or
             (getattr(request.user, "store_id", None) == p.store_id)):
         messages.error(request, "Siz faqat o‘zingizning do‘koningizdagi sotuvni qaytara olasiz.")
+        return redirect("product_detail", pk=p.id)
+
+    # Payout tekshiruvi
+    if _has_approved_consignment_payout(p.id):
+        messages.error(request, "Bu mahsulot bo‘yicha konsignatsiya to‘lovi tasdiqlangan. Avval uni bekor/yeching.")
         return redirect("product_detail", pk=p.id)
 
     with db_txn.atomic():
@@ -1156,7 +1192,11 @@ def sale_return_by_product(request, product_id):
 
         # Safety: tx topilmasa ham productni tiklaymiz
         p.status = "available"
-        p.save(update_fields=["status"])
+        p.sold_at = None
+        p.save(update_fields=["status", "sold_at"])
+        # pending consignment due bo‘lsa – tozalaymiz
+        if p.ownership == "consignment":
+            _delete_pending_cons_due(p.id)
         messages.success(request, "Mahsulot qaytarildi (Transaction topilmadi, product holati tiklandi).")
     return redirect("product_detail", pk=p.id)
 
@@ -1260,48 +1300,110 @@ def commission_update_amount(request, pk):
     return redirect("commissions_list")
 
 
+def seller_only(request):
+    u = getattr(request, "user", None)
+    return bool(u and u.is_authenticated and (u.is_owner or u.role == "seller"))
+
+def _seller_only(request):
+    u = getattr(request, "user", None)
+    return bool(u and u.is_authenticated and (getattr(u, "is_owner", False) or getattr(u, "role", "") == "seller"))
+
+
 @login_required
-def sell(request):
-    # Seller faqat o‘z do‘konidagi mahsulotlarni ko‘radi
-    qs = Product.objects.filter(status="available")
-    if not getattr(request.user, "is_owner", False):
-        qs = qs.filter(store_id=request.user.store_id)
+def sell(request, pk):
+    """
+    Full-paid sotuv (naqd/karta/aralash). Installment uchun alohida 'sell_installment' bor (tugma orqali).
+    Kross-do‘kon hisobi: sold_by=request.user, sold_in_store=request.user.store.
+    Komissiya miqdori DB(Config) dan olinadi.
+    """
+    if not _seller_only(request):
+        return HttpResponseForbidden()
 
-    product_id = request.GET.get("product_id")
-    if request.method == "GET":
-        ctx = {"products": qs}
-        if product_id:
-            prod = get_object_or_404(qs, pk=product_id)
-            ctx["product"] = prod
-        return render(request, "sales/sell.html", ctx)
+    product = get_object_or_404(Product.objects.select_related("brand", "model", "store"), pk=pk)
+    if getattr(product, "status", "available") != "available":
+        messages.error(request, _("Bu mahsulot sotuvga mos emas."))
+        return redirect("product_detail", pk=product.pk)
 
-    # POST: sotuvni amalga oshirish
-    prod = get_object_or_404(qs, pk=request.POST.get("product_id"))
-    amount = Decimal(request.POST.get("amount", "0"))
-    if amount <= 0:
-        messages.error(request, "Summani to‘g‘ri kiriting.")
-        return redirect("sell")
+    if request.method == "POST":
+        # Form ma’lumotlari
+        try:
+            price = Decimal(str(request.POST.get("price", "0")).replace(" ", "").replace(",", "."))
+        except Exception:
+            price = Decimal("0")
 
-    payment_type = request.POST.get("payment_type", "cash")
-    cash = amount if payment_type == "cash" else Decimal("0")
-    card = amount if payment_type == "card" else Decimal("0")
+        ptype = (request.POST.get("payment_type") or "cash").lower()
+        try:
+            cash_amount = Decimal(str(request.POST.get("cash_amount", "0")).replace(" ", "").replace(",", "."))
+        except Exception:
+            cash_amount = Decimal("0")
+        try:
+            card_amount = Decimal(str(request.POST.get("card_amount", "0")).replace(" ", "").replace(",", "."))
+        except Exception:
+            card_amount = Decimal("0")
 
-    # tannarx
-    cost = prod.calc_cost() if hasattr(prod, "calc_cost") else (prod.purchase_price or Decimal("0"))
-    tx = Transaction.objects.create(
-        type="sale", store=prod.store, seller=request.user, created_by=request.user,
-        product=prod, amount=amount, cash_amount=cash, card_amount=card,
-        payment_type=payment_type, cost=cost, profit=(amount - cost),
-        is_approved=True, approved_by=request.user, approved_at=dj_tz.now()
-    )
-    prod.status = "sold"; prod.sold_at = dj_tz.now()
-    prod.save(update_fields=["status","sold_at"])
+        # Minimal tekshiruvlar
+        if price <= 0:
+            messages.error(request, _("Umumiy narx to‘g‘ri kiritilmagan."))
+            return render(request, "sales/sell.html", {"product": product})
 
-    # komissiya ($5) — agar signal ishlamasa, safety-create
-    if not hasattr(tx, "commission"):
-        SellerCommission.objects.create(transaction=tx, seller=request.user, amount=Decimal("5.00"))
+        if ptype == "cash":
+            card_amount = Decimal("0")
+        elif ptype == "card":
+            cash_amount = Decimal("0")
+        # 'mixed' holatda ikkisi ham mumkin; ixtiyoriy tekshiruv:
+        if ptype in ("cash", "card", "mixed"):
+            if cash_amount + card_amount > price:
+                messages.error(request, _("Naqd + Karta summasi umumiy narxdan oshmasligi kerak."))
+                return render(request, "sales/sell.html", {"product": product})
+        else:
+            ptype = "cash"
 
-    messages.success(request, "Sotuv bajarildi.")
-    # testlar follow=True bilan 200 kutadi — qayta GET sahifasini ko‘rsatamiz
-    return render(request, "sales/sell_success.html", {"tx": tx})
+        with transaction.atomic():
+            # 1) Tranzaksiya (sale)
+            t = Transaction.objects.create(
+                type="sale",
+                product=product,
+                amount=price,
+                is_approved=True,
+                is_void=False,
+                sold_by=request.user,
+                sold_in_store=getattr(request.user, "store", None),
+                note=f"ptype={ptype}; cash={cash_amount}; card={card_amount}",
+            )
+
+            # 2) Komissiya — sotgan sotuvchiga
+            commission_amount = get_commission_amount(amount=price)
+            SellerCommission.objects.create(
+                transaction=t,
+                seller=request.user,
+                amount=commission_amount,
+                is_approved=True,
+            )
+
+            # 3) Product status
+            product.status = "sold"
+            if hasattr(product, "sold_at") and not product.sold_at:
+                product.sold_at = t.created_at
+            # Full-paid belgisi (installment emas)
+            if hasattr(product, "is_installment_sale"):
+                product.is_installment_sale = False
+            product.save()
+
+        messages.success(request, _("Sotuv yakunlandi."))
+        return redirect("product_detail", pk=product.pk)
+
+    # GET
+    return render(request, "sales/sell.html", {"product": product})
+
+
+
+@login_required
+def sold_list(request):
+    if not seller_only(request):
+        return HttpResponseForbidden()
+    # Eng aniq ko‘rinish: sotilgan product’larni tranzaksiyalari bilan
+    items = Product.objects.filter(status="sold").prefetch_related("transactions", "brand", "model", "store")
+    grand_count = items.count()
+    return render(request, "inventory/product_sold_list.html", {"items": items, "grand_count": grand_count})
+
 

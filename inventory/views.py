@@ -12,23 +12,27 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q, Model, Sum, When, Case, F, OuterRef, Exists, Count
 from django.db.models.functions import Right, Coalesce, TruncDate
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils.dateparse import parse_date
 from django.utils.safestring import mark_safe
+from django.utils.timezone import make_aware
 from django.utils.translation import gettext as _
 from openpyxl import load_workbook
 from weasyprint import HTML
+from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Store, User
 from reference.models import Brand, ModelName, Color
 from sales.models import Transaction, SellerCommission
+from sales.services import calc_product_cost
+from sales.views import _seller_only
 from .forms import (
     ProductCreateForm,
     BatchIntakeForm,
     BatchItemForm,
-    ExcelImportForm, ImportExcelForm,
+    ExcelImportForm, ImportExcelForm, ProductImageFormSet, ProductForm, ProductImageForm,
 )
 from .mixins import can_edit_product
 from .models import Product, ProductImage
@@ -89,102 +93,104 @@ def product_list(request):
     })
 
 
+# inventory/views.py -> product_create()
+# inventory/views.py
+def _can_edit(user, product=None):
+    if not user.is_authenticated:
+        return False
+    if getattr(user, "is_owner", False):
+        return True
+    return product is None or user.store_id == getattr(product, "store_id", None)
+
 @login_required
-def product_create(request):
-    instance = None
-    edit_id = request.GET.get("edit")
-    if edit_id:
-        # edit rejimi uchun instance
-        qs = Product.objects.all()
-        if not request.user.is_owner:
-            qs = qs.filter(created_by_id=request.user.id)
-        instance = get_object_or_404(qs.select_related("brand","model","store"), pk=edit_id)
+@transaction.atomic
+def product_create(request, pk=None):
+    instance = get_object_or_404(Product.objects.select_related("store", "brand", "model"), pk=pk) if pk else None
+    if not _can_edit(request.user, instance):
+        messages.error(request, "Ushbu mahsulotni tahrirlashga ruxsatingiz yo‘q.")
+        return redirect("inventory:product_list")
 
     if request.method == "POST":
-        # edit bo‘lsa POST ichidan ham instance id kelsa olish mumkin
-        if request.POST.get("id"):
-            qs = Product.objects.all()
-            if not request.user.is_owner:
-                qs = qs.filter(created_by_id=request.user.id)
-            instance = get_object_or_404(qs, pk=request.POST.get("id"))
-
-        form = ProductCreateForm(request.POST, request.FILES, user=request.user, instance=instance)
-        if form.is_valid():
-            with transaction.atomic():
-                p: Product = form.save(commit=False)
-
-                # Store siyosati
-                if request.user.is_owner:
-                    if not p.store_id:
-                        messages.error(request, _("Select a store."))
-                        return render(request, "inventory/product_create.html", {"form": form})
-                else:
-                    # seller — tayinlangan bo‘lsa majburiy o‘sha, bo‘lmasa formdan
-                    if getattr(request.user, "store_id", None):
-                        p.store = request.user.store
-                    elif not p.store_id:
-                        messages.error(request, _("Select a store."))
-                        return render(request, "inventory/product_create.html", {"form": form})
-
-                if not instance:
-                    p.created_by = request.user  # faqat yangi yaratilganda
-                p.save()
-
-                # Rasmlar
-                def _save_images(files, kind, set_primary=False):
-                    first = True
-                    for f in files:
-                        pi = ProductImage.objects.create(product=p, image=f, kind=kind)
-                        if set_primary and first:
-                            pi.is_primary = True
-                            pi.save(update_fields=["is_primary"])
-                            first = False
-
-                _save_images(request.FILES.getlist("doc_images"), "doc", set_primary=False)
-                _save_images(request.FILES.getlist("cond_images"), "cond", set_primary=True if not instance else False)
-                _save_images(request.FILES.getlist("images"), "other", set_primary=False)
-
-            messages.success(request, _("Saved successfully."))
-            if instance:
-                return redirect("product_detail", pk=p.id)
-            return redirect("product_create")
+        pform = ProductForm(request.POST, request.FILES, instance=instance, user=request.user)
+        if instance:
+            existing_count = ProductImage.objects.filter(product=instance).count()
         else:
-            messages.error(request, "; ".join([" ".join(v) for v in form.errors.values()]))
+            existing_count = 0
+        if "images" in request.FILES:
+            # Agar foydalanuvchi bir nechta fayl tanlasa ham — getlist bilan olamiz
+            files = request.FILES.getlist("images")
+        else:
+            files = []
+        imgform = ProductImageForm(request.POST, request.FILES)
+
+        # Server tomoni limit tekshiruvi (existing + yangi <= 7)
+        total_after = existing_count + len(files)
+        if total_after > 7:
+            imgform.add_error("images", f"Umumiy rasm soni 7 tadan oshmasin. Hozir {total_after} ta bo‘lib qolyapti.")
+
+        if pform.is_valid() and imgform.is_valid():
+            # Saqlash
+            product = pform.save(commit=False)
+            if not getattr(request.user, "is_owner", False):
+                product.store = request.user.store  # disabled bo‘lgani uchun POSTda kelmaydi
+            if not product.pk:
+                product.created_by = request.user
+            product.save()
+            pform.save_m2m()
+
+            # Rasmlar: ixtiyoriy, lekin 7 ta limit
+            for f in files:
+                ProductImage.objects.create(product=product, image=f)
+
+            messages.success(request, "Ma’lumot saqlandi.")
+            return redirect("inventory:product_detail", pk=product.pk)
+        else:
+            messages.error(request, "Xatolarni to‘g‘rilang.")
     else:
-        form = ProductCreateForm(user=request.user, instance=instance)
+        initial = {}
+        if not getattr(request.user, "is_owner", False) and getattr(request.user, "store_id", None):
+            initial["store"] = request.user.store_id
+        pform = ProductForm(instance=instance, user=request.user, initial=initial)
+        imgform = ProductImageForm()
 
-    return render(request, "inventory/product_create.html", {"form": form, "editing": bool(instance), "obj": instance})
-
-
+    return render(request, "inventory/product_form.html", {
+        "p": instance,
+        "is_edit": bool(instance),
+        "form": pform,
+        "imgform": imgform,
+        "existing_images": ProductImage.objects.filter(product=instance) if instance else [],
+    })
 
 
 
 @login_required
 def move_to_repair(request, pk):
-    if request.method != "POST":
-        return redirect("product_list")
-    qs = Product.objects.all()
-    if not request.user.is_owner:
-        qs = qs.filter(store=request.user.store_id)
-    p = get_object_or_404(qs, pk=pk)
+    p = get_object_or_404(Product, pk=pk)
+    if not (getattr(request.user, "is_owner", False) or p.created_by_id == request.user.id):
+        messages.error(request, _("Ushbu mahsulot holatini o‘zgartira olmaysiz."))
+        return redirect("inventory:product_detail", pk=p.id)
+    if p.status != "available":
+        messages.error(request, _("Faqat 'available' holatidagi mahsulot ta’mirga o‘tkaziladi."))
+        return redirect("inventory:product_detail", pk=p.id)
     p.status = "on_repair"
     p.save(update_fields=["status"])
-    messages.info(request, _("Moved to repair."))
-    return redirect("product_list")
+    messages.success(request, _("Ta’mirga o‘tkazildi."))
+    return redirect("inventory:product_detail", pk=p.id)
 
 
 @login_required
 def mark_available(request, pk):
-    if request.method != "POST":
-        return redirect("product_list")
-    qs = Product.objects.all()
-    if not request.user.is_owner:
-        qs = qs.filter(store=request.user.store_id)
-    p = get_object_or_404(qs, pk=pk)
+    p = get_object_or_404(Product, pk=pk)
+    if not (getattr(request.user, "is_owner", False) or p.created_by_id == request.user.id):
+        messages.error(request, _("Ushbu mahsulot holatini o‘zgartira olmaysiz."))
+        return redirect("inventory:product_detail", pk=p.id)
+    if p.status != "on_repair":
+        messages.error(request, _("Faqat 'on_repair' holatidan qaytarish mumkin."))
+        return redirect("inventory:product_detail", pk=p.id)
     p.status = "available"
     p.save(update_fields=["status"])
-    messages.success(request, _("Marked available."))
-    return redirect("product_list")
+    messages.success(request, _("Available holatiga qaytarildi."))
+    return redirect("inventory:product_detail", pk=p.id)
 
 
 @login_required
@@ -598,6 +604,7 @@ def product_detail(request, pk):
 
 @login_required
 def product_edit(request, pk):
+    product = get_object_or_404(Product, pk=pk)
     qs = Product.objects.select_related("brand","model","store")
     p = get_object_or_404(qs, pk=pk)
     if not can_edit_product(request.user, p):
@@ -605,6 +612,23 @@ def product_edit(request, pk):
         return redirect("product_detail", pk=pk)
 
     if request.method == "POST":
+        form = ProductForm(request.POST, request.FILES, instance=product)
+        if form.is_valid():
+            with transaction.atomic():
+                product: Product = form.save(commit=False)
+                product.updated_by = request.user
+                product.save()
+
+                # Agar yangi rasmlar yuborilsa, qo‘shamiz (eski rasmlar o‘z holida qoladi)
+                existing_count = product.images.count()
+                new_files = request.FILES.getlist("images")
+                for idx, f in enumerate(new_files[: max(0, 7 - existing_count)]):
+                    ProductImage.objects.create(
+                        product=product, image=f, order=existing_count + idx
+                    )
+                form.save_m2m()
+            messages.success(request, "Telefon ma’lumotlari yangilandi.")
+
         form = ProductCreateForm(request.POST, request.FILES, user=request.user, instance=p)
         if form.is_valid():
             with transaction.atomic():
@@ -629,7 +653,7 @@ def product_edit(request, pk):
     else:
         form = ProductCreateForm(user=request.user, instance=p)
 
-    return render(request, "inventory/product_create.html", {"form": form, "editing": True, "obj": p})
+    return render(request, "inventory/product_form.html", {"form": form, "editing": True, "obj": p})
 
 @login_required
 def my_acquisitions(request):
@@ -861,65 +885,174 @@ def product_received_list(request):
 
 
 # ==== SOTILGAN TELEFONLAR ====
-# inventory/views.py
+
+def _pdate(s: str):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
 @login_required
 def product_sold_list(request):
     """
-    Sotilgan mahsulotlar: bo‘lib to‘lash (installment) bo‘lganlarini alohida ajratamiz
-    VA 30 kunlik mini-analitikani chiqaramiz.
-    Mezoni: shu product uchun type='debt_out' (is_void=False) mavjud bo‘lsa -> installment.
+    Sotilgan telefonlar ro‘yxati + filtrlar + mini analitika.
+    *** Eʼtibor: prefetch_related("transactions") yoʻq — tranzaksiyalar alohida yigʻiladi. ***
     """
-    qs = (Product.objects
-          .select_related("brand","model","store")
-          .filter(status="sold")
-          .order_by("-sold_at"))
+    u = request.user
+    if not (getattr(u, "is_owner", False) or getattr(u, "role", "") == "seller"):
+        return HttpResponseForbidden()
 
-    # Seller scope
-    if not getattr(request.user, "is_owner", False):
-        qs = qs.filter(store_id=request.user.store_id)
+    # --- Filters from GET ---
+    store_id = request.GET.get("store_id") or ""
+    seller_id = request.GET.get("seller_id") or ""
+    brand_id = request.GET.get("brand") or ""
+    model_id = request.GET.get("model") or ""
+    date_from = request.GET.get("date_from") or ""
+    date_to   = request.GET.get("date_to") or ""
 
-    installment_exists = Transaction.objects.filter(
-        type="debt_out", product_id=OuterRef("pk"), is_void=False
-    )
-    qs = qs.annotate(is_installment=Exists(installment_exists))
+    # Bazaviy queryset (prefetchsiz)
+    qs = Product.objects.filter(status="sold").select_related("brand", "model", "store")
 
-    installment_rows = list(qs.filter(is_installment=True)[:500])
-    full_rows = list(qs.filter(is_installment=False)[:500])
+    # Sana filterlari: sold_at mavjud bo'lsa undan, bo'lmasa sale tranzaksiya sanasidan foydalanamiz.
+    # Bu uchun hozircha productlarni tanlab olib, tranzaksiyani keyin mapping qilamiz.
+    if store_id:
+        qs = qs.filter(store_id=store_id)
+    if brand_id:
+        qs = qs.filter(brand_id=brand_id)
+    if model_id:
+        qs = qs.filter(model_id=model_id)
 
-    # --- MINI ANALITIKA (oxirgi 30 kun) ---
-    today = dj_tz.now().date()
-    start = today - datetime.timedelta(days=29)
+    products = list(qs.order_by("-sold_at", "-id"))
+    product_ids = [p.id for p in products]
 
-    # Sotuvlar bo‘yicha summa (Transaction)
-    tx = Transaction.objects.filter(
-        type="sale", is_void=False, is_approved=True,
-        created_at__date__range=(start, today)
-    )
-    if not getattr(request.user, "is_owner", False):
-        tx = tx.filter(store_id=request.user.store_id)
+    # Barcha tegishli SALE tranzaksiyalarni birdaniga olib kelamiz (eng oxirgisi kerak bo'ladi)
+    sale_tx_qs = Transaction.objects.filter(type="sale", product_id__in=product_ids).select_related("sold_by", "sold_in_store").order_by("-created_at")
+    # Har product uchun eng so'nggi sale tranzaksiyani map qilamiz
+    last_sale_by_product = {}
+    for t in sale_tx_qs:
+        if t.product_id not in last_sale_by_product:
+            last_sale_by_product[t.product_id] = t
 
-    tx_daily = (tx.annotate(d=TruncDate("created_at"))
-                  .values("d")
-                  .annotate(amount=Sum("amount"))
-                  .order_by("d"))
-    by = {r["d"]: float(r["amount"] or 0) for r in tx_daily}
-    labels = [(start + datetime.timedelta(days=i)) for i in range(30)]
-    sales_amounts = [by.get(d, 0.0) for d in labels]
+    # Sana diapazoni bo'yicha filtrlash (sold_at yoki tranzaksiya created_at)
+    if date_from or date_to:
+        def in_range(p):
+            # sold_at yoki tranzaksiya sanasi
+            sold_dt = getattr(p, "sold_at", None)
+            if not sold_dt:
+                t = last_sale_by_product.get(p.id)
+                sold_dt = getattr(t, "created_at", None)
+            if not sold_dt:
+                return False
+            ds = sold_dt.date()
+            if date_from:
+                try:
+                    df = make_aware(datetime.strptime(date_from, "%Y-%m-%d")).date()
+                except Exception:
+                    df = None
+            else:
+                df = None
+            if date_to:
+                try:
+                    dt = make_aware(datetime.strptime(date_to, "%Y-%m-%d")).date()
+                except Exception:
+                    dt = None
+            else:
+                dt = None
+            if df and ds < df:
+                return False
+            if dt and ds > dt:
+                return False
+            return True
+        products = [p for p in products if in_range(p)]
 
-    # Ownership bo‘yicha soni (sold products)
-    owned_cnt = qs.filter(ownership="owned").count()
-    cons_cnt  = qs.filter(ownership="consignment").count()
+    # Endi jadval/analitika uchun qatorlarni tayyorlaymiz
+    rows = []
+    owned_cnt = 0
+    cons_cnt  = 0
+    for p in products:
+        t = last_sale_by_product.get(p.id)
+        # Sana
+        sold_dt = getattr(p, "sold_at", None) or (t.created_at if t else None)
+        sold_date_str = sold_dt.strftime("%Y-%m-%d") if sold_dt else ""
 
-    ctx = {
-        "installment_rows": installment_rows,
-        "full_rows": full_rows,
-        # mini-analytics
-        "sold_labels_json": mark_safe(json.dumps([d.strftime("%Y-%m-%d") for d in labels])),
-        "sold_amounts_json": mark_safe(json.dumps(sales_amounts)),
+        amount = Decimal(getattr(p, "price", 0) or 0)
+        cost   = calc_product_cost(p)
+        profit = amount - cost
+
+        rows.append({
+            "obj": p,
+            "sold_date": sold_date_str,
+            "amount": float(amount),
+            "cost": float(cost),
+            "profit": float(profit),
+            "sold_by": getattr(t, "sold_by", None),
+            "sold_in_store": getattr(t, "sold_in_store", None),
+        })
+
+        if getattr(p, "ownership", "owned") == "owned":
+            owned_cnt += 1
+        else:
+            cons_cnt += 1
+
+    # 30 kunlik chiziqli grafik ma'lumotlari
+    from datetime import timedelta, date
+    today = date.today()
+    labels = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(29, -1, -1)]
+    amounts = [0.0 for _ in labels]
+    index_map = {d: i for i, d in enumerate(labels)}
+    for r in rows:
+        j = index_map.get(r["sold_date"])
+        if j is not None:
+            amounts[j] += r["amount"]
+
+    # Installment vs full-paid (sizning loyihangizdagi flag/mantiqqa moslashtirilgan)
+    installment_rows = []
+    full_rows = []
+    for p in products:
+        is_inst = False
+        if hasattr(p, "is_installment_sale"):
+            is_inst = bool(p.is_installment_sale)
+        else:
+            t = last_sale_by_product.get(p.id)
+            if t and t.note and "installment" in t.note.lower():
+                is_inst = True
+        (installment_rows if is_inst else full_rows).append(p)
+
+    # Filtrlar uchun reference ma'lumotlar
+    stores  = Store.objects.filter(is_active=True).order_by("name")
+    sellers = User.objects.filter(is_active=True).order_by("username")
+    brands  = Brand.objects.all().order_by("name")
+    models  = ModelName.objects.all().order_by("name")
+
+    context = {
+        "stores": stores,
+        "sellers": sellers,
+        "brands": brands,
+        "models": models,
+
+        "store_id": store_id,
+        "seller_id": seller_id,
+        "brand_id": brand_id,
+        "model_id": model_id,
+        "date_from": date_from,
+        "date_to": date_to,
+
+        "rows": rows,
+        "items": [r["obj"] for r in rows],  # agar shablonning boshqa joyi ishlatsa
+
+        "sold_labels_json": json.dumps(labels),
+        "sold_amounts_json": json.dumps(amounts),
         "sold_owned_cnt": owned_cnt,
         "sold_cons_cnt": cons_cnt,
+
+        "installment_rows": installment_rows,
+        "full_rows": full_rows,
     }
-    return render(request, "inventory/product_sold_list.html", ctx)
+    return render(request, "inventory/product_sold_list.html", context)
+
 
 
 

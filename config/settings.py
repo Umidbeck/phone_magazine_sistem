@@ -47,10 +47,13 @@ INSTALLED_APPS = [
     "reports",
     "operations",
     "core",
+    "finance",
 
     "storages",
     "widget_tweaks",
 ]
+
+FINANCE_AUTOPOST = True
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto">
+    {{ form.date_from.label_tag }} {{ form.date_from }}
+  </div>
+  <div class="col-auto">
+    {{ form.date_to.label_tag }} {{ form.date_to }}
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-primary">Filter</button>
+  </div>
+</form>
+
+<div class="row">
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Active (Inventar)</div><div class="h4 mb-0">{{ kpi.balances.active }}</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Passive (Naqd)</div><div class="h4 mb-0">{{ kpi.balances.passive }}</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Debtorlar (AR)</div><div class="h4 mb-0">{{ kpi.balances.ar }}</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Do'kon qarzlari (AP)</div><div class="h4 mb-0">{{ kpi.balances.ap }}</div></div></div>
+</div>
+
+<div class="row mt-3">
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Sotuv</div><div class="h4 mb-0">{{ kpi.pnl.sales }}</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">COGS</div><div class="h4 mb-0">{{ kpi.pnl.cogs }}</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Gross Profit</div><div class="h4 mb-0">{{ kpi.pnl.gross_profit }}</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Net Profit</div><div class="h4 mb-0">{{ kpi.pnl.net_profit }}</div></div></div>
+</div>
+
+<div class="row mt-3">
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Gross Margin %</div><div class="h4 mb-0">{{ kpi.ratios.gross_margin_pct|floatformat:2 }}%</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Net Margin %</div><div class="h4 mb-0">{{ kpi.ratios.net_margin_pct|floatformat:2 }}%</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Inventory Turnover</div><div class="h4 mb-0">{{ kpi.ratios.inventory_turnover|floatformat:2 }}</div></div></div>
+  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Cash / Inventory</div><div class="h4 mb-0">{{ kpi.ratios.cash_to_inventory|floatformat:2 }}</div></div></div>
+</div>
+
+<hr class="my-4"/>
+
+<h5>Kunlik Trendlar (30 kun)</h5>
+<div class="row">
+  <div class="col-md-8">
+    <canvas id="salesProfitChart"></canvas>
+  </div>
+  <div class="col-md-4">
+    <canvas id="expenseChart"></canvas>
+  </div>
+</div>
+
+<hr class="my-4"/>
+
+<h5>AR / AP tafsiloti</h5>
+<div class="row">
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="h6">AR (Mijoz qarzlari)</div>
+      <ul class="mb-0">
+        {% for row in ar_ap.AR %}
+          <li>{{ row.object_app }}.{{ row.object_model }}#{{ row.object_id }} — {{ row.total }}</li>
+        {% empty %}
+          <li>Ma'lumot yo'q</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="h6">AP (Do'kon qarzlari)</div>
+      <ul class="mb-0">
+        {% for row in ar_ap.AP %}
+          <li>{{ row.object_app }}.{{ row.object_model }}#{{ row.object_id }} — {{ row.total }}</li>
+        {% empty %}
+          <li>Ma'lumot yo'q</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const seriesSales = {{ series_sales|safe }};
+  const seriesExp = {{ series_expense|safe }};
+
+  new Chart(document.getElementById('salesProfitChart'), {
+    type: 'line',
+    data: {
+      labels: seriesSales.labels,
+      datasets: [
+        { label: 'Sales', data: seriesSales.sales },
+        { label: 'Cost', data: seriesSales.cost },
+        { label: 'Profit', data: seriesSales.profit },
+      ]
+    }
+  });
+
+  new Chart(document.getElementById('expenseChart'), {
+    type: 'bar',
+    data: {
+      labels: seriesExp.labels,
+      datasets: [
+        { label: 'Expense', data: seriesExp.expense },
+      ]
+    }
+  });
+</script>
+{% endblock %}

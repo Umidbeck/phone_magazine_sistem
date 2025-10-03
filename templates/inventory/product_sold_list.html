@@ -2,293 +2,392 @@
 {% load i18n money %}
 
 {% block content %}
-    <div class="max-w-7xl mx-auto p-4 space-y-6">
+<div class="max-w-7xl mx-auto p-4 space-y-6">
 
-        <!-- Title + Quick ranges -->
-        <div class="flex items-center justify-between gap-4">
-            <h1 class="text-2xl font-semibold">📱 {% trans "Sotilgan telefonlar" %}</h1>
+  <!-- Title + Quick ranges -->
+  <div class="flex items-center justify-between gap-4">
+      <h1 class="text-2xl font-semibold">📱 {% trans "Sotilgan telefonlar" %}</h1>
 
-            <!-- Quick date filters (JS bilan ishlaydi) -->
-            <div class="flex items-center gap-2">
-                <button type="button" data-range="today"
-                        class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
-                    Bugun
-                </button>
-                <button type="button" data-range="7"
-                        class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
-                    7 kun
-                </button>
-                <button type="button" data-range="30"
-                        class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
-                    30 kun
-                </button>
-            </div>
-        </div>
-
-        <!-- Filters -->
-        <form id="filter-form" method="get"
-              class="grid md:grid-cols-6 gap-3 bg-white border border-neutral-200 rounded-2xl p-4">
-            {% if stores %}
-                <div>
-                    <label class="text-xs text-neutral-500">Do‘kon</label>
-                    <select name="store_id" class="w-full rounded-xl border p-2">
-                        <option value="">Hammasi</option>
-                        {% for s in stores %}
-                            <option value="{{ s.id }}"
-                                    {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
-                                {{ s.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            {% endif %}
-
-            {% if sellers %}
-                <div>
-                    <label class="text-xs text-neutral-500">Sotuvchi</label>
-                    <select name="seller_id" class="w-full rounded-xl border p-2">
-                        <option value="">Hammasi</option>
-                        {% for u in sellers %}
-                            <option value="{{ u.id }}"
-                                    {% if seller_id|stringformat:"s" == u.id|stringformat:"s" %}selected{% endif %}>
-                                {{ u.username }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            {% endif %}
-
-            <div>
-                <label class="text-xs text-neutral-500">Brend</label>
-                <select name="brand" class="w-full rounded-xl border p-2">
-                    <option value="">Hammasi</option>
-                    {% for b in brands %}
-                        <option value="{{ b.id }}"
-                                {% if brand_id|stringformat:"s" == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div>
-                <label class="text-xs text-neutral-500">Model</label>
-                <select name="model" class="w-full rounded-xl border p-2">
-                    <option value="">Hammasi</option>
-                    {% for m in models %}
-                        <option value="{{ m.id }}"
-                                {% if model_id|stringformat:"s" == m.id|stringformat:"s" %}selected{% endif %}>{{ m.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div>
-                <label class="text-xs text-neutral-500">Sana — dan</label>
-                <input id="date_from" type="date" name="date_from" value="{{ date_from }}"
-                       class="w-full rounded-xl border p-2">
-            </div>
-            <div>
-                <label class="text-xs text-neutral-500">Sana — gacha</label>
-                <input id="date_to" type="date" name="date_to" value="{{ date_to|default_if_none:'' }}"
-                       class="w-full rounded-xl border p-2">
-            </div>
-
-            <div class="md:col-span-6 flex items-end justify-end">
-                <button class="px-4 py-2 rounded-xl bg-black text-white">Filtrlash</button>
-                <a href="{% url 'product_sold_list' %}" class="ml-2 px-4 py-2 rounded-xl border">Reset</a>
-            </div>
-        </form>
-
-        <!-- TODAY KPI cards (computed client-side from table) -->
-        <div class="grid sm:grid-cols-3 gap-4">
-            <div class="rounded-2xl border bg-white p-4">
-                <div class="text-xs text-neutral-500">Bugungi savdo (summa)</div>
-                <div id="kpi-today-amount" class="text-2xl font-semibold mt-1">–</div>
-            </div>
-            <div class="rounded-2xl border bg-white p-4">
-                <div class="text-xs text-neutral-500">Bugungi tan narxi (cost)</div>
-                <div id="kpi-today-cost" class="text-2xl font-semibold mt-1 text-amber-600">–</div>
-            </div>
-            <div class="rounded-2xl border bg-white p-4">
-                <div class="text-xs text-neutral-500">Bugungi foyda (profit)</div>
-                <div id="kpi-today-profit" class="text-2xl font-semibold mt-1 text-emerald-700">–</div>
-            </div>
-        </div>
-
-        <!-- MINI ANALYTICS (30 days) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">Oxirgi 30 kun sotuv summasi (lin.)</div>
-        <canvas id="soldChart"></canvas>
-        <script id="soldLabels" type="application/json">{{ sold_labels_json }}</script>
-        <script id="soldAmounts" type="application/json">{{ sold_amounts_json }}</script>
+      <!-- Quick date filters (JS bilan ishlaydi) -->
+      <div class="flex items-center gap-2">
+          <button type="button" data-range="today"
+                  class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
+              Bugun
+          </button>
+          <button type="button" data-range="7"
+                  class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
+              7 kun
+          </button>
+          <button type="button" data-range="30"
+                  class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
+              30 kun
+          </button>
       </div>
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">Ownership bo‘yicha taqsimot</div>
-        <div class="mt-2 text-sm">
-          <div class="flex items-center justify-between"><span>Owned</span><span class="font-semibold">{{ sold_owned_cnt }}</span></div>
-          <div class="flex items-center justify-between"><span>Consignment</span><span class="font-semibold">{{ sold_cons_cnt }}</span></div>
-        </div>
-        <canvas id="soldDonut" class="mt-2"></canvas>
-        <script type="application/json" id="soldDonutData">
-          {{ sold_owned_cnt|default:0 }},{{ sold_cons_cnt|default:0 }}
-        </script>
+  </div>
+
+  <!-- Filters -->
+  <form id="filter-form" method="get"
+        class="grid md:grid-cols-6 gap-3 bg-white border border-neutral-200 rounded-2xl p-4">
+      {% if stores %}
+          <div>
+              <label class="text-xs text-neutral-500">Do‘kon</label>
+              <select name="store_id" class="w-full rounded-xl border p-2">
+                  <option value="">Hammasi</option>
+                  {% for s in stores %}
+                      <option value="{{ s.id }}"
+                              {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
+                          {{ s.name }}
+                      </option>
+                  {% endfor %}
+              </select>
+          </div>
+      {% endif %}
+
+      {% if sellers %}
+          <div>
+              <label class="text-xs text-neutral-500">Sotuvchi</label>
+              <select name="seller_id" class="w-full rounded-xl border p-2">
+                  <option value="">Hammasi</option>
+                  {% for u in sellers %}
+                      <option value="{{ u.id }}"
+                              {% if seller_id|stringformat:"s" == u.id|stringformat:"s" %}selected{% endif %}>
+                          {{ u.username }}
+                      </option>
+                  {% endfor %}
+              </select>
+          </div>
+      {% endif %}
+
+      <div>
+          <label class="text-xs text-neutral-500">Brend</label>
+          <select name="brand" class="w-full rounded-xl border p-2">
+              <option value="">Hammasi</option>
+              {% for b in brands %}
+                  <option value="{{ b.id }}"
+                          {% if brand_id|stringformat:"s" == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+              {% endfor %}
+          </select>
       </div>
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">Installment va Full-paid soni</div>
-        <div class="mt-2 text-sm">
-          <div class="flex items-center justify-between text-amber-700"><span>Installment</span><span class="font-semibold">{{ installment_rows|length }}</span></div>
-          <div class="flex items-center justify-between text-emerald-700"><span>Full-paid</span><span class="font-semibold">{{ full_rows|length }}</span></div>
-        </div>
+
+      <div>
+          <label class="text-xs text-neutral-500">Model</label>
+          <select name="model" class="w-full rounded-xl border p-2">
+              <option value="">Hammasi</option>
+              {% for m in models %}
+                  <option value="{{ m.id }}"
+                          {% if model_id|stringformat:"s" == m.id|stringformat:"s" %}selected{% endif %}>{{ m.name }}</option>
+              {% endfor %}
+          </select>
+      </div>
+
+      <div>
+          <label class="text-xs text-neutral-500">Sana — dan</label>
+          <input id="date_from" type="date" name="date_from" value="{{ date_from }}"
+                 class="w-full rounded-xl border p-2">
+      </div>
+      <div>
+          <label class="text-xs text-neutral-500">Sana — gacha</label>
+          <input id="date_to" type="date" name="date_to" value="{{ date_to|default_if_none:'' }}"
+                 class="w-full rounded-xl border p-2">
+      </div>
+
+      <div class="md:col-span-6 flex items-end justify-end">
+          <button class="px-4 py-2 rounded-xl bg-black text-white">Filtrlash</button>
+          <a href="{% url 'product_sold_list' %}" class="ml-2 px-4 py-2 rounded-xl border">Reset</a>
+      </div>
+  </form>
+
+  <!-- TODAY KPI cards (computed client-side from #sold-rows) -->
+  <div class="grid sm:grid-cols-3 gap-4">
+      <div class="rounded-2xl border bg-white p-4">
+          <div class="text-xs text-neutral-500">Bugungi savdo (summa)</div>
+          <div id="kpi-today-amount" class="text-2xl font-semibold mt-1">–</div>
+      </div>
+      <div class="rounded-2xl border bg-white p-4">
+          <div class="text-xs text-neutral-500">Bugungi tan narxi (cost)</div>
+          <div id="kpi-today-cost" class="text-2xl font-semibold mt-1 text-amber-600">–</div>
+      </div>
+      <div class="rounded-2xl border bg-white p-4">
+          <div class="text-xs text-neutral-500">Bugungi foyda (profit)</div>
+          <div id="kpi-today-profit" class="text-2xl font-semibold mt-1 text-emerald-700">–</div>
+      </div>
+  </div>
+
+  <!-- MINI ANALYTICS (30 days) -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="text-xs text-neutral-500">Oxirgi 30 kun sotuv summasi (lin.)</div>
+      <canvas id="soldChart"></canvas>
+      <script id="soldLabels" type="application/json">{{ sold_labels_json|safe }}</script>
+      <script id="soldAmounts" type="application/json">{{ sold_amounts_json|safe }}</script>
+    </div>
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="text-xs text-neutral-500">Ownership bo‘yicha taqsimot</div>
+      <div class="mt-2 text-sm">
+        <div class="flex items-center justify-between"><span>Owned</span><span class="font-semibold">{{ sold_owned_cnt }}</span></div>
+        <div class="flex items-center justify-between"><span>Consignment</span><span class="font-semibold">{{ sold_cons_cnt }}</span></div>
+      </div>
+      <canvas id="soldDonut" class="mt-2"></canvas>
+      <script type="application/json" id="soldDonutData">[{{ sold_owned_cnt|default:0 }}, {{ sold_cons_cnt|default:0 }}]</script>
+    </div>
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="text-xs text-neutral-500">Installment va Full-paid soni</div>
+      <div class="mt-2 text-sm">
+        <div class="flex items-center justify-between text-amber-700"><span>Installment</span><span class="font-semibold">{{ installment_rows|length }}</span></div>
+        <div class="flex items-center justify-between text-emerald-700"><span>Full-paid</span><span class="font-semibold">{{ full_rows|length }}</span></div>
       </div>
     </div>
+  </div>
 
-
-
-
-        <!-- Installment (bo'lib to'lash) -->
-        <div class="bg-white border rounded-2xl">
-            <div class="px-4 py-3 border-b bg-amber-50 rounded-t-2xl">
-                <div class="font-semibold">{% trans "Installment sales" %}</div>
-                <div class="text-sm text-amber-700">{% trans "These products were sold on installment" %}</div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-amber-100 text-amber-900">
-                    <tr>
-                        <th class="text-left px-3 py-2">{% trans "Product" %}</th>
-                        <th class="text-left px-3 py-2">{% trans "Store" %}</th>
-                        <th class="text-left px-3 py-2">{% trans "Sold at" %}</th>
-                        <th class="text-right px-3 py-2">{% trans "Purchase/Consignment" %}</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for p in installment_rows %}
-                        <tr class="border-b last:border-0">
-                            <td class="px-3 py-2">{{ p.brand.name }} {{ p.model.name }} {% if p.imei_last4 %}
-                                <span class="text-xs text-neutral-500">({{ p.imei_last4 }})</span>{% endif %}</td>
-                            <td class="px-3 py-2">{{ p.store.name }}</td>
-                            <td class="px-3 py-2">{{ p.sold_at|date:"Y-m-d H:i" }}</td>
-                            <td class="px-3 py-2 text-right">
-                                {% if p.ownership == "owned" %}
-                                    {{ p.purchase_price|usd }}
-                                {% else %}
-                                    {{ p.consignment_price|usd }}
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td class="px-3 py-4 text-neutral-500" colspan="4">{% trans "No installment sales" %}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Full paid -->
-        <div class="bg-white border rounded-2xl">
-            <div class="px-4 py-3 border-b bg-emerald-50 rounded-t-2xl">
-                <div class="font-semibold">{% trans "Fully paid sales" %}</div>
-                <div class="text-sm text-emerald-700">{% trans "Products sold with full payment" %}</div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-emerald-100 text-emerald-900">
-                    <tr>
-                        <th class="text-left px-3 py-2">{% trans "Product" %}</th>
-                        <th class="text-left px-3 py-2">{% trans "Store" %}</th>
-                        <th class="text-left px-3 py-2">{% trans "Sold at" %}</th>
-                        <th class="text-right px-3 py-2">{% trans "Purchase/Consignment" %}</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for p in full_rows %}
-                        <tr class="border-b last:border-0">
-                            <td class="px-3 py-2">{{ p.brand.name }} {{ p.model.name }} {% if p.imei_last4 %}
-                                <span class="text-xs text-neutral-500">({{ p.imei_last4 }})</span>{% endif %}</td>
-                            <td class="px-3 py-2">{{ p.store.name }}</td>
-                            <td class="px-3 py-2">{{ p.sold_at|date:"Y-m-d H:i" }}</td>
-                            <td class="px-3 py-2 text-right">
-                                {% if p.ownership == "owned" %}
-                                    {{ p.purchase_price|usd }}
-                                {% else %}
-                                    {{ p.consignment_price|usd }}
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td class="px-3 py-4 text-neutral-500" colspan="4">{% trans "No full-paid sales" %}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
+  <!-- MAIN TABLE: All sold rows (for KPI calc too) -->
+  <div class="bg-white border rounded-2xl">
+    <div class="px-4 py-3 border-b bg-neutral-50 rounded-t-2xl">
+      <div class="font-semibold">{% trans "Barcha sotilganlar" %}</div>
+      <div class="text-sm text-neutral-600">{% trans "KPI kartalar shu jadvaldan hisoblanadi" %}</div>
     </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-neutral-100">
+          <tr>
+            <th class="text-left px-3 py-2">{% trans "Product" %}</th>
+            <th class="text-left px-3 py-2">{% trans "Store (owner)" %}</th>
+            <th class="text-left px-3 py-2">{% trans "Sold at" %}</th>
+            <th class="text-right px-3 py-2">{% trans "Amount" %}</th>
+            <th class="text-right px-3 py-2">{% trans "Cost" %}</th>
+            <th class="text-right px-3 py-2">{% trans "Profit" %}</th>
+            <th class="text-left px-3 py-2">{% trans "Kim sotdi" %}</th>
+            <th class="text-left px-3 py-2">{% trans "Qaysi do‘kon" %}</th>
+            <th class="text-right px-3 py-2">{% trans "Actions" %}</th>
+          </tr>
+        </thead>
+        <tbody id="sold-rows" class="divide-y">
+          {% for r in rows %}
+          {% with p=r.obj %}
+          <tr data-date="{{ r.sold_date }}" data-amount="{{ r.amount }}" data-cost="{{ r.cost }}" data-profit="{{ r.profit }}">
+            <td class="px-3 py-2">
+              {{ p.brand.name }} {{ p.model.name }}
+              {% if p.imei_full %}<span class="text-xs text-neutral-500">({{ p.imei_full }})</span>{% endif %}
+            </td>
+            <td class="px-3 py-2">{{ p.store.name }}</td>
+            <td class="px-3 py-2">
+              {% if p.sold_at %}{{ p.sold_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}
+            </td>
+            <td class="px-3 py-2 text-right">{{ p.price|default:0|usd }}</td>
+            <td class="px-3 py-2 text-right">{{ r.cost|floatformat:2 }}</td>
+            <td class="px-3 py-2 text-right">{{ r.profit|floatformat:2 }}</td>
+            <td class="px-3 py-2">
+              {% if r.sold_by %}
+                {{ r.sold_by.get_full_name|default:r.sold_by.username }}
+              {% else %}-{% endif %}
+            </td>
+            <td class="px-3 py-2">
+              {% if r.sold_in_store %}
+                {{ r.sold_in_store.name }}
+              {% else %}-{% endif %}
+            </td>
+            <td class="px-3 py-2 text-right">
+                                    {% if user.is_owner or user.store_id == p.store_id %}
+                                      <form method="post"
+                                            action="{% url 'sale_return_product' p.id %}"
+                                            onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
+                                            class="inline">
+                                          {% csrf_token %}
+                                          <button type="submit"
+                                                  class="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">
+                                            {% trans "Qaytarish" %}
+                                          </button>
+                                      </form>
+                                    {% else %}
+                                      <span class="text-neutral-400">—</span>
+                                    {% endif %}
+            </td>
+          </tr>
+          {% endwith %}
+          {% empty %}
+          <tr><td class="px-3 py-4 text-center text-neutral-500" colspan="8">{% trans "Ma’lumot yo‘q" %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-    <script>
-        // Quick ranges: "Bugun/7/30" tugmalari date_from/date_to ni to'ldiradi va formani yuboradi
-        (function () {
-            const fmt = (d) => d.toISOString().slice(0, 10);
-            const $from = document.getElementById('date_from');
-            const $to = document.getElementById('date_to');
-            const $form = document.getElementById('filter-form');
+  <!-- Installment -->
+  <div class="bg-white border rounded-2xl">
+      <div class="px-4 py-3 border-b bg-amber-50 rounded-t-2xl">
+          <div class="font-semibold">{% trans "Installment sales" %}</div>
+          <div class="text-sm text-amber-700">{% trans "These products were sold on installment" %}</div>
+      </div>
+      <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+              <thead class="bg-amber-100 text-amber-900">
+              <tr>
+                  <th class="text-left px-3 py-2">{% trans "Product" %}</th>
+                  <th class="text-left px-3 py-2">{% trans "Store" %}</th>
+                  <th class="text-left px-3 py-2">{% trans "Sold at" %}</th>
+                  <th class="text-right px-3 py-2">{% trans "Purchase/Consignment" %}</th>
+                  <th class="text-right px-3 py-2">{% trans "Actions" %}</th>
+              </tr>
+              </thead>
+              <tbody>
+              {% for p in installment_rows %}
+                  <tr class="border-b last:border-0">
+                      <td class="px-3 py-2">{{ p.brand.name }} {{ p.model.name }} {% if p.imei_last4 %}<span class="text-xs text-neutral-500">({{ p.imei_last4 }})</span>{% endif %}</td>
+                      <td class="px-3 py-2">{{ p.store.name }}</td>
+                      <td class="px-3 py-2">{{ p.sold_at|date:"Y-m-d H:i" }}</td>
+                      <td class="px-3 py-2 text-right">
+                          {% if p.ownership == "owned" %}
+                              {{ p.purchase_price|usd }}
+                          {% else %}
+                              {{ p.consignment_price|usd }}
+                          {% endif %}
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                                    {% if user.is_owner or user.store_id == p.store_id %}
+                                      <form method="post"
+                                            action="{% url 'sale_return_product' p.id %}"
+                                            onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
+                                            class="inline">
+                                          {% csrf_token %}
+                                          <button type="submit"
+                                                  class="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">
+                                            {% trans "Qaytarish" %}
+                                          </button>
+                                      </form>
+                                    {% else %}
+                                      <span class="text-neutral-400">—</span>
+                                    {% endif %}
+                      </td>
+                  </tr>
+              {% empty %}
+                  <tr>
+                      <td class="px-3 py-4 text-neutral-500" colspan="4">{% trans "No installment sales" %}</td>
+                  </tr>
+              {% endfor %}
+              </tbody>
+          </table>
+      </div>
+  </div>
 
-            document.querySelectorAll('[data-range]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const today = new Date();
-                    const kind = btn.getAttribute('data-range');
-                    let start = new Date(today);
+  <!-- Full paid -->
+  <div class="bg-white border rounded-2xl">
+      <div class="px-4 py-3 border-b bg-emerald-50 rounded-t-2xl">
+          <div class="font-semibold">{% trans "Fully paid sales" %}</div>
+          <div class="text-sm text-emerald-700">{% trans "Products sold with full payment" %}</div>
+      </div>
+      <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+              <thead class="bg-emerald-100 text-emerald-900">
+              <tr>
+                  <th class="text-left px-3 py-2">{% trans "Product" %}</th>
+                  <th class="text-left px-3 py-2">{% trans "Store" %}</th>
+                  <th class="text-left px-3 py-2">{% trans "Sold at" %}</th>
+                  <th class="text-right px-3 py-2">{% trans "Purchase/Consignment" %}</th>
+                  <th class="text-right px-3 py-2">{% trans "Actions" %}</th>
+              </tr>
+              </thead>
+              <tbody>
+              {% for p in full_rows %}
+                  <tr class="border-b last:border-0">
+                      <td class="px-3 py-2">{{ p.brand.name }} {{ p.model.name }} {% if p.imei_last4 %}<span class="text-xs text-neutral-500">({{ p.imei_last4 }})</span>{% endif %}</td>
+                      <td class="px-3 py-2">{{ p.store.name }}</td>
+                      <td class="px-3 py-2">{{ p.sold_at|date:"Y-m-d H:i" }}</td>
+                      <td class="px-3 py-2 text-right">
+                          {% if p.ownership == "owned" %}
+                              {{ p.purchase_price|usd }}
+                          {% else %}
+                              {{ p.consignment_price|usd }}
+                          {% endif %}
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                                    {% if user.is_owner or user.store_id == p.store_id %}
+                                      <form method="post"
+                                            action="{% url 'sale_return_product' p.id %}"
+                                            onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
+                                            class="inline">
+                                          {% csrf_token %}
+                                          <button type="submit"
+                                                  class="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">
+                                            {% trans "Qaytarish" %}
+                                          </button>
+                                      </form>
+                                    {% else %}
+                                      <span class="text-neutral-400">—</span>
+                                    {% endif %}
+                      </td>
+                  </tr>
+              {% empty %}
+                  <tr>
+                      <td class="px-3 py-4 text-neutral-500" colspan="4">{% trans "No full-paid sales" %}</td>
+                  </tr>
+              {% endfor %}
+              </tbody>
+          </table>
+      </div>
+  </div>
 
-                    if (kind === 'today') {
-                        // start = today
-                    } else {
-                        const days = parseInt(kind, 10);
-                        start.setDate(today.getDate() - (days - 1));
-                    }
-                    $from.value = fmt(start);
-                    $to.value = fmt(today);
-                    $form.submit();
-                });
-            });
+</div>
 
-            // KPI: bugungi aggregatlar jadvaldan
-            const todayStr = (new Date()).toISOString().slice(0, 10);
-            let amt = 0, cost = 0, profit = 0;
-            document.querySelectorAll('#sold-rows tr').forEach(tr => {
-                if (tr.dataset.date === todayStr) {
-                    amt += parseFloat(tr.dataset.amount || 0);
-                    cost += parseFloat(tr.dataset.cost || 0);
-                    profit += parseFloat(tr.dataset.profit || 0);
-                }
-            });
-            const nf = (n) => (isNaN(n) ? '–' : n.toLocaleString());
-            const a = document.getElementById('kpi-today-amount');
-            const c = document.getElementById('kpi-today-cost');
-            const p = document.getElementById('kpi-today-profit');
-            if (a) a.textContent = nf(amt);
-            if (c) c.textContent = nf(cost);
-            if (p) p.textContent = nf(profit);
-        })();
-    </script>
-    <!-- Chart.js faqat shu sahifada -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-    (function(){
-      const L = JSON.parse(document.getElementById('soldLabels').textContent);
-      const V = JSON.parse(document.getElementById('soldAmounts').textContent);
-      new Chart(document.getElementById('soldChart').getContext('2d'), {
-        type: 'line',
-        data: { labels: L, datasets: [{ label: 'Sales', data: V, tension: .25 }] }
+<script>
+  // Quick ranges
+  (function () {
+      const fmt = (d) => d.toISOString().slice(0, 10);
+      const $from = document.getElementById('date_from');
+      const $to = document.getElementById('date_to');
+      const $form = document.getElementById('filter-form');
+
+      document.querySelectorAll('[data-range]').forEach(btn => {
+          btn.addEventListener('click', () => {
+              const today = new Date();
+              const kind = btn.getAttribute('data-range');
+              let start = new Date(today);
+
+              if (kind === 'today') {
+                  // start = today
+              } else {
+                  const days = parseInt(kind, 10);
+                  start.setDate(today.getDate() - (days - 1));
+              }
+              $from.value = fmt(start);
+              $to.value = fmt(today);
+              $form.submit();
+          });
       });
 
-      const D = JSON.parse(document.getElementById('soldDonutData').textContent);
-      new Chart(document.getElementById('soldDonut').getContext('2d'), {
-        type: 'doughnut',
-        data: { labels: ['Owned','Consignment'], datasets: [{ data: D }] }
+      // KPI from table rows
+      const todayStr = (new Date()).toISOString().slice(0, 10);
+      let amt = 0, cost = 0, profit = 0;
+      document.querySelectorAll('#sold-rows tr').forEach(tr => {
+          if (tr.dataset.date === todayStr) {
+              amt += parseFloat(tr.dataset.amount || 0);
+              cost += parseFloat(tr.dataset.cost || 0);
+              profit += parseFloat(tr.dataset.profit || 0);
+          }
       });
-    })();
-    </script>
+      const nf = (n) => (isNaN(n) ? '–' : n.toLocaleString());
+      const a = document.getElementById('kpi-today-amount');
+      const c = document.getElementById('kpi-today-cost');
+      const p = document.getElementById('kpi-today-profit');
+      if (a) a.textContent = nf(amt);
+      if (c) c.textContent = nf(cost);
+      if (p) p.textContent = nf(profit);
+  })();
+</script>
+<!-- Chart.js faqat shu sahifada -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function(){
+  const L = JSON.parse(document.getElementById('soldLabels').textContent);
+  const V = JSON.parse(document.getElementById('soldAmounts').textContent);
+  new Chart(document.getElementById('soldChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: L, datasets: [{ label: 'Sales', data: V, tension: .25 }] }
+  });
+
+  const D = JSON.parse(document.getElementById('soldDonutData').textContent);
+  new Chart(document.getElementById('soldDonut').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: ['Owned','Consignment'], datasets: [{ data: D }] }
+  });
+})();
+</script>
 {% endblock %}

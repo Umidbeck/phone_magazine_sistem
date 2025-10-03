@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Komissiya hisobot</h1>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto">{{ form.date_from.label_tag }} {{ form.date_from }}</div>
+  <div class="col-auto">{{ form.date_to.label_tag }} {{ form.date_to }}</div>
+  <div class="col-auto"><button class="btn btn-primary">Filter</button></div>
+  <div class="col-auto">
+    <a class="btn btn-outline-secondary"
+       href="#"
+       onclick="this.href='{% url 'finance:commission_csv' %}?date_from='+ (document.querySelector('[name=date_from]').value || '') +'&date_to='+ (document.querySelector('[name=date_to]').value || '')">
+      CSV Export
+    </a>
+  </div>
+</form>
+
+<div class="card p-3">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Obyekt</th>
+        <th>Commission Income</th>
+        <th>Commission Expense</th>
+        <th>Net</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{ r.object }}</td>
+          <td>{{ r.income }}</td>
+          <td>{{ r.expense }}</td>
+          <td><strong>{{ r.net }}</strong></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">Ma'lumot yo'q</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

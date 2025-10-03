@@ -33,6 +33,7 @@ urlpatterns += i18n_patterns(
     path("reference/", include("reference.urls")),
     path("reports/", include("reports.urls")),
     path("", include("inventory.urls")),
+    path("finance/", include("finance.urls")),
     prefix_default_language=False,
 )
 

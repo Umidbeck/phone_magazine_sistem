@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>AR/AP hisobot</h1>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto">{{ form.date_from.label_tag }} {{ form.date_from }}</div>
+  <div class="col-auto">{{ form.date_to.label_tag }} {{ form.date_to }}</div>
+  <div class="col-auto"><button class="btn btn-primary">Filter</button></div>
+  <div class="col-auto">
+    <a class="btn btn-outline-secondary" href="?kind=ar{% if form.date_from.value %}&date_from={{ form.date_from.value }}{% endif %}{% if form.date_to.value %}&date_to={{ form.date_to.value }}{% endif %}&download=1" onclick="this.href='{% url 'finance:arap_csv' %}?kind=ar&date_from='+ (document.querySelector('[name=date_from]').value || '') +'&date_to='+ (document.querySelector('[name=date_to]').value || '')">AR CSV</a>
+    <a class="btn btn-outline-secondary" href="?kind=ap{% if form.date_from.value %}&date_from={{ form.date_from.value }}{% endif %}{% if form.date_to.value %}&date_to={{ form.date_to.value }}{% endif %}&download=1" onclick="this.href='{% url 'finance:arap_csv' %}?kind=ap&date_from='+ (document.querySelector('[name=date_from]').value || '') +'&date_to='+ (document.querySelector('[name=date_to]').value || '')">AP CSV</a>
+  </div>
+</form>
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="card p-3">
+      <h5>AR (Mijoz qarzlari)</h5>
+      <ul class="mb-0">
+        {% for r in ar_rows %}
+          <li>{{ r.object }} — <strong>{{ r.amount }}</strong></li>
+        {% empty %}
+          <li>Ma'lumot yo'q</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-3">
+      <h5>AP (Do'kon qarzlari)</h5>
+      <ul class="mb-0">
+        {% for r in ap_rows %}
+          <li>{{ r.object }} — <strong>{{ r.amount }}</strong></li>
+        {% empty %}
+          <li>Ma'lumot yo'q</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
