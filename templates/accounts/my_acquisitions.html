@@ -1,29 +1,323 @@
-# accounts/my_acquisitions.html
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "My acquisitions" %}{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block header_title %}{% trans "Mening xaridlarim" %}{% endblock %}
+
 {% block content %}
-<div class="p-4 space-y-3">
-  <div class="bg-white border rounded-xl overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead><tr class="text-left border-b">
-        <th class="p-2">{% trans "Date" %}</th>
-        <th class="p-2">{% trans "Product" %}</th>
-        <th class="p-2">{% trans "Store" %}</th>
-        <th class="p-2">{% trans "Ownership" %}</th>
-      </tr></thead>
-      <tbody>
-        {% for p in rows %}
-          <tr class="border-b">
-            <td class="p-2">{{ p.created_at|date:"Y-m-d H:i" }}</td>
-            <td class="p-2">{{ p.brand.name }} {{ p.model.name }} — {{ p.imei_full }}</td>
-            <td class="p-2">{{ p.store.name }}</td>
-            <td class="p-2">{{ p.ownership }}</td>
-          </tr>
-        {% empty %}
-          <tr><td class="p-3 text-sm text-gray-500" colspan="4">{% trans "No items" %}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-violet-50 to-fuchsia-50">
+
+  <!-- Header with gradient -->
+  <div class="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">
+          🛒
+        </div>
+        <div>
+          <h1 class="text-3xl md:text-4xl font-bold">{% trans "Mening xaridlarim" %}</h1>
+          <p class="text-violet-100 text-sm md:text-base">{% trans "Qo'shgan telefonlarim tarixi" %}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 -mt-6 pb-8 space-y-6">
+
+    <!-- Stats Card -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-violet-400 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-violet-600">{{ rows|length }}</div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Jami" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-blue-600">
+            {% for p in rows %}{% if p.ownership == "owned" %}1{% endif %}{% empty %}0{% endfor %}
+          </div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "O'zimizniki" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-indigo-600">
+            {% for p in rows %}{% if p.ownership == "consignment" %}1{% endif %}{% empty %}0{% endfor %}
+          </div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Konsignatsiya" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-fuchsia-400 to-fuchsia-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-fuchsia-600">
+            {% if rows %}{{ rows.0.created_at|date:"d.m" }}{% else %}-{% endif %}
+          </div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Oxirgi" %}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desktop Table View -->
+    <div class="hidden lg:block bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-violet-500 to-fuchsia-600 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+          </svg>
+          <div>
+            <h2 class="text-white font-bold text-lg">{% trans "Xaridlar ro'yxati" %}</h2>
+            <p class="text-violet-100 text-sm">{% trans "Barcha qo'shgan telefonlar" %}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <div class="flex items-center gap-2">
+                  <span>📅</span>
+                  <span>{% trans "Sana" %}</span>
+                </div>
+              </th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <div class="flex items-center gap-2">
+                  <span>📱</span>
+                  <span>{% trans "Mahsulot" %}</span>
+                </div>
+              </th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <div class="flex items-center gap-2">
+                  <span>🏪</span>
+                  <span>{% trans "Do'kon" %}</span>
+                </div>
+              </th>
+              <th class="text-center px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <div class="flex items-center justify-center gap-2">
+                  <span>🏷️</span>
+                  <span>{% trans "Egalik turi" %}</span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for p in rows %}
+              <tr class="hover:bg-violet-50 transition-all duration-300 hover:scale-[1.01]">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm font-semibold text-slate-700">{{ p.created_at|date:"d.m.Y" }}</div>
+                  <div class="text-xs text-slate-500">{{ p.created_at|date:"H:i" }}</div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-violet-400 to-fuchsia-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="font-bold text-slate-800">{{ p.brand.name }} {{ p.model.name }}</div>
+                      <div class="text-xs text-slate-500 font-mono">IMEI: {{ p.imei_full }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-slate-400 to-slate-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                      {{ p.store.name|slice:":1"|upper }}
+                    </div>
+                    <span class="font-semibold text-slate-700">{{ p.store.name }}</span>
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  {% if p.ownership == "owned" %}
+                    <span class="inline-flex items-center gap-1 px-4 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 border-2 border-blue-300">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                      </svg>
+                      <span>{% trans "O'zimizniki" %}</span>
+                    </span>
+                  {% elif p.ownership == "consignment" %}
+                    <span class="inline-flex items-center gap-1 px-4 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-indigo-100 to-purple-200 text-indigo-700 border-2 border-indigo-300">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                      </svg>
+                      <span>{% trans "Konsignatsiya" %}</span>
+                    </span>
+                  {% else %}
+                    <span class="text-slate-400">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4" class="px-6 py-12 text-center">
+                  <div class="text-8xl mb-4">📦</div>
+                  <h3 class="text-2xl font-bold text-slate-700 mb-2">{% trans "Xaridlar yo'q" %}</h3>
+                  <p class="text-slate-500">{% trans "Hali hech qanday telefon qo'shilmagan" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Mobile Card View -->
+    <div class="lg:hidden space-y-4">
+      {% for p in rows %}
+        <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden hover:shadow-2xl transition-all duration-300">
+
+          <!-- Card Header -->
+          <div class="bg-gradient-to-r from-violet-500 to-fuchsia-600 px-5 py-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-white text-xl">
+                  📱
+                </div>
+                <div>
+                  <div class="font-bold text-white text-lg">{{ p.brand.name }}</div>
+                  <div class="text-violet-100 text-sm">{{ p.model.name }}</div>
+                </div>
+              </div>
+
+              <!-- Ownership Badge -->
+              {% if p.ownership == "owned" %}
+                <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                  </svg>
+                </div>
+              {% elif p.ownership == "consignment" %}
+                <div class="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                  </svg>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="p-5 space-y-3">
+
+            <!-- Date -->
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-slate-500">📅</span>
+              <span class="text-xs text-slate-500 font-medium">{% trans "Sana" %}:</span>
+              <span class="font-semibold text-slate-700">{{ p.created_at|date:"d.m.Y H:i" }}</span>
+            </div>
+
+            <!-- IMEI -->
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-slate-500">🔢</span>
+              <span class="text-xs text-slate-500 font-medium">IMEI:</span>
+              <span class="font-mono font-bold text-slate-700">{{ p.imei_full }}</span>
+            </div>
+
+            <!-- Store -->
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-slate-500">🏪</span>
+              <span class="text-xs text-slate-500 font-medium">{% trans "Do'kon" %}:</span>
+              <span class="font-semibold text-slate-700">{{ p.store.name }}</span>
+            </div>
+
+            <!-- Ownership Type Badge -->
+            <div class="pt-3 border-t border-slate-100">
+              {% if p.ownership == "owned" %}
+                <div class="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl">
+                  <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                  </svg>
+                  <span class="font-bold text-blue-700">{% trans "O'zimizniki" %}</span>
+                </div>
+              {% elif p.ownership == "consignment" %}
+                <div class="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-50 to-purple-100 border-2 border-indigo-200 rounded-2xl">
+                  <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                  </svg>
+                  <span class="font-bold text-indigo-700">{% trans "Konsignatsiya" %}</span>
+                </div>
+              {% endif %}
+            </div>
+
+          </div>
+        </div>
+      {% empty %}
+        <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-12 text-center">
+          <div class="text-8xl mb-4">📦</div>
+          <h3 class="text-2xl font-bold text-slate-700 mb-2">{% trans "Xaridlar yo'q" %}</h3>
+          <p class="text-slate-500">{% trans "Hali hech qanday telefon qo'shilmagan" %}</p>
+        </div>
+      {% endfor %}
+    </div>
+
   </div>
 </div>
+
+<style>
+  /* Fade in animation */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #7c3aed, #c026d3);
+  }
+
+  /* Hover effects */
+  tbody tr {
+    transition: all 0.3s ease;
+  }
+
+  /* Badge animations */
+  .inline-flex {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  /* Smooth transitions */
+  * {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+</style>
 {% endblock %}

@@ -1,20 +1,529 @@
-# reference/brabd_form.html
-{% extends "base.html" %}{% load i18n %}
-{% load widget_tweaks %}
-{% block header_title %}{% trans "Brand" %}{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}
+    {% if obj %}
+        {% trans "Brendni tahrirlash" %}
+    {% else %}
+        {% trans "Yangi brend qo'shish" %}
+    {% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .form-container {
+        max-width: 500px;
+        width: 100%;
+    }
+
+    /* Header */
+    .form-header {
+        text-align: center;
+        margin-bottom: 24px;
+    }
+
+    .form-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 16px;
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        animation: scaleIn 0.4s ease-out;
+    }
+
+    @keyframes scaleIn {
+        from {
+            transform: scale(0);
+            opacity: 0;
+        }
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .form-title {
+        font-size: 26px;
+        font-weight: 800;
+        color: #262626;
+        margin-bottom: 8px;
+    }
+
+    .form-subtitle {
+        font-size: 14px;
+        color: #737373;
+    }
+
+    /* Form Card */
+    .form-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Messages */
+    .messages {
+        margin-bottom: 20px;
+    }
+
+    .alert {
+        padding: 14px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: start;
+        gap: 10px;
+    }
+
+    .alert svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+
+    .alert-error {
+        background-color: #fed7d7;
+        color: #c53030;
+        border: 1px solid #fc8181;
+    }
+
+    .alert-error svg {
+        stroke: #c53030;
+    }
+
+    .alert-success {
+        background-color: #c6f6d5;
+        color: #22543d;
+        border: 1px solid #68d391;
+    }
+
+    .alert-success svg {
+        stroke: #22543d;
+    }
+
+    /* Form Groups */
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #262626;
+        margin-bottom: 8px;
+    }
+
+    .form-label.required::after {
+        content: " *";
+        color: #ed4956;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #dbdbdb;
+        border-radius: 10px;
+        font-size: 15px;
+        background: #fafafa;
+        transition: all 0.2s;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #8b5cf6;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+    }
+
+    .form-input.error {
+        border-color: #ed4956;
+        background: #fff5f5;
+    }
+
+    .error-message {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #ed4956;
+        margin-top: 6px;
+    }
+
+    .error-message svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+
+    /* Checkbox Group */
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 16px;
+        background: #f9fafb;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .checkbox-group:hover {
+        border-color: #8b5cf6;
+        background: #f5f3ff;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+        cursor: pointer;
+        accent-color: #8b5cf6;
+    }
+
+    .checkbox-label {
+        font-size: 15px;
+        font-weight: 600;
+        color: #262626;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .checkbox-help {
+        font-size: 13px;
+        color: #737373;
+        margin-top: 6px;
+    }
+
+    /* Buttons */
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 32px;
+    }
+
+    .btn {
+        flex: 1;
+        padding: 14px 24px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        text-decoration: none;
+        border: none;
+    }
+
+    .btn-secondary {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        color: #262626;
+    }
+
+    .btn-secondary:hover {
+        background: #f9f9f9;
+        border-color: #999;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+
+    .btn-primary:active {
+        transform: translateY(0);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Info Box */
+    .info-box {
+        background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 100%);
+        border: 1px solid #e9d5ff;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .info-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #7c3aed;
+        margin-bottom: 8px;
+    }
+
+    .info-header svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .info-content {
+        font-size: 13px;
+        color: #6b21a8;
+        line-height: 1.5;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 640px) {
+        body {
+            padding: 16px;
+        }
+
+        .form-card {
+            padding: 24px 20px;
+        }
+
+        .form-icon {
+            width: 70px;
+            height: 70px;
+            font-size: 32px;
+        }
+
+        .form-title {
+            font-size: 22px;
+        }
+
+        .form-actions {
+            flex-direction: column-reverse;
+        }
+
+        .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="p-4">
-  <form method="post" class="bg-white border rounded-xl p-4 space-y-3">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    <div>
-      <label class="text-sm">{% trans "Name" %}</label>
-      {{ form.name|add_class:"w-full border rounded-lg px-3 py-2" }}
+<div class="form-container">
+    <!-- Header -->
+    <div class="form-header">
+        <div class="form-icon">🏷️</div>
+        <h1 class="form-title">
+            {% if obj %}
+                {% trans "Brendni tahrirlash" %}
+            {% else %}
+                {% trans "Yangi brend qo'shish" %}
+            {% endif %}
+        </h1>
+        <p class="form-subtitle">
+            {% if obj %}
+                {% trans "Brend ma'lumotlarini yangilang" %}
+            {% else %}
+                {% trans "Yangi brend yarating va saqlang" %}
+            {% endif %}
+        </p>
     </div>
-    <div class="flex items-center gap-2">
-      {{ form.is_active }} <span class="text-sm">{% trans "Active" %}</span>
+
+    <!-- Form Card -->
+    <div class="form-card">
+        <!-- Messages -->
+        {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {% if message.tags == 'success' %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                {% elif message.tags == 'error' %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                {% endif %}
+                <span>{{ message }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Non-field errors -->
+        {% if form.non_field_errors %}
+        <div class="alert alert-error">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            <div>
+                {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Info Box -->
+        <div class="info-box">
+            <div class="info-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                {% trans "Ma'lumot" %}
+            </div>
+            <div class="info-content">
+                {% trans "Brend nomi yagona bo'lishi kerak. Telefon modellari ushbu brendga bog'lanadi." %}
+            </div>
+        </div>
+
+        <!-- Form -->
+        <form method="post" id="brandForm">
+            {% csrf_token %}
+
+            <!-- Name Field -->
+            <div class="form-group">
+                <label for="{{ form.name.id_for_label }}" class="form-label required">
+                    {% trans "Brend nomi" %}
+                </label>
+                <input 
+                    type="text"
+                    name="{{ form.name.name }}"
+                    id="{{ form.name.id_for_label }}"
+                    value="{{ form.name.value|default:'' }}"
+                    class="form-input {% if form.name.errors %}error{% endif %}"
+                    placeholder="{% trans 'Samsung, Apple, Xiaomi...' %}"
+                    required
+                    maxlength="100"
+                >
+                {% if form.name.errors %}
+                    {% for error in form.name.errors %}
+                    <div class="error-message">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                        <span>{{ error }}</span>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- Is Active Field -->
+            <div class="form-group">
+                <label class="checkbox-group">
+                    <input 
+                        type="checkbox"
+                        name="{{ form.is_active.name }}"
+                        id="{{ form.is_active.id_for_label }}"
+                        {% if form.is_active.value %}checked{% endif %}
+                    >
+                    <div>
+                        <div class="checkbox-label">{% trans "Faol" %}</div>
+                        <div class="checkbox-help">
+                            {% trans "Faol brendlar tizimda ko'rinadi va ishlatiladi" %}
+                        </div>
+                    </div>
+                </label>
+                {% if form.is_active.errors %}
+                    {% for error in form.is_active.errors %}
+                    <div class="error-message">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                        <span>{{ error }}</span>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="form-actions">
+                <a href="{% url 'brand_list' %}" class="btn btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                    {% trans "Bekor qilish" %}
+                </a>
+
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    {% trans "Saqlash" %}
+                </button>
+            </div>
+        </form>
     </div>
-    <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Save" %}</button>
-  </form>
 </div>
+
+<script>
+    // Form submission with loading state
+    document.getElementById('brandForm').addEventListener('submit', function(e) {
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner"></span>{% trans "Saqlanmoqda..." %}';
+    });
+
+    // Auto-focus on name input
+    document.getElementById('{{ form.name.id_for_label }}').focus();
+</script>
 {% endblock %}

@@ -1,137 +1,821 @@
-# inventor/product_received_list.html
 {% extends "base.html" %}
-{% block title %}Olingan telefonlar · PhoneStore{% endblock %}
+{% load i18n %}
+
+{% block title %}{% trans "Olingan telefonlar" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        min-height: 100vh;
+    }
+
+    .inventory-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    /* Header Section */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: #262626;
+    }
+
+    .filter-toggle-btn {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #262626;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .filter-toggle-btn:hover {
+        background: #f9f9f9;
+    }
+
+    .filter-toggle-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Main Card */
+    .main-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Filter Panel */
+    .filter-panel {
+        background: #f9f9f9;
+        border: 1px solid #efefef;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .filter-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #737373;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .filter-select,
+    .filter-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #dbdbdb;
+        border-radius: 8px;
+        font-size: 14px;
+        background: #fff;
+        transition: all 0.2s;
+    }
+
+    .filter-select:focus,
+    .filter-input:focus {
+        outline: none;
+        border-color: #0095f6;
+        box-shadow: 0 0 0 3px rgba(0, 149, 246, 0.1);
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 24px;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: #262626;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .checkbox-label input {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+    }
+
+    .filter-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #0095f6 0%, #0080d6 100%);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(0, 149, 246, 0.3);
+    }
+
+    .filter-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 149, 246, 0.4);
+    }
+
+    .filter-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .stat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        color: #737373;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0284c7;
+    }
+
+    .stat-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .stat-value {
+        font-size: 32px;
+        font-weight: 800;
+        color: #262626;
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+    }
+
+    .stat-currency {
+        font-size: 20px;
+        color: #10b981;
+        font-weight: 700;
+    }
+
+    .stat-unit {
+        font-size: 14px;
+        color: #737373;
+        font-weight: 500;
+    }
+
+    .chart-wrapper {
+        height: 180px;
+        margin-top: 16px;
+    }
+
+    /* Product List */
+    .product-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        background: #efefef;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .product-item {
+        background: #fff;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        transition: background 0.2s;
+    }
+
+    .product-item:hover {
+        background: #fafafa;
+    }
+
+    .product-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .product-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #737373;
+        margin-bottom: 8px;
+    }
+
+    .product-meta-dot {
+        width: 3px;
+        height: 3px;
+        background: #737373;
+        border-radius: 50%;
+    }
+
+    .product-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #262626;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .product-imei {
+        font-family: 'Courier New', monospace;
+        color: #737373;
+        font-size: 14px;
+    }
+
+    .product-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .badge-owned {
+        background: #262626;
+        color: #fff;
+    }
+
+    .badge-consignment {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge-new {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-documents {
+        background: #dbeafe;
+        color: #1e3a8a;
+    }
+
+    .badge-available {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-repair {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .product-actions {
+        flex-shrink: 0;
+        text-align: right;
+    }
+
+    .product-price-label {
+        font-size: 11px;
+        color: #737373;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    .product-price {
+        font-size: 20px;
+        font-weight: 800;
+        color: #262626;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-end;
+        gap: 4px;
+    }
+
+    .price-currency {
+        font-size: 16px;
+        color: #10b981;
+    }
+
+    .view-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #262626;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .view-btn:hover {
+        background: #f9f9f9;
+        border-color: #0095f6;
+        color: #0095f6;
+    }
+
+    .view-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .empty-state {
+        padding: 60px 20px;
+        text-align: center;
+        color: #737373;
+    }
+
+    .empty-state svg {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        opacity: 0.3;
+    }
+
+    .empty-state p {
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .inventory-container {
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 22px;
+        }
+
+        .filter-toggle-btn {
+            display: flex;
+        }
+
+        .filter-panel.mobile-hidden {
+            display: none;
+        }
+
+        .main-card {
+            padding: 16px;
+        }
+
+        .filter-panel {
+            padding: 16px;
+        }
+
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .checkbox-group {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .product-item {
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .product-actions {
+            width: 100%;
+            text-align: left;
+        }
+
+        .product-price {
+            justify-content: flex-start;
+        }
+
+        .view-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="card p-4">
-  <div class="flex items-center justify-between mb-3">
-    <h1 class="text-xl font-semibold">Olingan telefonlar</h1>
-  </div>
-
-
-  <form method="get" class="grid md:grid-cols-6 gap-3 mb-4">
-    {% if request.user.is_owner %}
-      <div class="md:col-span-2">
-        <label class="block text-xs text-neutral-500 mb-1">Do‘kon</label>
-        <select name="store_id" class="w-full rounded-xl border-neutral-300">
-          <option value="">Barchasi</option>
-          {% for s in stores %}
-            <option value="{{ s.id }}" {% if store_id == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    {% endif %}
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">Brend</label>
-      <select name="brand" class="w-full rounded-xl border-neutral-300">
-        <option value="">Barchasi</option>
-        {% for b in brands %}
-          <option value="{{ b.id }}" {% if brand_id == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">Model</label>
-      <select name="model" class="w-full rounded-xl border-neutral-300">
-        <option value="">Barchasi</option>
-        {% for m in models %}
-          <option value="{{ m.id }}" {% if model_id == m.id|stringformat:"s" %}selected{% endif %}>{{ m.brand.name }} {{ m.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">Ownership</label>
-      <select name="ownership" class="w-full rounded-xl border-neutral-300">
-        <option value="">Barchasi</option>
-        <option value="owned" {% if ownership == "owned" %}selected{% endif %}>Owned</option>
-        <option value="consignment" {% if ownership == "consignment" %}selected{% endif %}>Consignment</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">Status</label>
-      <select name="status" class="w-full rounded-xl border-neutral-300">
-        <option value="">Barchasi</option>
-        <option value="available" {% if status == "available" %}selected{% endif %}>Available</option>
-        <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>On Repair</option>
-      </select>
-    </div>
-    <div class="flex items-center gap-4">
-      <label class="inline-flex items-center gap-2 mt-6">
-        <input class="rounded" type="checkbox" name="is_new" value="1" {% if is_new_val %}checked{% endif %}><span>Yangi</span>
-      </label>
-      <label class="inline-flex items-center gap-2 mt-6">
-        <input class="rounded" type="checkbox" name="has_documents" value="1" {% if has_docs_val %}checked{% endif %}><span>Hujjatli</span>
-      </label>
-    </div>
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">From</label>
-      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border-neutral-300">
-    </div>
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">To</label>
-      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border-neutral-300">
-    </div>
-    <div class="md:col-span-6">
-      <button class="btn btn-ghost">Filter</button>
-    </div>
-  </form>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          <div class="bg-white border rounded-2xl p-4">
-            <div class="text-xs text-neutral-500">Oxirgi 30 kun: kirim soni</div>
-            <canvas id="recChart"></canvas>
-            <script type="application/json" id="recLabels">{{ rec_labels_json }}</script>
-            <script type="application/json" id="recCounts">{{ rec_counts_json }}</script>
-          </div>
-          <div class="bg-white border rounded-2xl p-4">
-            <div class="text-xs text-neutral-500">Oxirgi 30 kun: umumiy qiymat</div>
-            <div class="mt-3 text-2xl font-semibold">${{ rec_total_value_30|floatformat:2 }}</div>
-          </div>
-   </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-    (function(){
-      const L = JSON.parse(document.getElementById('recLabels').textContent);
-      const C = JSON.parse(document.getElementById('recCounts').textContent);
-      new Chart(document.getElementById('recChart').getContext('2d'), {
-        type: 'bar',
-        data: { labels: L, datasets: [{ label: 'Received count', data: C }] }
-      });
-    })();
-    </script>
-
-  <div class="divide-y divide-neutral-200">
-    {% for p in rows %}
-      <article class="py-4 flex items-start justify-between gap-4">
-        <div>
-          <div class="text-sm text-neutral-500">{{ p.created_at|date:"Y-m-d H:i" }} · {{ p.store.name }}</div>
-          <div class="font-semibold">{{ p.brand.name }} {{ p.model.name }} · {{ p.imei_full }}</div>
-          <div class="mt-1 flex flex-wrap gap-2">
-            {% if p.ownership == "owned" %}
-              <span class="badge bg-neutral-900 text-white">Owned</span>
-            {% else %}
-              <span class="badge badge-warn">Consignment</span>
-            {% endif %}
-            {% if p.is_new %}<span class="badge badge-ok">New</span>{% endif %}
-            {% if p.has_documents %}<span class="badge bg-sky-100 text-sky-900">Docs</span>{% endif %}
-            {% if p.status == "available" %}
-              <span class="badge bg-emerald-100 text-emerald-900">Available</span>
-            {% elif p.status == "on_repair" %}
-              <span class="badge badge-danger">On Repair</span>
-            {% endif %}
-          </div>
+<div class="inventory-container">
+    <div class="main-card">
+        <!-- Header -->
+        <div class="page-header">
+            <h1 class="page-title">📱 {% trans "Olingan telefonlar" %}</h1>
+            <button type="button" class="filter-toggle-btn" onclick="toggleFilter()">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4.5h18M6 10.5h12M10 16.5h4"/>
+                </svg>
+                {% trans "Filtrlash" %}
+            </button>
         </div>
-        <div class="text-right">
-          <div class="text-xs text-neutral-500">Baza narx</div>
-          <div class="font-semibold">
-            {% if p.ownership == "owned" %}{{ p.purchase_price }}{% else %}{{ p.consignment_price }}{% endif %}
-          </div>
-          <a href="{% url 'product_detail' p.id %}" class="btn btn-ghost mt-2">Ochilish</a>
+
+        <!-- Filter Panel -->
+        <form method="get" id="filterPanel" class="filter-panel mobile-hidden">
+            <div class="filter-grid">
+                {% if request.user.is_owner %}
+                <div class="filter-group" style="grid-column: span 2;">
+                    <label class="filter-label">{% trans "Do'kon" %}</label>
+                    <select name="store_id" class="filter-select">
+                        <option value="">{% trans "Barchasi" %}</option>
+                        {% for s in stores %}
+                        <option value="{{ s.id }}" {% if store_id == s.id|stringformat:"s" %}selected{% endif %}>
+                            {{ s.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="filter-group">
+                    <label class="filter-label">{% trans "Brend" %}</label>
+                    <select name="brand" class="filter-select">
+                        <option value="">{% trans "Barchasi" %}</option>
+                        {% for b in brands %}
+                        <option value="{{ b.id }}" {% if brand_id == b.id|stringformat:"s" %}selected{% endif %}>
+                            {{ b.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">{% trans "Model" %}</label>
+                    <select name="model" class="filter-select">
+                        <option value="">{% trans "Barchasi" %}</option>
+                        {% for m in model_names %}
+                        <option value="{{ m.id }}" {% if model_id == m.id|stringformat:"s" %}selected{% endif %}>
+                            {{ m.brand.name }} {{ m.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">{% trans "Egalik turi" %}</label>
+                    <select name="ownership" class="filter-select">
+                        <option value="">{% trans "Barchasi" %}</option>
+                        <option value="owned" {% if ownership == "owned" %}selected{% endif %}>
+                            {% trans "Do'konniki" %}
+                        </option>
+                        <option value="consignment" {% if ownership == "consignment" %}selected{% endif %}>
+                            {% trans "Komissiya" %}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">{% trans "Holat" %}</label>
+                    <select name="status" class="filter-select">
+                        <option value="">{% trans "Barchasi" %}</option>
+                        <option value="available" {% if status == "available" %}selected{% endif %}>
+                            {% trans "Mavjud" %}
+                        </option>
+                        <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>
+                            {% trans "Ta'mirda" %}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">{% trans "Dan" %}</label>
+                    <input type="date" name="date_from" value="{{ date_from }}" class="filter-input">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">{% trans "Gacha" %}</label>
+                    <input type="date" name="date_to" value="{{ date_to }}" class="filter-input">
+                </div>
+            </div>
+
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_new" value="1" {% if is_new_val %}checked{% endif %}>
+                    <span>{% trans "Yangi" %}</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="has_documents" value="1" {% if has_docs_val %}checked{% endif %}>
+                    <span>{% trans "Hujjatli" %}</span>
+                </label>
+            </div>
+
+            <div class="filter-actions">
+                <button type="submit" class="filter-btn">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/>
+                    </svg>
+                    {% trans "Qidirish" %}
+                </button>
+            </div>
+        </form>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <!-- Chart Card -->
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-label">{% trans "Oxirgi 30 kun: kirim" %}</div>
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-width="2" stroke-linecap="round" d="M4 20V8m5 12V4m5 16v-8m5 8v-5"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="recChart"></canvas>
+                </div>
+                <script type="application/json" id="recLabels">{{ rec_labels_json }}</script>
+                <script type="application/json" id="recCounts">{{ rec_counts_json }}</script>
+            </div>
+
+            <!-- Total Value Card -->
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-label">{% trans "30 kun: umumiy qiymat" %}</div>
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #d1fae5 0%, #ccfbf1 100%); color: #10b981;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="stat-value">
+                    <span class="stat-currency">$</span>
+                    <span>{{ rec_total_value_30|floatformat:2 }}</span>
+                </div>
+            </div>
+
+            <!-- Count Card -->
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-label">{% trans "Filtrlangan natijalar" %}</div>
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%); color: #8b5cf6;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="stat-value">
+                    <span>{{ rows|length }}</span>
+                    <span class="stat-unit">{% trans "dona" %}</span>
+                </div>
+            </div>
         </div>
-      </article>
-    {% empty %}
-      <div class="py-10 text-neutral-500 text-center">Ma’lumot yo‘q</div>
-    {% endfor %}
-  </div>
+
+        <!-- Product List -->
+        <div class="product-list">
+            {% for p in rows %}
+            <div class="product-item">
+                <div class="product-info">
+                    <div class="product-meta">
+                        <span>{{ p.created_at|date:"Y-m-d H:i" }}</span>
+                        <span class="product-meta-dot"></span>
+                        <span>{{ p.store.name }}</span>
+                    </div>
+
+                    <div class="product-name">
+                        <span>{{ p.brand.name }} {{ p.model.name }}</span>
+                        <span class="product-imei">{{ p.imei_full }}</span>
+                    </div>
+
+                    <div class="product-badges">
+                        {% if p.ownership == "owned" %}
+                        <span class="badge badge-owned">{% trans "Do'konniki" %}</span>
+                        {% else %}
+                        <span class="badge badge-consignment">{% trans "Komissiya" %}</span>
+                        {% endif %}
+
+                        {% if p.is_new %}
+                        <span class="badge badge-new">{% trans "Yangi" %}</span>
+                        {% endif %}
+
+                        {% if p.has_documents %}
+                        <span class="badge badge-documents">{% trans "Hujjatli" %}</span>
+                        {% endif %}
+
+                        {% if p.status == "available" %}
+                        <span class="badge badge-available">{% trans "Mavjud" %}</span>
+                        {% elif p.status == "on_repair" %}
+                        <span class="badge badge-repair">{% trans "Ta'mirda" %}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="product-actions">
+                    <div class="product-price-label">{% trans "Baza narx" %}</div>
+                    <div class="product-price">
+                        <span class="price-currency">$</span>
+                        <span>
+                            {% if p.ownership == "owned" %}
+                                {{ p.purchase_price|floatformat:2 }}
+                            {% else %}
+                                {{ p.consignment_price|floatformat:2 }}
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <a href="{% url 'product_detail' p.id %}" class="view-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                        {% trans "Ko'rish" %}
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                </svg>
+                <p>{% trans "Ma'lumot topilmadi" %}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Toggle filter panel on mobile
+    function toggleFilter() {
+        const panel = document.getElementById('filterPanel');
+        panel.classList.toggle('mobile-hidden');
+    }
+
+    // Chart initialization
+    (function() {
+        try {
+            const labels = JSON.parse(document.getElementById('recLabels').textContent || "[]");
+            const counts = JSON.parse(document.getElementById('recCounts').textContent || "[]");
+            const ctx = document.getElementById('recChart').getContext('2d');
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '{% trans "Kirim soni" %}',
+                        data: counts,
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderColor: 'rgb(59, 130, 246)',
+                        borderWidth: 2,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 13,
+                                weight: 'bold',
+                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                            },
+                            bodyFont: {
+                                size: 12,
+                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                maxRotation: 0,
+                                font: {
+                                    size: 11,
+                                    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                font: {
+                                    size: 11,
+                                    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Chart error:', e);
+        }
+    })();
+</script>
 {% endblock %}

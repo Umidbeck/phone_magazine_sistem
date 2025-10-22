@@ -1,30 +1,379 @@
-# accounts/my_stats.html
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "My statistics" %}{% endblock %}
-{% block content %}
-<div class="p-4 space-y-3">
-  <form method="get" class="bg-white border rounded-xl p-3">
-    <select name="period" class="border rounded-lg px-3 py-2">
-      <option value="day" {% if period == "day" %}selected{% endif %}>{% trans "Day" %}</option>
-      <option value="week" {% if period == "week" %}selected{% endif %}>{% trans "Week" %}</option>
-      <option value="month" {% if period == "month" %}selected{% endif %}>{% trans "Month" %}</option>
-      <option value="year" {% if period == "year" %}selected{% endif %}>{% trans "Year" %}</option>
-    </select>
-    <button class="bg-black text-white rounded-lg px-3 py-2">{% trans "Apply" %}</button>
-  </form>
+{% extends "base.html" %}
+{% load i18n %}
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-    <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Sales count" %}</div><div class="text-sm font-semibold">{{ sales_count }}</div></div>
-    <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Sales sum" %}</div><div class="text-sm font-semibold">{{ sales_sum }}</div></div>
-    <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Profit" %}</div><div class="text-sm font-semibold">{{ profit_sum }}</div></div>
-    <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "My expenses" %}</div><div class="text-sm font-semibold">{{ my_expenses }}</div></div>
-    <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Commission total" %}</div><div class="text-sm font-semibold">{{ commission_total }}</div></div>
-    <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Commission paid" %}</div><div class="text-sm font-semibold">{{ commission_paid }}</div></div>
-    <div class="bg-white border rounded-xl p-4"><div class="text-xs text-gray-500">{% trans "Acquired count" %}</div><div class="text-sm font-semibold">{{ acquired_count }}</div></div>
+{% block title %}{% trans "Mening statistikam" %}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50 to-orange-50">
+  
+  <!-- Header with gradient -->
+  <div class="bg-gradient-to-r from-rose-600 via-pink-600 to-orange-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">
+            📊
+          </div>
+          <div>
+            <h1 class="text-3xl md:text-4xl font-bold">{% trans "Mening statistikam" %}</h1>
+            <p class="text-rose-100 text-sm md:text-base">
+              {{ date_from|date:"d.m.Y" }} - {{ date_to|date:"d.m.Y" }}
+            </p>
+          </div>
+        </div>
+        
+        <!-- Period Selector -->
+        <div class="flex items-center gap-2">
+          <a href="?period=day" class="px-4 py-2 rounded-xl {% if period == 'day' %}bg-white text-rose-600{% else %}bg-white/20 hover:bg-white/30 text-white{% endif %} font-semibold transition-all duration-300 hover:scale-105">
+            📅 {% trans "Kun" %}
+          </a>
+          <a href="?period=week" class="px-4 py-2 rounded-xl {% if period == 'week' %}bg-white text-rose-600{% else %}bg-white/20 hover:bg-white/30 text-white{% endif %} font-semibold transition-all duration-300 hover:scale-105">
+            📆 {% trans "Hafta" %}
+          </a>
+          <a href="?period=month" class="px-4 py-2 rounded-xl {% if period == 'month' %}bg-white text-rose-600{% else %}bg-white/20 hover:bg-white/30 text-white{% endif %} font-semibold transition-all duration-300 hover:scale-105">
+            📊 {% trans "Oy" %}
+          </a>
+          <a href="?period=year" class="px-4 py-2 rounded-xl {% if period == 'year' %}bg-white text-rose-600{% else %}bg-white/20 hover:bg-white/30 text-white{% endif %} font-semibold transition-all duration-300 hover:scale-105">
+            📈 {% trans "Yil" %}
+          </a>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="text-xs text-gray-500">
-    {% trans "From" %} {{ date_from }} {% trans "to" %} {{ date_to }}
+  <div class="max-w-7xl mx-auto px-4 -mt-6 pb-8 space-y-6">
+    
+    <!-- Main KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Sales Count -->
+      <div class="group animate-slide-up bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl p-6 transition-all duration-300 hover:-translate-y-2" style="animation-delay: 0.1s">
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+            </svg>
+          </div>
+          <div class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">
+            {{ period|upper }}
+          </div>
+        </div>
+        <h3 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-1">
+          {{ sales_count }}
+        </h3>
+        <p class="text-sm text-slate-600 font-medium mb-3">{% trans "Sotuvlar soni" %}</p>
+        <div class="flex items-center gap-2 text-xs text-slate-500">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+          </svg>
+          <span>{% trans "Sotilgan telefonlar" %}</span>
+        </div>
+      </div>
+
+      <!-- Sales Amount -->
+      <div class="group animate-slide-up bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl p-6 transition-all duration-300 hover:-translate-y-2" style="animation-delay: 0.2s">
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+            💰
+          </div>
+        </div>
+        <h3 class="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent mb-1">
+          ${{ sales_sum|floatformat:2 }}
+        </h3>
+        <p class="text-sm text-slate-600 font-medium mb-3">{% trans "Jami sotuv summasi" %}</p>
+        <div class="flex items-center gap-2 text-xs text-slate-500">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+          </svg>
+          <span>{% trans "Tushum" %}</span>
+        </div>
+      </div>
+
+      <!-- Profit -->
+      <div class="group animate-slide-up bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl p-6 transition-all duration-300 hover:-translate-y-2" style="animation-delay: 0.3s">
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-14 h-14 bg-gradient-to-br from-violet-400 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
+          </div>
+          <div class="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-bold">
+            🎯
+          </div>
+        </div>
+        <h3 class="text-4xl font-bold bg-gradient-to-r from-violet-600 to-violet-800 bg-clip-text text-transparent mb-1">
+          ${{ profit_sum|floatformat:2 }}
+        </h3>
+        <p class="text-sm text-slate-600 font-medium mb-3">{% trans "Sof foyda" %}</p>
+        <div class="flex items-center gap-2 text-xs text-slate-500">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span>{% trans "Daromad" %}</span>
+        </div>
+      </div>
+
+      <!-- Commission -->
+      <div class="group animate-slide-up bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl p-6 transition-all duration-300 hover:-translate-y-2" style="animation-delay: 0.4s">
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+            </svg>
+          </div>
+          <div class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
+            🎁
+          </div>
+        </div>
+        <h3 class="text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mb-1">
+          ${{ commission_total|floatformat:2 }}
+        </h3>
+        <p class="text-sm text-slate-600 font-medium mb-3">{% trans "Komissiya" %}</p>
+        <div class="flex items-center gap-2 text-xs text-slate-500">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path>
+          </svg>
+          <span>{% trans "Bonuslar" %}</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Secondary Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      
+      <!-- Cost -->
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-gradient-to-br from-slate-400 to-slate-600 rounded-2xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Tan narx" %}</div>
+        <div class="text-2xl font-bold text-slate-700">${{ cost_sum|floatformat:2 }}</div>
+      </div>
+
+      <!-- Expenses -->
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-gradient-to-br from-red-400 to-red-600 rounded-2xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Xarajatlar" %}</div>
+        <div class="text-2xl font-bold text-red-600">${{ my_expenses|floatformat:2 }}</div>
+      </div>
+
+      <!-- Acquired -->
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-2xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Qo'shilgan telefonlar" %}</div>
+        <div class="text-2xl font-bold text-cyan-600">{{ acquired_count }}</div>
+      </div>
+
+    </div>
+
+    <!-- Commission Details -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+          </svg>
+          <div>
+            <h2 class="text-white font-bold text-lg">{% trans "Komissiya tafsilotlari" %}</h2>
+            <p class="text-amber-100 text-sm">{% trans "To'langan va to'lanmagan bonuslar" %}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Total Commission -->
+          <div class="p-6 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-3xl">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <span class="text-xs font-bold text-amber-700 bg-amber-200 px-3 py-1 rounded-full">💰</span>
+            </div>
+            <div class="text-sm text-amber-700 font-semibold mb-1">{% trans "Jami komissiya" %}</div>
+            <div class="text-3xl font-bold text-amber-600">${{ commission_total|floatformat:2 }}</div>
+          </div>
+
+          <!-- Paid Commission -->
+          <div class="p-6 bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-3xl">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-500 rounded-xl flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <span class="text-xs font-bold text-emerald-700 bg-emerald-200 px-3 py-1 rounded-full">✅</span>
+            </div>
+            <div class="text-sm text-emerald-700 font-semibold mb-1">{% trans "To'langan" %}</div>
+            <div class="text-3xl font-bold text-emerald-600">${{ commission_paid|floatformat:2 }}</div>
+          </div>
+
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mt-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold text-slate-700">{% trans "To'lov jarayoni" %}</span>
+            <span class="text-sm font-bold text-slate-800">
+              {% if commission_total > 0 %}
+                {% widthratio commission_paid commission_total 100 %}%
+              {% else %}
+                0%
+              {% endif %}
+            </span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-3">
+            <div class="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full transition-all duration-500" 
+                 style="width: {% if commission_total > 0 %}{% widthratio commission_paid commission_total 100 %}%{% else %}0%{% endif %}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Card -->
+    <div class="bg-gradient-to-r from-rose-600 to-orange-600 rounded-3xl p-8 text-white shadow-2xl">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="text-rose-100 text-sm mb-1">{% trans "Umumiy natija" %}</div>
+            <div class="text-3xl font-bold">
+              {% if period == 'day' %}
+                {% trans "Bugun" %}
+              {% elif period == 'week' %}
+                {% trans "Bu hafta" %}
+              {% elif period == 'month' %}
+                {% trans "Bu oy" %}
+              {% else %}
+                {% trans "Bu yil" %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-6 text-center">
+          <div>
+            <div class="text-rose-100 text-xs mb-1">{% trans "O'rtacha sotuv" %}</div>
+            <div class="text-2xl font-bold">
+              {% if sales_count > 0 %}
+                ${% widthratio sales_sum sales_count 1 %}
+              {% else %}
+                $0
+              {% endif %}
+            </div>
+          </div>
+          <div>
+            <div class="text-rose-100 text-xs mb-1">{% trans "Foyda margin" %}</div>
+            <div class="text-2xl font-bold">
+              {% if sales_sum > 0 %}
+                {% widthratio profit_sum sales_sum 100 %}%
+              {% else %}
+                0%
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
+
+<style>
+  /* Slide up animation */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.6s ease-out;
+    animation-fill-mode: both;
+  }
+
+  /* Gradient animation */
+  @keyframes gradientShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .bg-gradient-to-r {
+    background-size: 200% 200%;
+    animation: gradientShift 15s ease infinite;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #f43f5e, #fb923c);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #e11d48, #f97316);
+  }
+
+  /* Gradient text animation */
+  .bg-clip-text {
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite;
+  }
+
+  /* Hover effects */
+  .group:hover {
+    box-shadow: 0 20px 50px -10px rgba(244, 63, 94, 0.3);
+  }
+</style>
 {% endblock %}

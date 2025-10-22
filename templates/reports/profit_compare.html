@@ -1,52 +1,752 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="max-w-7xl mx-auto p-4 space-y-6">
-  <div class="flex items-center justify-between">
-    <h1 class="text-2xl font-semibold">📊 Oyma-oy taqqoslash</h1>
-  </div>
+{% load i18n %}
 
-  <form method="get" class="grid md:grid-cols-4 gap-3 bg-white border rounded-2xl p-4">
-    {% if stores %}
-    <div>
-      <label class="text-xs text-neutral-500">Do‘kon</label>
-      <select name="store_id" class="w-full rounded-xl border p-2">
-        <option value="">Hammasi</option>
-        {% for s in stores %}
-          <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-        {% endfor %}
-      </select>
+{% block title %}{% trans "Oyma-oy taqqoslash" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        min-height: 100vh;
+    }
+
+    .compare-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    /* Page Header */
+    .page-header {
+        margin-bottom: 24px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: #262626;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .title-icon {
+        font-size: 32px;
+    }
+
+    /* Filter Card */
+    .filter-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .filter-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #737373;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .filter-select,
+    .filter-input {
+        padding: 10px 14px;
+        border: 2px solid #dbdbdb;
+        border-radius: 10px;
+        font-size: 14px;
+        background: #fafafa;
+        transition: all 0.2s;
+    }
+
+    .filter-select:focus,
+    .filter-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        background: #fff;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Summary Cards */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .summary-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.2s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .summary-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+    }
+
+    .summary-card.total-kassa::before {
+        background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+    }
+
+    .summary-card.total-profit::before {
+        background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+    }
+
+    .summary-card.avg-kassa::before {
+        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+    }
+
+    .summary-card.avg-profit::before {
+        background: linear-gradient(90deg, #ec4899 0%, #f472b6 100%);
+    }
+
+    .summary-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .summary-label {
+        font-size: 12px;
+        color: #737373;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .summary-value {
+        font-size: 28px;
+        font-weight: 800;
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+    }
+
+    .summary-value.kassa {
+        color: #8b5cf6;
+    }
+
+    .summary-value.profit {
+        color: #10b981;
+    }
+
+    .summary-value.avg {
+        color: #f59e0b;
+    }
+
+    .currency-symbol {
+        font-size: 20px;
+        color: #10b981;
+        font-weight: 700;
+    }
+
+    /* Chart Card */
+    .chart-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .chart-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #262626;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .chart-wrapper {
+        position: relative;
+        height: 300px;
+    }
+
+    /* Table Card */
+    .table-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    }
+
+    th {
+        padding: 16px 20px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    th.text-right {
+        text-align: right;
+    }
+
+    tbody tr {
+        border-bottom: 1px solid #f3f4f6;
+        transition: background 0.2s;
+    }
+
+    tbody tr:hover {
+        background: #f9fafb;
+    }
+
+    tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    td {
+        padding: 16px 20px;
+        font-size: 14px;
+        color: #374151;
+    }
+
+    .month-cell {
+        font-weight: 600;
+        color: #262626;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .month-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+    }
+
+    .amount-cell {
+        text-align: right;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .amount-cell.kassa {
+        color: #8b5cf6;
+    }
+
+    .amount-cell.profit {
+        color: #10b981;
+    }
+
+    .currency {
+        font-size: 12px;
+        color: #10b981;
+        margin-right: 2px;
+    }
+
+    .trend-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        margin-left: 8px;
+    }
+
+    .trend-indicator.up {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .trend-indicator.down {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .trend-indicator svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    /* Empty State */
+    .empty-state {
+        padding: 80px 20px;
+        text-align: center;
+    }
+
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+        opacity: 0.3;
+        stroke: #9ca3af;
+    }
+
+    .empty-state-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #6b7280;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-text {
+        font-size: 14px;
+        color: #9ca3af;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .compare-container {
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 22px;
+        }
+
+        .filter-card {
+            padding: 20px;
+        }
+
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .filter-actions {
+            flex-direction: column;
+        }
+
+        .btn-primary {
+            width: 100%;
+        }
+
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .chart-wrapper {
+            height: 250px;
+        }
+
+        .table-wrapper {
+            margin: 0 -16px;
+        }
+
+        table {
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 12px 16px;
+        }
+
+        .month-icon {
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+        }
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    tbody tr {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    tbody tr:nth-child(1) { animation-delay: 0.05s; }
+    tbody tr:nth-child(2) { animation-delay: 0.1s; }
+    tbody tr:nth-child(3) { animation-delay: 0.15s; }
+    tbody tr:nth-child(4) { animation-delay: 0.2s; }
+    tbody tr:nth-child(5) { animation-delay: 0.25s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="compare-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">
+            <span class="title-icon">📊</span>
+            {% trans "Oyma-oy taqqoslash" %}
+        </h1>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="filter-card">
+        <div class="filter-grid">
+            {% if stores %}
+            <div class="filter-group">
+                <label class="filter-label">{% trans "Do'kon" %}</label>
+                <select name="store_id" class="filter-select">
+                    <option value="">{% trans "Hammasi" %}</option>
+                    {% for s in stores %}
+                    <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
+                        {{ s.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="filter-group">
+                <label class="filter-label">{% trans "Oylar" %}</label>
+                <input type="number" name="months" min="1" max="24" value="{{ months|default:12 }}" class="filter-input">
+            </div>
+        </div>
+
+        <div class="filter-actions">
+            <button type="submit" class="btn-primary">
+                🔍 {% trans "Ko'rsatish" %}
+            </button>
+        </div>
+    </form>
+
+    <!-- Summary Cards -->
+    {% if series %}
+    <div class="summary-grid">
+        <div class="summary-card total-kassa">
+            <div class="summary-label">💰 {% trans "Jami Kassa" %}</div>
+            <div class="summary-value kassa">
+                <span class="currency-symbol">$</span>
+                <span id="totalKassa">0.00</span>
+            </div>
+        </div>
+
+        <div class="summary-card total-profit">
+            <div class="summary-label">📈 {% trans "Jami Foyda" %}</div>
+            <div class="summary-value profit">
+                <span class="currency-symbol">$</span>
+                <span id="totalProfit">0.00</span>
+            </div>
+        </div>
+
+        <div class="summary-card avg-kassa">
+            <div class="summary-label">📊 {% trans "O'rtacha Kassa" %}</div>
+            <div class="summary-value avg">
+                <span class="currency-symbol">$</span>
+                <span id="avgKassa">0.00</span>
+            </div>
+        </div>
+
+        <div class="summary-card avg-profit">
+            <div class="summary-label">💹 {% trans "O'rtacha Foyda" %}</div>
+            <div class="summary-value avg">
+                <span class="currency-symbol">$</span>
+                <span id="avgProfit">0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-card">
+        <div class="chart-title">
+            📈 {% trans "Grafik ko'rinish" %}
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="compareChart"></canvas>
+        </div>
     </div>
     {% endif %}
-    <div>
-      <label class="text-xs text-neutral-500">Oylar</label>
-      <input type="number" name="months" min="1" max="24" value="{{ months|default:12 }}" class="w-full rounded-xl border p-2">
-    </div>
-    <div class="md:col-span-4 flex justify-end">
-      <button class="px-4 py-2 rounded-xl bg-black text-white">Ko‘rsat</button>
-    </div>
-  </form>
 
-  <div class="rounded-2xl border overflow-x-auto bg-white">
-    <table class="min-w-full text-sm">
-      <thead class="bg-neutral-50 text-neutral-600">
-        <tr>
-          <th class="text-left px-4 py-2">Oy</th>
-          <th class="text-right px-4 py-2">Kassa</th>
-          <th class="text-right px-4 py-2">Net profit</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in series %}
-        <tr class="border-t">
-          <td class="px-4 py-2">{{ r.year }}-{{ r.month|stringformat:"02d" }}</td>
-          <td class="px-4 py-2 text-right">{{ r.kassa }}</td>
-          <td class="px-4 py-2 text-right">{{ r.net_profit }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="3" class="px-4 py-6 text-center text-neutral-500">Ma’lumot yo‘q</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    <!-- Table -->
+    <div class="table-card">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Oy" %}</th>
+                        <th class="text-right">{% trans "Kassa" %}</th>
+                        <th class="text-right">{% trans "Net profit" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in series %}
+                    <tr data-kassa="{{ r.kassa }}" data-profit="{{ r.net_profit }}">
+                        <td>
+                            <div class="month-cell">
+                                <div class="month-icon">📅</div>
+                                {{ r.year }}-{{ r.month|stringformat:"02d" }}
+                            </div>
+                        </td>
+                        <td class="amount-cell kassa">
+                            <span class="currency">$</span>{{ r.kassa|floatformat:2 }}
+                        </td>
+                        <td class="amount-cell profit">
+                            <span class="currency">$</span>{{ r.net_profit|floatformat:2 }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                                <div class="empty-state-title">{% trans "Ma'lumot topilmadi" %}</div>
+                                <p class="empty-state-text">{% trans "Tanlangan davr uchun ma'lumotlar yo'q" %}</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+    // Calculate totals and averages
+    (function() {
+        let totalKassa = 0;
+        let totalProfit = 0;
+        let count = 0;
+
+        document.querySelectorAll('tbody tr[data-kassa]').forEach(function(row) {
+            totalKassa += parseFloat(row.dataset.kassa || 0);
+            totalProfit += parseFloat(row.dataset.profit || 0);
+            count++;
+        });
+
+        const avgKassa = count > 0 ? totalKassa / count : 0;
+        const avgProfit = count > 0 ? totalProfit / count : 0;
+
+        // Update summary cards
+        const elements = {
+            totalKassa: document.getElementById('totalKassa'),
+            totalProfit: document.getElementById('totalProfit'),
+            avgKassa: document.getElementById('avgKassa'),
+            avgProfit: document.getElementById('avgProfit')
+        };
+
+        if (elements.totalKassa) {
+            elements.totalKassa.textContent = totalKassa.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        if (elements.totalProfit) {
+            elements.totalProfit.textContent = totalProfit.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        if (elements.avgKassa) {
+            elements.avgKassa.textContent = avgKassa.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        if (elements.avgProfit) {
+            elements.avgProfit.textContent = avgProfit.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // Create chart
+        const chartCanvas = document.getElementById('compareChart');
+        if (chartCanvas && count > 0) {
+            const labels = [];
+            const kassaData = [];
+            const profitData = [];
+
+            document.querySelectorAll('tbody tr[data-kassa]').forEach(function(row) {
+                const monthCell = row.querySelector('.month-cell');
+                if (monthCell) {
+                    labels.push(monthCell.textContent.trim());
+                }
+                kassaData.push(parseFloat(row.dataset.kassa || 0));
+                profitData.push(parseFloat(row.dataset.profit || 0));
+            });
+
+            new Chart(chartCanvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '{% trans "Kassa" %}',
+                            data: kassaData,
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 3,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: '#8b5cf6'
+                        },
+                        {
+                            label: '{% trans "Net Profit" %}',
+                            data: profitData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 3,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: '#10b981'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 15,
+                                font: {
+                                    size: 13,
+                                    weight: '600',
+                                    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 14,
+                                weight: 'bold',
+                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                            },
+                            bodyFont: {
+                                size: 13,
+                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': $' + context.parsed.y.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    });
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12,
+                                    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                                },
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12,
+                                    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    })();
+</script>
 {% endblock %}

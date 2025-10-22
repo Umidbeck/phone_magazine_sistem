@@ -1,14 +1,215 @@
-# accounts/store_delete_confirm.html
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Delete store" %}{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block header_title %}{% trans "Do'konni o'chirish" %}{% endblock %}
+
 {% block content %}
-<div class="p-4 space-y-3">
-  <div class="bg-white border rounded-xl p-4">
-    {% trans "Delete store" %}: <strong>{{ obj.name }}</strong>?
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-red-50 to-orange-50 flex items-center justify-center p-4">
+  
+  <div class="w-full max-w-2xl">
+    
+    <!-- Warning Card -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-2xl rounded-3xl overflow-hidden">
+      
+      <!-- Alert Header -->
+      <div class="bg-gradient-to-r from-red-500 to-orange-600 px-6 py-8 text-center">
+        <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <h1 class="text-3xl font-bold text-white mb-2">{% trans "Diqqat!" %}</h1>
+        <p class="text-red-100">{% trans "Bu amal qaytarib bo'lmaydigan" %}</p>
+      </div>
+
+      <!-- Content -->
+      <div class="p-8 space-y-6">
+        
+        <!-- Store Info -->
+        <div class="bg-gradient-to-r from-slate-50 to-red-50 border-2 border-red-200 rounded-2xl p-6">
+          <div class="flex items-center gap-4">
+            <div class="w-16 h-16 bg-gradient-to-br from-red-400 to-orange-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="text-sm text-slate-600 mb-1">{% trans "O'chirmoqchi bo'lgan do'kon:" %}</div>
+              <div class="text-2xl font-bold text-slate-800">{{ obj.name }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning Message -->
+        <div class="space-y-4">
+          <div class="flex items-start gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-2xl">
+            <div class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-red-900 mb-1">{% trans "Bu do'konni o'chirsangiz:" %}</h3>
+              <ul class="text-sm text-red-700 space-y-1">
+                <li class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                  <span>{% trans "Do'kon ma'lumotlari butunlay o'chib ketadi" %}</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                  <span>{% trans "Bog'liq mahsulotlar va sotuvlar ma'lumotlari yo'qolishi mumkin" %}</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                  <span>{% trans "Bu amalni qaytarib bo'lmaydi" %}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3 p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl">
+            <div class="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-amber-900 mb-1">{% trans "Tavsiya" %}</h3>
+              <p class="text-sm text-amber-700">
+                {% trans "Agar do'konni vaqtincha o'chirib qo'ymoqchi bo'lsangiz, uni 'Faol emas' holga o'tkazing. Bu usul ma'lumotlarni saqlaydi." %}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirmation Question -->
+        <div class="bg-gradient-to-r from-slate-100 to-red-100 border-2 border-slate-300 rounded-2xl p-6 text-center">
+          <div class="text-lg font-bold text-slate-800 mb-2">
+            {% trans "Rostdan ham o'chirmoqchimisiz?" %}
+          </div>
+          <p class="text-sm text-slate-600">
+            {% trans "Agar ishonchingiz komil bo'lsa, quyidagi tugmani bosing" %}
+          </p>
+        </div>
+
+        <!-- Action Buttons -->
+        <form method="post" class="space-y-3">
+          {% csrf_token %}
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Cancel Button (Primary) -->
+            <a href="{% url 'store_list' %}" class="order-2 sm:order-1 group px-6 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-center flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+              </svg>
+              <span>{% trans "Yo'q, qaytish" %}</span>
+            </a>
+
+            <!-- Delete Button (Danger) -->
+            <button type="submit" class="order-1 sm:order-2 group relative px-6 py-4 rounded-2xl bg-gradient-to-r from-red-500 to-orange-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-r from-red-600 to-orange-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div class="relative flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                <span>{% trans "Ha, o'chirish" %}</span>
+              </div>
+            </button>
+          </div>
+
+          <p class="text-xs text-center text-slate-500">
+            ⚠️ {% trans "Bu amalni bajarganingizdan so'ng ma'lumotlarni qayta tiklab bo'lmaydi" %}
+          </p>
+        </form>
+
+      </div>
+
+    </div>
+
+    <!-- Back to Safety Link -->
+    <div class="mt-6 text-center">
+      <a href="{% url 'store_list' %}" class="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span>{% trans "Do'konlar ro'yxatiga qaytish" %}</span>
+      </a>
+    </div>
+
   </div>
-  <form method="post">
-    {% csrf_token %}
-    <button class="px-3 py-2 bg-black text-white rounded-lg">{% trans "Confirm" %}</button>
-  </form>
 </div>
+
+<style>
+  /* Pulse animation for warning icon */
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 0.9;
+    }
+  }
+
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #dc2626, #ea580c);
+  }
+
+  /* Smooth transitions */
+  * {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Button loading state */
+  button[type="submit"]:active {
+    transform: scale(0.98);
+  }
+</style>
+
+<script>
+  // Add confirmation animation
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const deleteBtn = form.querySelector('button[type="submit"]');
+    
+    deleteBtn.addEventListener('click', function(e) {
+      if (!confirm('{% trans "OXIRGI OGOHLANTIRISH: Bu do'konni butunlay o'chirib yubormoqchimisiz?" %}')) {
+        e.preventDefault();
+        return false;
+      }
+      
+      // Show loading state
+      deleteBtn.disabled = true;
+      deleteBtn.innerHTML = `
+        <div class="relative flex items-center justify-center gap-2">
+          <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span>{% trans "O'chirilmoqda..." %}</span>
+        </div>
+      `;
+    });
+  });
+</script>
 {% endblock %}

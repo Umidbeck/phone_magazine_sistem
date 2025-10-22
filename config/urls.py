@@ -1,3 +1,4 @@
+# config/urls.py
 """
 URL configuration for config project.
 

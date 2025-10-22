@@ -15,6 +15,7 @@ django-widget-tweaks = "*"
 pytest = "*"
 pytest-django = "*"
 freezegun = "*"
+djangorestframework = "*"
 
 [dev-packages]
 

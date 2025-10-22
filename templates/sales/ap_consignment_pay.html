@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load i18n money %}
+
+{% block title %}{% trans "Konsignatsiya to‘lovi — tasdiqlash" %}{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto p-4 space-y-6">
+  <h1 class="text-2xl font-semibold">{% trans "Konsignatsiya to‘lovi — tasdiqlash" %}</h1>
+
+  <div class="bg-white border rounded-2xl p-4 space-y-2">
+    <div class="text-sm">
+      <div class="text-neutral-500">{% trans "Mahsulot" %}</div>
+      <div class="font-medium">
+        {{ p.brand.name }} {{ p.model.name }}
+        {% if p.imei_full %}<span class="text-xs text-neutral-500">• {{ p.imei_full|slice:"-4:" }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="grid grid-cols-3 gap-3 text-sm">
+      <div>
+        <div class="text-neutral-500">{% trans "Kelishilgan" %}</div>
+        <div class="font-semibold">{{ base|usd }}</div>
+      </div>
+      <div>
+        <div class="text-neutral-500">{% trans "Avval to‘langan" %}</div>
+        <div class="font-semibold text-emerald-700">{{ paid|usd }}</div>
+      </div>
+      <div>
+        <div class="text-neutral-500">{% trans "Qolgan balans" %}</div>
+        <div class="font-semibold text-amber-700">{{ balance|usd }}</div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" class="bg-white border rounded-2xl p-4 space-y-4">
+    {% csrf_token %}
+
+    <div>
+      <label class="block text-sm text-neutral-600 mb-1" for="amount">{% trans "To‘lov summasi ($)" %}</label>
+      <input id="amount" name="amount" type="number" step="0.01" min="0" value="{{ suggest_amount }}"
+             class="w-full rounded-xl border p-2">
+      <p class="text-xs text-neutral-500 mt-1">{% trans "Default: qolgan balans." %}</p>
+    </div>
+
+    <div>
+      <div class="text-sm font-medium mb-2">{% trans "To‘lov turi" %}</div>
+      <div class="flex items-center gap-4">
+        <label class="inline-flex items-center gap-2">
+          <input type="radio" name="payment_type" value="cash" checked>
+          <span>{% trans "Naqd" %}</span>
+        </label>
+        <label class="inline-flex items-center gap-2">
+          <input type="radio" name="payment_type" value="card">
+          <span>{% trans "Karta" %}</span>
+        </label>
+        <label class="inline-flex items-center gap-2">
+          <input type="radio" name="payment_type" value="mixed">
+          <span>{% trans "Aralash" %}</span>
+        </label>
+      </div>
+    </div>
+
+    <div id="mixedBox" class="hidden grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm text-neutral-600 mb-1" for="cash_amount">{% trans "Naqd ($)" %}</label>
+        <input id="cash_amount" name="cash_amount" type="number" step="0.01" min="0" value="0"
+               class="w-full rounded-xl border p-2">
+      </div>
+      <div>
+        <label class="block text-sm text-neutral-600 mb-1" for="card_amount">{% trans "Karta ($)" %}</label>
+        <input id="card_amount" name="card_amount" type="number" step="0.01" min="0" value="0"
+               class="w-full rounded-xl border p-2">
+      </div>
+      <p class="col-span-2 text-xs text-neutral-500">
+        {% trans "Eslatma: Naqd + Karta = Umumiy to‘lov summasiga teng bo‘lsin." %}
+      </p>
+    </div>
+
+    <div class="flex items-center justify-end gap-2">
+      <a href="{% url 'ap_consignment_list' %}" class="px-4 py-2 rounded-xl border">{% trans "Bekor qilish" %}</a>
+      <button type="submit" class="px-4 py-2 rounded-xl bg-black text-white">{% trans "Tasdiqlash va yechish" %}</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  const radios = document.querySelectorAll('input[name="payment_type"]');
+  const box = document.getElementById('mixedBox');
+  function toggle(){
+    const v = document.querySelector('input[name="payment_type"]:checked')?.value;
+    box.classList.toggle('hidden', v !== 'mixed');
+  }
+  radios.forEach(r => r.addEventListener('change', toggle));
+  toggle();
+})();
+</script>
+{% endblock %}

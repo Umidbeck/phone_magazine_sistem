@@ -1,107 +1,425 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}💰 Moliyaviy Dashboard{% endblock %}
+
 {% block content %}
-<h1>Dashboard</h1>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
 
-<form method="get" class="row g-2 mb-3">
-  <div class="col-auto">
-    {{ form.date_from.label_tag }} {{ form.date_from }}
-  </div>
-  <div class="col-auto">
-    {{ form.date_to.label_tag }} {{ form.date_to }}
-  </div>
-  <div class="col-auto">
-    <button class="btn btn-primary">Filter</button>
-  </div>
-</form>
+        <!-- Header with Actions -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-4xl font-bold text-slate-800 flex items-center gap-3">
+                    <span class="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                        💰 Moliyaviy Dashboard
+                    </span>
+                </h1>
+                <p class="text-slate-600 mt-2">To'liq moliyaviy holat va kassa boshqaruvi</p>
+            </div>
 
-<div class="row">
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Active (Inventar)</div><div class="h4 mb-0">{{ kpi.balances.active }}</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Passive (Naqd)</div><div class="h4 mb-0">{{ kpi.balances.passive }}</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Debtorlar (AR)</div><div class="h4 mb-0">{{ kpi.balances.ar }}</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Do'kon qarzlari (AP)</div><div class="h4 mb-0">{{ kpi.balances.ap }}</div></div></div>
-</div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'finance:capital_inject' %}"
+                   class="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 font-semibold">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    Investitsiya
+                </a>
 
-<div class="row mt-3">
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Sotuv</div><div class="h4 mb-0">{{ kpi.pnl.sales }}</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">COGS</div><div class="h4 mb-0">{{ kpi.pnl.cogs }}</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Gross Profit</div><div class="h4 mb-0">{{ kpi.pnl.gross_profit }}</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Net Profit</div><div class="h4 mb-0">{{ kpi.pnl.net_profit }}</div></div></div>
-</div>
+                <a href="{% url 'finance:capital_withdraw' %}"
+                   class="flex items-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 font-semibold">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                    </svg>
+                    Pul yechish
+                </a>
 
-<div class="row mt-3">
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Gross Margin %</div><div class="h4 mb-0">{{ kpi.ratios.gross_margin_pct|floatformat:2 }}%</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Net Margin %</div><div class="h4 mb-0">{{ kpi.ratios.net_margin_pct|floatformat:2 }}%</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Inventory Turnover</div><div class="h4 mb-0">{{ kpi.ratios.inventory_turnover|floatformat:2 }}</div></div></div>
-  <div class="col-md-3"><div class="card p-3"><div class="small text-muted">Cash / Inventory</div><div class="h4 mb-0">{{ kpi.ratios.cash_to_inventory|floatformat:2 }}</div></div></div>
-</div>
+                <a href="{% url 'finance:capital_movements_log' %}"
+                   class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 font-semibold">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Tarix
+                </a>
+            </div>
+        </div>
 
-<hr class="my-4"/>
+        <!-- Filters Card -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-slate-200">
+            <form method="get" class="flex flex-wrap gap-4 items-end">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Do'kon</label>
+                    <select name="store_id"
+                            class="w-full border-2 border-slate-300 rounded-xl px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                        <option value="">Barcha do'konlar</option>
+                        {% for store in stores %}
+                        <option value="{{ store.id }}" {% if store.id|stringformat:"s" == store_id %}selected{% endif %}>
+                            {{ store.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-<h5>Kunlik Trendlar (30 kun)</h5>
-<div class="row">
-  <div class="col-md-8">
-    <canvas id="salesProfitChart"></canvas>
-  </div>
-  <div class="col-md-4">
-    <canvas id="expenseChart"></canvas>
-  </div>
-</div>
+                <button type="submit"
+                        class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-2.5 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                    🔍 Filtrlash
+                </button>
+            </form>
+        </div>
 
-<hr class="my-4"/>
+        <!-- KPI Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 
-<h5>AR / AP tafsiloti</h5>
-<div class="row">
-  <div class="col-md-6">
-    <div class="card p-3">
-      <div class="h6">AR (Mijoz qarzlari)</div>
-      <ul class="mb-0">
-        {% for row in ar_ap.AR %}
-          <li>{{ row.object_app }}.{{ row.object_model }}#{{ row.object_id }} — {{ row.total }}</li>
-        {% empty %}
-          <li>Ma'lumot yo'q</li>
-        {% endfor %}
-      </ul>
+            <!-- Total Assets Card -->
+            <div class="bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 text-white rounded-2xl shadow-2xl p-6 hover:scale-105 transition-transform duration-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide opacity-90">Jami Aktivlar</h3>
+                    <div class="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+                            <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="text-4xl font-bold mb-4">${{ bs.total_assets|floatformat:2 }}</div>
+
+                <div class="space-y-2 text-sm bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">💵 Naqd</span>
+                        <span class="font-bold">${{ bs.cash_balance|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">💳 Karta</span>
+                        <span class="font-bold">${{ bs.card_balance|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-white/20 pt-2">
+                        <span class="opacity-90">📦 Tovar</span>
+                        <span class="font-bold">${{ bs.inventory_value|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">👥 Qarzlar (AR)</span>
+                        <span class="font-bold">${{ bs.accounts_receivable|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Net Profit Card -->
+            <div class="bg-gradient-to-br from-emerald-500 via-green-600 to-teal-600 text-white rounded-2xl shadow-2xl p-6 hover:scale-105 transition-transform duration-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide opacity-90">Sof Foyda (30 kun)</h3>
+                    <div class="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="text-4xl font-bold mb-4">${{ kpi_30d.net_profit|floatformat:2 }}</div>
+
+                <div class="space-y-2 text-sm bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">📊 Gross Profit</span>
+                        <span class="font-bold">${{ kpi_30d.gross_profit|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">💰 Sotuv</span>
+                        <span class="font-bold">${{ kpi_30d.total_sales|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-white/20 pt-2">
+                        <span class="opacity-90">📉 Xarajat</span>
+                        <span class="font-bold">${{ kpi_30d.total_expense|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">👤 Komissiya</span>
+                        <span class="font-bold">${{ kpi_30d.total_commission|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Owner's Equity Card -->
+            <div class="bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-600 text-white rounded-2xl shadow-2xl p-6 hover:scale-105 transition-transform duration-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide opacity-90">Kapital & Foyda</h3>
+                    <div class="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="text-4xl font-bold mb-4">${{ bs.total_equity|floatformat:2 }}</div>
+
+                <div class="space-y-2 text-sm bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">💼 Owner Equity</span>
+                        <span class="font-bold">${{ bs.owner_equity|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-white/20 pt-2">
+                        <span class="opacity-90">📈 Yig'ilgan foyda</span>
+                        <span class="font-bold">${{ bs.retained_earnings|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-white/20 pt-2">
+                        <span class="opacity-90">🏦 Majburiyatlar</span>
+                        <span class="font-bold text-red-300">${{ bs.total_liabilities|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cash on Hand Card -->
+            <div class="bg-gradient-to-br from-amber-500 via-orange-600 to-red-600 text-white rounded-2xl shadow-2xl p-6 hover:scale-105 transition-transform duration-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide opacity-90">Kassa (Bugun)</h3>
+                    <div class="bg-white/20 backdrop-blur-sm p-3 rounded-xl">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z"/>
+                        </svg>
+                    </div>
+                </div>
+
+                {% with total_cash=cash.cash_closing|add:cash.card_closing %}
+                <div class="text-4xl font-bold mb-4">${{ total_cash|floatformat:2 }}</div>
+                {% endwith %}
+
+                <div class="space-y-2 text-sm bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">💵 Naqd</span>
+                        <span class="font-bold">${{ cash.cash_closing|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="opacity-90">💳 Karta</span>
+                        <span class="font-bold">${{ cash.card_closing|floatformat:2 }}</span>
+                    </div>
+                    <div class="border-t border-white/20 pt-2 mt-2 space-y-1">
+                        {% with total_in=cash.cash_in|add:cash.card_in %}
+                        <div class="flex justify-between items-center">
+                            <span class="opacity-90">⬆️ Kirim</span>
+                            <span class="font-bold text-green-300">${{ total_in|floatformat:2 }}</span>
+                        </div>
+                        {% endwith %}
+                        {% with total_out=cash.cash_out|add:cash.card_out %}
+                        <div class="flex justify-between items-center">
+                            <span class="opacity-90">⬇️ Chiqim</span>
+                            <span class="font-bold text-red-300">${{ total_out|floatformat:2 }}</span>
+                        </div>
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profit Trend Chart -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-slate-200">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    📈 Foyda Tendensiyasi
+                    <span class="text-sm font-normal text-slate-500">(12 oy)</span>
+                </h2>
+            </div>
+            <div class="relative" style="height: 400px;">
+                <canvas id="profitChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Capital Movements -->
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+            <div class="bg-gradient-to-r from-slate-50 to-slate-100 px-8 py-6 border-b border-slate-200">
+                <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    💸 Oxirgi Kapital Harakatlari
+                </h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Sana</th>
+                            <th class="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Turi</th>
+                            <th class="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Summa</th>
+                            <th class="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Kanal</th>
+                            <th class="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Sabab</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-slate-100">
+                        {% for movement in capital_movements %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                                {{ movement.created_at|date:"Y-m-d H:i" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if movement.type == 'injection' %}
+                                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Investitsiya
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Yechish
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                                {% if movement.type == 'injection' %}
+                                <span class="text-green-600">+${{ movement.amount|floatformat:2 }}</span>
+                                {% else %}
+                                <span class="text-red-600">-${{ movement.amount|floatformat:2 }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700">
+                                    {% if movement.channel == 'cash' %}💵{% else %}💳{% endif %}
+                                    {{ movement.get_channel_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-600">
+                                {{ movement.memo|truncatewords:15 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-12 text-center text-slate-500">
+                                <div class="flex flex-col items-center gap-3">
+                                    <svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                    </svg>
+                                    <p class="font-semibold">Harakatlar topilmadi</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if capital_movements %}
+            <div class="bg-slate-50 px-8 py-4 border-t border-slate-200">
+                <a href="{% url 'finance:capital_movements_log' %}"
+                   class="text-blue-600 hover:text-blue-700 font-semibold text-sm flex items-center gap-2">
+                    Barcha harakatlarni ko'rish
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            {% endif %}
+        </div>
     </div>
-  </div>
-  <div class="col-md-6">
-    <div class="card p-3">
-      <div class="h6">AP (Do'kon qarzlari)</div>
-      <ul class="mb-0">
-        {% for row in ar_ap.AP %}
-          <li>{{ row.object_app }}.{{ row.object_model }}#{{ row.object_id }} — {{ row.total }}</li>
-        {% empty %}
-          <li>Ma'lumot yo'q</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
-  const seriesSales = {{ series_sales|safe }};
-  const seriesExp = {{ series_expense|safe }};
-
-  new Chart(document.getElementById('salesProfitChart'), {
+const ctx = document.getElementById('profitChart').getContext('2d');
+new Chart(ctx, {
     type: 'line',
     data: {
-      labels: seriesSales.labels,
-      datasets: [
-        { label: 'Sales', data: seriesSales.sales },
-        { label: 'Cost', data: seriesSales.cost },
-        { label: 'Profit', data: seriesSales.profit },
-      ]
+        labels: {{ months_labels|safe }},
+        datasets: [
+            {
+                label: 'Sof Foyda',
+                data: {{ net_profit_series|safe }},
+                borderColor: 'rgb(16, 185, 129)',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 3,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                pointBackgroundColor: 'rgb(16, 185, 129)',
+            },
+            {
+                label: 'Gross Foyda',
+                data: {{ gross_profit_series|safe }},
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 3,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                pointBackgroundColor: 'rgb(59, 130, 246)',
+            },
+            {
+                label: 'Sotuv',
+                data: {{ sales_series|safe }},
+                borderColor: 'rgb(168, 85, 247)',
+                backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                tension: 0.4,
+                fill: false,
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointBackgroundColor: 'rgb(168, 85, 247)',
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    usePointStyle: true,
+                    padding: 15,
+                    font: {
+                        size: 13,
+                        weight: '600'
+                    }
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: 12,
+                titleFont: {
+                    size: 14,
+                    weight: 'bold'
+                },
+                bodyFont: {
+                    size: 13
+                },
+                callbacks: {
+                    label: function(context) {
+                        return context.dataset.label + ': $' + context.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.05)'
+                },
+                ticks: {
+                    font: {
+                        size: 12
+                    },
+                    callback: function(value) {
+                        return '$' + value.toLocaleString();
+                    }
+                }
+            },
+            x: {
+                grid: {
+                    display: false
+                },
+                ticks: {
+                    font: {
+                        size: 12
+                    }
+                }
+            }
+        }
     }
-  });
-
-  new Chart(document.getElementById('expenseChart'), {
-    type: 'bar',
-    data: {
-      labels: seriesExp.labels,
-      datasets: [
-        { label: 'Expense', data: seriesExp.expense },
-      ]
-    }
-  });
+});
 </script>
 {% endblock %}

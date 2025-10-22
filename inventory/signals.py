@@ -4,8 +4,10 @@ from decimal import Decimal
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.conf import settings
-from finance.adapters import post_purchase_from_domain, post_purchase_from_product
+from finance.adapters import post_purchase_from_product as post_purchase_from_domain, post_purchase_from_product
 from .models import Product  # yoki PurchaseTransaction — loyihangga moslashtir
+import logging
+logger = logging.getLogger(__name__)
 
 def _digits_only(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
@@ -41,27 +43,20 @@ def inventory_purchase_autopost(sender, instance, created, **kwargs):
         import logging; logging.getLogger(__name__).exception(ex)
 
 
-FINANCE_AUTOPOST = getattr(settings, "FINANCE_AUTOPOST", True)
 
 @receiver(post_save, sender=Product)
 def product_purchase_autopost(sender, instance: Product, created, **kwargs):
-    """
-    Product yaratilganda yoki kirim holatiga o'tganda, inventoryga kirimni ledgerga post qiladi.
-    cost_price/purchase_price maydonlaridan biri bo'lsa — ishlaydi.
-    supplier_credit True bo'lsa -> AP, aks holda Cash.
-    """
-    if not FINANCE_AUTOPOST:
+    if not created:
         return
     try:
-        # 'status' loyihangizda mavjud va kirim holatlarini bildirsa:
-        status = getattr(instance, "status", "")
-        if created or status in ("in_stock", "purchased", "new"):
-            cost = Decimal(getattr(instance, "cost_price", getattr(instance, "purchase_price", "0")) or 0)
-            if cost > 0:
-                is_cash = not bool(getattr(instance, "supplier_credit", False))
-                post_purchase_from_product(
-                    instance, cost=cost, is_cash=is_cash,
-                    ref=f"inventory.Product:{instance.pk}", memo="Olingan tovar"
-                )
-    except Exception:
-        import logging; logging.getLogger(__name__).exception("product_purchase_autopost error")
+        from finance.adapters import post_purchase_from_product
+        post_purchase_from_product(
+            product=instance,
+            ref=f"PRD-{instance.pk}",
+            memo=f"Kirim (auto) – {instance.brand} {instance.model} [{instance.pk}]",
+        )
+    except Exception as e:
+        # Ledgerga yozish muvaffaqiyatsiz bo'lsa ham product saqlangan bo'lsin
+        logger.exception("product_purchase_autopost error")
+        # agar istasangiz, instance.ga flag qo'ying: instance.need_finance_retry = True; instance.save(update_fields=[...])
+

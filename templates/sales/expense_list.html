@@ -1,223 +1,329 @@
+<!-- templates/sales/expense_list.html - EXPENSES MANAGEMENT -->
 {% extends "base.html" %}
-{% load i18n %}
+
+{% block title %}Xarajatlar{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto p-4 space-y-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-  <div class="flex items-center justify-between">
-    <h1 class="text-2xl font-semibold">🧾 {% trans "Rashodlar" %}</h1>
-    <a href="{% url 'expense_new' %}" class="px-4 py-2 rounded-xl bg-black text-white">+ Rashod kiritish</a>
-  </div>
-
-  <!-- Filters -->
-  <form method="get" class="grid md:grid-cols-5 gap-3 bg-white border border-neutral-200 rounded-2xl p-4">
-    {% if stores %}
-    <div>
-      <label class="text-xs text-neutral-500">Do‘kon</label>
-      <select name="store_id" class="w-full rounded-xl border p-2">
-        <option value="">Hammasi</option>
-        {% for s in stores %}
-          <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    {% endif %}
-    {% if sellers %}
-    <div>
-      <label class="text-xs text-neutral-500">Sotuvchi</label>
-      <select name="seller_id" class="w-full rounded-xl border p-2">
-        <option value="">Hammasi</option>
-        {% for u in sellers %}
-          <option value="{{ u.id }}" {% if seller_id|stringformat:"s" == u.id|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    {% endif %}
-
-    <div>
-      <label class="text-xs text-neutral-500">Sana — dan</label>
-      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border p-2">
-    </div>
-    <div>
-      <label class="text-xs text-neutral-500">Sana — gacha</label>
-      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border p-2">
+    <!-- Header -->
+    <div class="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Xarajatlar</h1>
+            <p class="text-gray-500 dark:text-gray-400">Barcha xarajatlarni boshqaring</p>
+        </div>
+        <a href="{% url 'sales:expense_new' %}" class="px-6 py-3 bg-gradient-to-r from-red-500 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2">
+            <i data-lucide="plus" class="w-5 h-5"></i>
+            <span>Yangi xarajat</span>
+        </a>
     </div>
 
-    <div class="md:col-span-5 flex justify-end">
-      <button class="px-4 py-2 rounded-xl bg-black text-white">Filtrlash</button>
-      <a href="{% url 'expenses_list' %}" class="ml-2 px-4 py-2 rounded-xl border">Reset</a>
-    </div>
-  </form>
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
 
-  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">Bugun approved</div>
-        <div class="mt-2 text-2xl font-semibold">${{ today_approved|floatformat:2 }}</div>
-      </div>
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">Bugun pending</div>
-        <div class="mt-2 text-2xl font-semibold">${{ today_pending|floatformat:2 }}</div>
-      </div>
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">7 kun approved</div>
-        <div class="mt-2 text-2xl font-semibold">${{ total_appr7|floatformat:2 }}</div>
-      </div>
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">30 kun approved</div>
-        <div class="mt-2 text-2xl font-semibold">${{ total_appr30|floatformat:2 }}</div>
-      </div>
-  </div>
+        <!-- Today Approved -->
+        <div class="bg-gradient-to-br from-green-500 to-green-700 rounded-2xl p-6 text-white shadow-xl animate-slide-up">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-white/80 text-sm mb-1">Bugun tasdiqlangan</p>
+                    <p class="text-4xl font-bold">${{ today_approved|floatformat:0 }}</p>
+                </div>
+                <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <i data-lucide="check-circle" class="w-8 h-8"></i>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 text-sm text-white/80">
+                <i data-lucide="trending-up" class="w-4 h-4"></i>
+                <span>Tasdiqlangan xarajatlar</span>
+            </div>
+        </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500 mb-2">7 kun: Approved vs Pending</div>
-        <canvas id="exp7"></canvas>
-        <script id="labels7" type="application/json">{{ labels7_json }}</script>
-        <script id="appr7" type="application/json">{{ appr7_json }}</script>
-        <script id="pend7" type="application/json">{{ pend7_json }}</script>
-      </div>
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500 mb-2">30 kun: Approved vs Pending</div>
-        <canvas id="exp30"></canvas>
-        <script id="labels30" type="application/json">{{ labels30_json }}</script>
-        <script id="appr30" type="application/json">{{ appr30_json }}</script>
-        <script id="pend30" type="application/json">{{ pend30_json }}</script>
-      </div>
+        <!-- Today Pending -->
+        <div class="bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-2xl p-6 text-white shadow-xl animate-slide-up" style="animation-delay: 0.1s">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-white/80 text-sm mb-1">Bugun kutilmoqda</p>
+                    <p class="text-4xl font-bold">${{ today_pending|floatformat:0 }}</p>
+                </div>
+                <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <i data-lucide="clock" class="w-8 h-8"></i>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 text-sm text-white/80">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                <span>Tasdiq kutilmoqda</span>
+            </div>
+        </div>
+
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-    (function(){
-      function mk(idL,idA,idB,canvas,type='bar'){
-        const L = JSON.parse(document.getElementById(idL).textContent);
-        const A = JSON.parse(document.getElementById(idA).textContent);
-        const B = JSON.parse(document.getElementById(idB).textContent);
-        new Chart(document.getElementById(canvas).getContext('2d'), {
-          type,
-          data: { labels: L, datasets: [{label:'Approved',data:A,stack:'x'},{label:'Pending',data:B,stack:'x'}] }
-        });
-      }
-      mk('labels7','appr7','pend7','exp7');
-      mk('labels30','appr30','pend30','exp30');
-    })();
-    </script>
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 mb-8">
+        <form method="get" class="flex flex-col sm:flex-row gap-4">
 
+            {% if user.is_owner %}
+            <select name="store_id" class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:border-instagram-pink outline-none">
+                <option value="">Barcha do'konlar</option>
+                {% for store in stores %}
+                <option value="{{ store.id }}" {% if store_id == store.id|stringformat:'s' %}selected{% endif %}>
+                    {{ store.name }}
+                </option>
+                {% endfor %}
+            </select>
 
-  <!-- Big cards -->
-  <div class="grid sm:grid-cols-2 gap-4">
-    <div class="rounded-2xl border bg-white p-4">
-      <div class="text-xs text-neutral-500">Bugun – Tasdiqlangan</div>
-      <div class="text-2xl font-semibold text-emerald-700 mt-1">{{ today_approved }}</div>
+            <select name="seller_id" class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:border-instagram-pink outline-none">
+                <option value="">Barcha sotuvchilar</option>
+                {% for seller in sellers %}
+                <option value="{{ seller.id }}" {% if seller_id == seller.id|stringformat:'s' %}selected{% endif %}>
+                    {{ seller.username }}
+                </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+
+            <input type="date"
+                   name="date_from"
+                   value="{{ date_from }}"
+                   class="px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:border-instagram-pink outline-none">
+
+            <input type="date"
+                   name="date_to"
+                   value="{{ date_to }}"
+                   class="px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:border-instagram-pink outline-none">
+
+            <button type="submit" class="px-6 py-3 bg-gradient-to-r from-instagram-purple to-instagram-pink text-white rounded-xl font-semibold hover:shadow-lg transition-all whitespace-nowrap">
+                <i data-lucide="filter" class="w-5 h-5 inline mr-2"></i>
+                Filtrlash
+            </button>
+        </form>
     </div>
-    <div class="rounded-2xl border bg-white p-4">
-      <div class="text-xs text-neutral-500">Bugun – Pending</div>
-      <div class="text-2xl font-semibold text-amber-600 mt-1">{{ today_pending }}</div>
-    </div>
-  </div>
 
-  <!-- Pending -->
-  <div class="rounded-2xl border overflow-x-auto bg-white">
-    <div class="px-4 py-3 text-sm font-semibold border-b bg-amber-50">⏳ Tasdiqlash kutilmoqda</div>
-    <table class="min-w-full text-sm">
-      <thead class="bg-neutral-50 text-neutral-600">
-        <tr>
-          <th class="text-left px-4 py-2">Sana</th>
-          <th class="text-left px-4 py-2">Do‘kon</th>
-          <th class="text-left px-4 py-2">Sotuvchi</th>
-          <th class="text-left px-4 py-2">Turi</th>
-          <th class="text-left px-4 py-2">Telefon</th>
-          <th class="text-right px-4 py-2">Summa</th>
-          <th class="text-left px-4 py-2">Izoh</th>
-          <th class="text-right px-4 py-2">Amal</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in pending %}
-          <tr class="border-t">
-            <td class="px-4 py-2">{{ r.created_at|date:"Y-m-d H:i" }}</td>
-            <td class="px-4 py-2">{{ r.store.name }}</td>
-            <td class="px-4 py-2">{{ r.seller.username }}</td>
-            <td class="px-4 py-2">{{ r.expense_type.name|default:"-" }}</td>
-            <td class="px-4 py-2">{% if r.product %}{{ r.product.brand.name }} {{ r.product.model.name }} • {{ r.product.imei_full|slice:"-4:" }}{% else %}-{% endif %}</td>
-            <td class="px-4 py-2 text-right font-medium">{{ r.amount }}</td>
-            <td class="px-4 py-2">{{ r.note|default:"" }}</td>
-            <td class="px-4 py-2 text-right">
-              {% if request.user.is_owner %}
-                <form method="post" action="{% url 'expense_approve' r.id %}" class="inline">
-                  {% csrf_token %}
-                  <button class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white">Tasdiqlash</button>
-                </form>
-                <form method="post" action="{% url 'expense_reject' r.id %}" class="inline" onsubmit="return confirm('O‘chirilsinmi?')">
-                  {% csrf_token %}
-                  <button class="px-3 py-1.5 rounded-lg border">Bekor qilish</button>
-                </form>
-              {% else %}
-                <span class="text-neutral-400">Owner tasdiqlaydi</span>
-              {% endif %}
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="8" class="px-4 py-6 text-center text-neutral-500">Pending yo‘q</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Approved -->
-  <div class="rounded-2xl border overflow-x-auto bg-white">
-    <div class="px-4 py-3 text-sm font-semibold border-b bg-emerald-50">✅ Tasdiqlangan</div>
-    <table class="min-w-full text-sm">
-      <thead class="bg-neutral-50 text-neutral-600">
-        <tr>
-          <th class="text-left px-4 py-2">Sana</th>
-          <th class="text-left px-4 py-2">Do‘kon</th>
-          <th class="text-left px-4 py-2">Sotuvchi</th>
-          <th class="text-left px-4 py-2">Turi</th>
-          <th class="text-left px-4 py-2">Telefon</th>
-          <th class="text-right px-4 py-2">Summa</th>
-          <th class="text-left px-4 py-2">Izoh</th>
-          <th class="text-right px-4 py-2">Amal</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in approved %}
-          <tr class="border-t">
-            <td class="px-4 py-2">{{ r.created_at|date:"Y-m-d H:i" }}</td>
-            <td class="px-4 py-2">{{ r.store.name }}</td>
-            <td class="px-4 py-2">{{ r.seller.username }}</td>
-            <td class="px-4 py-2">{{ r.expense_type.name|default:"-" }}</td>
-            <td class="px-4 py-2">{% if r.product %}{{ r.product.brand.name }} {{ r.product.model.name }} • {{ r.product.imei_full|slice:"-4:" }}{% else %}-{% endif %}</td>
-            <td class="px-4 py-2 text-right font-medium">{{ r.amount }}</td>
-            <td class="px-4 py-2">{{ r.note|default:"" }}</td>
-            <td class="px-4 py-2 text-right">
-              {% if request.user.is_owner %}
-                <form method="post" action="{% url 'expense_unapprove' r.id %}">
-                  {% csrf_token %}
-                  <button class="px-3 py-1.5 rounded-lg border">Qaytarish (Unapprove)</button>
-                </form>
-              {% endif %}
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="8" class="px-4 py-6 text-center text-neutral-500">Hech narsa yo‘q</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- 7/30 kun ko‘rinishlari (sonlar) -->
-  <div class="grid sm:grid-cols-2 gap-4">
-    <div class="rounded-2xl border bg-white p-4">
-      <div class="text-sm font-semibold mb-2">7 kun (Approved vs Pending)</div>
-      <div class="text-sm">Approved: <span class="font-medium">{{ total_appr7 }}</span></div>
-      <div class="text-sm">Pending: <span class="font-medium">{{ total_pend7 }}</span></div>
+    <!-- Tabs -->
+    <div x-data="{ activeTab: 'pending' }" class="mb-6">
+        <div class="flex space-x-2 bg-gray-100 dark:bg-gray-700/50 p-2 rounded-xl w-fit">
+            <button @click="activeTab = 'pending'"
+                    :class="activeTab === 'pending' ? 'bg-white dark:bg-gray-800 shadow' : ''"
+                    class="px-6 py-3 rounded-lg font-semibold transition-all">
+                Kutilmoqda ({{ pending|length }})
+            </button>
+            <button @click="activeTab = 'approved'"
+                    :class="activeTab === 'approved' ? 'bg-white dark:bg-gray-800 shadow' : ''"
+                    class="px-6 py-3 rounded-lg font-semibold transition-all">
+                Tasdiqlangan ({{ approved|length }})
+            </button>
+        </div>
     </div>
-    <div class="rounded-2xl border bg-white p-4">
-      <div class="text-sm font-semibold mb-2">30 kun (Approved vs Pending)</div>
-      <div class="text-sm">Approved: <span class="font-medium">{{ total_appr30 }}</span></div>
-      <div class="text-sm">Pending: <span class="font-medium">{{ total_pend30 }}</span></div>
+
+    <!-- Pending Expenses -->
+    <div x-show="activeTab === 'pending'" x-transition>
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+
+            <!-- Mobile Cards -->
+            <div class="md:hidden divide-y divide-gray-200 dark:divide-gray-700">
+                {% for expense in pending %}
+                <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <p class="font-semibold text-gray-900 dark:text-white">${{ expense.amount|floatformat:2 }}</p>
+                            <p class="text-sm text-gray-500">{{ expense.created_at|date:"d M, H:i" }}</p>
+                        </div>
+                        <span class="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-xs font-semibold">
+                            Kutilmoqda
+                        </span>
+                    </div>
+
+                    {% if expense.note %}
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">{{ expense.note }}</p>
+                    {% endif %}
+
+                    {% if user.is_owner %}
+                    <div class="flex space-x-2">
+                        <form method="post" action="{% url 'sales:expense_approve' expense.id %}" class="flex-1">
+                            {% csrf_token %}
+                            <input type="hidden" name="payment_type" value="cash">
+                            <input type="hidden" name="cash_amount" value="{{ expense.amount }}">
+                            <button type="submit" class="w-full px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-sm font-medium hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors">
+                                Tasdiqlash
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'sales:expense_reject' expense.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">
+                                Rad etish
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="p-12 text-center">
+                    <i data-lucide="inbox" class="w-12 h-12 text-gray-400 mx-auto mb-3"></i>
+                    <p class="text-gray-500 dark:text-gray-400">Kutilayotgan xarajatlar yo'q</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Desktop Table -->
+            <div class="hidden md:block overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Sana</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Summa</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Izoh</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Sotuvchi</th>
+                            {% if user.is_owner %}
+                            <th class="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Amallar</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for expense in pending %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                {{ expense.created_at|date:"d M Y, H:i" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="text-lg font-bold text-red-600 dark:text-red-400">
+                                    -${{ expense.amount|floatformat:2 }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-900 dark:text-white">
+                                {{ expense.note|default:"—" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
+                                {{ expense.seller.username }}
+                            </td>
+                            {% if user.is_owner %}
+                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                <div class="flex items-center justify-end space-x-2">
+                                    <form method="post" action="{% url 'sales:expense_approve' expense.id %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="payment_type" value="cash">
+                                        <input type="hidden" name="cash_amount" value="{{ expense.amount }}">
+                                        <button type="submit"
+                                                class="p-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                                                title="Tasdiqlash">
+                                            <i data-lucide="check" class="w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{% url 'sales:expense_reject' expense.id %}">
+                                        {% csrf_token %}
+                                        <button type="submit"
+                                                class="p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                                                title="Rad etish"
+                                                onclick="return confirm('Rad etmoqchimisiz?')">
+                                            <i data-lucide="x" class="w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-12 text-center">
+                                <i data-lucide="inbox" class="w-12 h-12 text-gray-400 mx-auto mb-3"></i>
+                                <p class="text-gray-500 dark:text-gray-400">Kutilayotgan xarajatlar yo'q</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
     </div>
-  </div>
+
+    <!-- Approved Expenses -->
+    <div x-show="activeTab === 'approved'" x-transition>
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+
+            <!-- Mobile Cards -->
+            <div class="md:hidden divide-y divide-gray-200 dark:divide-gray-700">
+                {% for expense in approved %}
+                <div class="p-4">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <p class="font-semibold text-gray-900 dark:text-white">${{ expense.amount|floatformat:2 }}</p>
+                            <p class="text-sm text-gray-500">{{ expense.created_at|date:"d M, H:i" }}</p>
+                        </div>
+                        <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-semibold flex items-center">
+                            <i data-lucide="check" class="w-3 h-3 mr-1"></i>
+                            Tasdiqlangan
+                        </span>
+                    </div>
+                    {% if expense.note %}
+                    <p class="text-sm text-gray-600 dark:text-gray-400">{{ expense.note }}</p>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="p-12 text-center">
+                    <i data-lucide="check-circle" class="w-12 h-12 text-gray-400 mx-auto mb-3"></i>
+                    <p class="text-gray-500 dark:text-gray-400">Tasdiqlangan xarajatlar yo'q</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Desktop Table -->
+            <div class="hidden md:block overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Sana</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Summa</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">To'lov</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Izoh</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Sotuvchi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for expense in approved %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                {{ expense.created_at|date:"d M Y, H:i" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="text-lg font-bold text-red-600 dark:text-red-400">
+                                    -${{ expense.amount|floatformat:2 }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if expense.payment_type == 'cash' %}
+                                <span class="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-medium">
+                                    Naqd
+                                </span>
+                                {% elif expense.payment_type == 'card' %}
+                                <span class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-medium">
+                                    Karta
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-full text-xs font-medium">
+                                    Aralash
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-gray-900 dark:text-white">
+                                {{ expense.note|default:"—" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
+                                {{ expense.seller.username }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-12 text-center">
+                                <i data-lucide="check-circle" class="w-12 h-12 text-gray-400 mx-auto mb-3"></i>
+                                <p class="text-gray-500 dark:text-gray-400">Tasdiqlangan xarajatlar yo'q</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
 
 </div>
 {% endblock %}

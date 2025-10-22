@@ -1,0 +1,696 @@
+{% extends "base.html" %}
+{% load i18n money %}
+
+{% block title %}{% trans "Partiya bo'yicha to'lov" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .payment-container {
+        max-width: 600px;
+        width: 100%;
+    }
+
+    /* Header */
+    .page-header {
+        margin-bottom: 24px;
+        text-align: center;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: #262626;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .title-icon {
+        font-size: 32px;
+    }
+
+    .page-subtitle {
+        font-size: 14px;
+        color: #737373;
+    }
+
+    /* Batch Info Card */
+    .batch-info-card {
+        background: linear-gradient(135deg, #fff 0%, #f9fafb 100%);
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .batch-header {
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #efefef;
+    }
+
+    .batch-label {
+        font-size: 12px;
+        color: #737373;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+    }
+
+    .batch-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #262626;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .batch-id {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        background: linear-gradient(135deg, #0095f6 0%, #0080d6 100%);
+        color: #fff;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .supplier-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 10px 14px;
+        background: #f0f9ff;
+        border-radius: 10px;
+        font-size: 13px;
+        color: #0369a1;
+    }
+
+    .supplier-info svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+    }
+
+    .supplier-name {
+        font-weight: 600;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+
+    .stat-box {
+        text-align: center;
+        padding: 16px;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #efefef;
+    }
+
+    .stat-label {
+        font-size: 11px;
+        color: #737373;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .stat-value {
+        font-size: 20px;
+        font-weight: 800;
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 3px;
+    }
+
+    .stat-currency {
+        font-size: 14px;
+        color: #10b981;
+        font-weight: 700;
+    }
+
+    .stat-value.sold {
+        color: #8b5cf6;
+    }
+
+    .stat-value.paid {
+        color: #10b981;
+    }
+
+    .stat-value.balance {
+        color: #f59e0b;
+    }
+
+    /* Payment Form */
+    .payment-form {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .form-section {
+        margin-bottom: 24px;
+    }
+
+    .form-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #262626;
+        margin-bottom: 8px;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #dbdbdb;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        background: #fafafa;
+        transition: all 0.2s;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #0095f6;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(0, 149, 246, 0.1);
+    }
+
+    .input-prefix {
+        position: relative;
+    }
+
+    .input-prefix::before {
+        content: '$';
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 18px;
+        font-weight: 700;
+        color: #10b981;
+    }
+
+    .input-prefix .form-input {
+        padding-left: 36px;
+    }
+
+    .form-help {
+        font-size: 12px;
+        color: #737373;
+        margin-top: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .form-help svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    /* Payment Type Radio */
+    .payment-type-group {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .radio-card {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .radio-card input[type="radio"] {
+        display: none;
+    }
+
+    .radio-card label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 16px;
+        background: #fff;
+        border: 2px solid #dbdbdb;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+    }
+
+    .radio-card label:hover {
+        border-color: #0095f6;
+        background: #f9fafb;
+    }
+
+    .radio-card input[type="radio"]:checked + label {
+        border-color: #0095f6;
+        background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+    }
+
+    .radio-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+
+    .radio-card input[type="radio"]:checked + label .radio-icon {
+        background: linear-gradient(135deg, #0095f6 0%, #0080d6 100%);
+        color: #fff;
+    }
+
+    .radio-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #262626;
+    }
+
+    /* Mixed Payment Box */
+    .mixed-box {
+        margin-top: 16px;
+        padding: 20px;
+        background: #f9fafb;
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+    }
+
+    .mixed-box.hidden {
+        display: none;
+    }
+
+    .mixed-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .mixed-info {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: start;
+        gap: 8px;
+        padding: 12px;
+        background: #fef3c7;
+        border-radius: 8px;
+        font-size: 12px;
+        color: #92400e;
+    }
+
+    .mixed-info svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+
+    /* Action Buttons */
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+    }
+
+    .btn {
+        flex: 1;
+        padding: 14px 24px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        text-decoration: none;
+    }
+
+    .btn-secondary {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        color: #262626;
+    }
+
+    .btn-secondary:hover {
+        background: #f9f9f9;
+        border-color: #999;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: none;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-primary:active {
+        transform: translateY(0);
+    }
+
+    .btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 640px) {
+        body {
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 22px;
+        }
+
+        .title-icon {
+            font-size: 26px;
+        }
+
+        .batch-info-card {
+            padding: 20px;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .payment-form {
+            padding: 20px;
+        }
+
+        .payment-type-group {
+            flex-direction: column;
+        }
+
+        .radio-card {
+            min-width: 0;
+        }
+
+        .mixed-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+            flex-direction: column-reverse;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="payment-container">
+    <!-- Header -->
+    <div class="page-header">
+        <h1 class="page-title">
+            <span class="title-icon">💳</span>
+            {% trans "To'lov qilish" %}
+        </h1>
+        <p class="page-subtitle">{% trans "Konsignatsiya partiyasi bo'yicha to'lov" %}</p>
+    </div>
+
+    <!-- Batch Info Card -->
+    <div class="batch-info-card">
+        <div class="batch-header">
+            <div class="batch-label">{% trans "Partiya ma'lumotlari" %}</div>
+            <div class="batch-title">
+                <span class="batch-id">#{{ b.id }}</span>
+                {% if b.title %}
+                <span>{{ b.title }}</span>
+                {% endif %}
+            </div>
+
+            {% if supplier %}
+            <div class="supplier-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span class="supplier-name">{{ supplier }}</span>
+                {% if supplier_phone %}
+                <span>{{ supplier_phone }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">{% trans "Sotilgan" %}</div>
+                <div class="stat-value sold">
+                    <span class="stat-currency">$</span>
+                    <span>{{ base_sold|floatformat:2 }}</span>
+                </div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-label">{% trans "To'langan" %}</div>
+                <div class="stat-value paid">
+                    <span class="stat-currency">$</span>
+                    <span>{{ paid|floatformat:2 }}</span>
+                </div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-label">{% trans "Balans" %}</div>
+                <div class="stat-value balance">
+                    <span class="stat-currency">$</span>
+                    <span>{{ balance|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Form -->
+    <form method="post" class="payment-form">
+        {% csrf_token %}
+
+        <!-- Amount Input -->
+        <div class="form-section">
+            <label class="form-label" for="amount">{% trans "To'lov summasi" %}</label>
+            <div class="input-prefix">
+                <input
+                    id="amount"
+                    name="amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="{{ balance }}"
+                    value="{{ suggest_amount }}"
+                    class="form-input"
+                    required
+                >
+            </div>
+            <div class="form-help">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                <span>{% trans "Maksimal summa: qolgan balans" %} (${{ balance|floatformat:2 }})</span>
+            </div>
+        </div>
+
+        <!-- Payment Type -->
+        <div class="form-section">
+            <label class="form-label">{% trans "To'lov turi" %}</label>
+            <div class="payment-type-group">
+                <div class="radio-card">
+                    <input type="radio" name="payment_type" value="cash" id="type_cash" checked>
+                    <label for="type_cash">
+                        <div class="radio-icon">💵</div>
+                        <span class="radio-label">{% trans "Naqd" %}</span>
+                    </label>
+                </div>
+
+                <div class="radio-card">
+                    <input type="radio" name="payment_type" value="card" id="type_card">
+                    <label for="type_card">
+                        <div class="radio-icon">💳</div>
+                        <span class="radio-label">{% trans "Karta" %}</span>
+                    </label>
+                </div>
+
+                <div class="radio-card">
+                    <input type="radio" name="payment_type" value="mixed" id="type_mixed">
+                    <label for="type_mixed">
+                        <div class="radio-icon">🔀</div>
+                        <span class="radio-label">{% trans "Aralash" %}</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Mixed Payment Box -->
+            <div id="mixedBox" class="mixed-box hidden">
+                <div class="mixed-grid">
+                    <div>
+                        <label class="form-label" for="cash_amount">{% trans "Naqd" %}</label>
+                        <div class="input-prefix">
+                            <input
+                                id="cash_amount"
+                                name="cash_amount"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value="0"
+                                class="form-input"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="card_amount">{% trans "Karta" %}</label>
+                        <div class="input-prefix">
+                            <input
+                                id="card_amount"
+                                name="card_amount"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value="0"
+                                class="form-input"
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mixed-info">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <span>
+                        <strong>{% trans "Eslatma:" %}</strong>
+                        {% trans "Naqd + Karta summasi yuqoridagi umumiy to'lov summasiga teng bo'lishi kerak." %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="form-actions">
+            <a href="{% url 'ap_consignment_batch_list' %}" class="btn btn-secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                {% trans "Bekor qilish" %}
+            </a>
+
+            <button type="submit" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                {% trans "Tasdiqlash" %}
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+(function() {
+    const radios = document.querySelectorAll('input[name="payment_type"]');
+    const mixedBox = document.getElementById('mixedBox');
+    const amountInput = document.getElementById('amount');
+    const cashInput = document.getElementById('cash_amount');
+    const cardInput = document.getElementById('card_amount');
+
+    // Toggle mixed payment box
+    function toggleMixedBox() {
+        const selectedType = document.querySelector('input[name="payment_type"]:checked')?.value;
+        mixedBox.classList.toggle('hidden', selectedType !== 'mixed');
+    }
+
+    // Update mixed inputs when total amount changes
+    amountInput.addEventListener('input', function() {
+        const total = parseFloat(this.value) || 0;
+        if (document.querySelector('input[name="payment_type"]:checked')?.value === 'mixed') {
+            // Split equally by default
+            cashInput.value = (total / 2).toFixed(2);
+            cardInput.value = (total / 2).toFixed(2);
+        }
+    });
+
+    // Validate mixed payment
+    function validateMixedPayment() {
+        const selectedType = document.querySelector('input[name="payment_type"]:checked')?.value;
+        if (selectedType === 'mixed') {
+            const total = parseFloat(amountInput.value) || 0;
+            const cash = parseFloat(cashInput.value) || 0;
+            const card = parseFloat(cardInput.value) || 0;
+            const sum = cash + card;
+
+            if (Math.abs(sum - total) > 0.01) {
+                alert('{% trans "Xatolik: Naqd + Karta summasi umumiy to'lov summasiga teng emas!" %}');
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Event listeners
+    radios.forEach(radio => {
+        radio.addEventListener('change', toggleMixedBox);
+    });
+
+    // Form submit validation
+    document.querySelector('form').addEventListener('submit', function(e) {
+        if (!validateMixedPayment()) {
+            e.preventDefault();
+        }
+    });
+
+    // Initialize
+    toggleMixedBox();
+})();
+</script>
+{% endblock %}

@@ -1,12 +1,12 @@
-# reports/metrics.py
-from datetime import datetime, timezone, time, timedelta
+# reports/metrics.py — FULL REPLACE
+from datetime import datetime
 from decimal import Decimal
-from django.db.models import Sum, Q
+from django.db.models import Sum
 from django.utils import timezone as dj_tz
 
 from sales.models import Transaction, SellerCommission
 
-DEC0 = Decimal("0")
+DEC0 = Decimal("0.00")
 
 def _sum(qs, field="amount") -> Decimal:
     return qs.aggregate(s=Sum(field))["s"] or DEC0
@@ -29,112 +29,78 @@ def sales_qs(user, df, dt):
     )
     return _scope(user, qs)
 
-def period_expenses_qs(user, df, dt):
-    # product=NULL bo‘lgan approved rashodlar
+def debt_pay_qs(user, df, dt):
     qs = Transaction.objects.filter(
-        type="expense", is_approved=True, product__isnull=True,
+        type="debt_pay", is_approved=True, is_void=False,
         created_at__date__gte=df, created_at__date__lte=dt
     )
     return _scope(user, qs)
 
-def debt_pay_qs(user, df, dt):
+def all_expenses_qs(user, df, dt):
+    # CASH FLOW uchun barcha approved expense’lar (product bor/yo'q — farqi yo'q)
     qs = Transaction.objects.filter(
-        type="debt_pay", is_approved=True,
+        type="expense", is_approved=True, is_void=False,
         created_at__date__gte=df, created_at__date__lte=dt
     )
     return _scope(user, qs)
 
 def cons_payout_qs(user, df, dt):
     qs = Transaction.objects.filter(
-        type="consignment_payout", is_approved=True,
+        type="consignment_payout", is_approved=True, is_void=False,
         created_at__date__gte=df, created_at__date__lte=dt
     )
     return _scope(user, qs)
 
 def commissions_qs(user, df, dt):
-    qs = (SellerCommission.objects
-          .select_related("transaction")
-          .filter(is_approved=True,
-                  transaction__is_void=False,
-                  transaction__created_at__date__gte=df,
-                  transaction__created_at__date__lte=dt))
+    qs = SellerCommission.objects.filter(
+        is_approved=True, is_rescinded=False,
+        transaction__is_void=False,
+        transaction__created_at__date__gte=df,
+        transaction__created_at__date__lte=dt
+    )
     if not getattr(user, "is_owner", False):
         qs = qs.filter(seller_id=user.id)
     return qs
 
 def kpi_block(user, df, dt):
-    s = sales_qs(user, df, dt)
-    e = period_expenses_qs(user, df, dt)
-    d = debt_pay_qs(user, df, dt)
-    cns = cons_payout_qs(user, df, dt)
-    com = commissions_qs(user, df, dt)
-
-    total_sales   = _sum(s, "amount")
-    gross_profit  = _sum(s, "profit")
-    total_expense = _sum(e, "amount")
-    total_comm    = _sum(com, "amount")
-    cons_payouts  = _sum(cns, "amount")
-
-    sales_cash = _sum(s, "cash_amount")
-    sales_card = _sum(s, "card_amount")
-    debt_cash  = _sum(d, "cash_amount")
-    debt_card  = _sum(d, "card_amount")
-
-    cash_in = sales_cash + debt_cash
-    card_in = sales_card + debt_card
-
-    # KASSA: siz tanlagan siyosat = komissiya tasdiqlanganda kassadan ayiramiz
-    kassa_total = (cash_in + card_in) - total_expense - cons_payouts - total_comm
-
-    # NET PROFIT: cons_payouts bu yerga kiritilmaydi
-    net_profit = gross_profit - total_expense - total_comm
-
+    from reports.accounting import compute_kpi
+    # KPI-ni faqat accounting.compute_kpi dan olamiz (yagona manba!)
+    k = compute_kpi(user, df, dt, store_id=None)
     return {
-        "total_sales": total_sales,
-        "gross_profit": gross_profit,
-        "total_expense": total_expense,
-        "total_commission": total_comm,
-        "total_cons_payouts": cons_payouts,
-
-        "cash_in": cash_in,
-        "card_in": card_in,
-        "kassa_total": kassa_total,
-
-        "net_profit": net_profit,
+        "total_sales": k.total_sales,
+        "gross_profit": k.gross_profit,
+        "total_expense": k.total_expense,
+        "total_commission": k.total_commission,
+        "total_cons_payouts": k.total_cons_payouts,
+        "cash_in": k.cash_in, "card_in": k.card_in,
+        "kassa_total": k.kassa_total,
+        "net_profit": k.net_profit,
     }
 
-def _day_bounds(day=None, tz=None):
-    tz = tz or timezone.get_current_timezone()
-    today = day or timezone.localdate()  # tz aware
-    start = timezone.make_aware(datetime.combine(today, time.min), tz)
-    end = start + timedelta(days=1)
-    return start, end
+def kassa_cash_card_period_local(user, df, dt, store_id=None):
+    # IN
+    s = sales_qs(user, df, dt)
+    d = debt_pay_qs(user, df, dt)
+    cash_in = _sum(s, "cash_amount") + _sum(d, "cash_amount")
+    card_in = _sum(s, "card_amount") + _sum(d, "card_amount")
 
-def get_today_sales_stats(*, user=None, store=None, day=None):
-    # NOTE: sozlang: "price" -> "amount" bo‘lsa, moslang
-    from sales.models import Transaction
+    # OUT (split bo'yicha)
+    exp = all_expenses_qs(user, df, dt)
+    cns = cons_payout_qs(user, df, dt)
 
-    start, end = _day_bounds(day)
-    qs = Transaction.objects.filter(
-        type="sale",
-        is_approved=True,
-        is_void=False,
-        created_at__gte=start,
-        created_at__lt=end,
-    )
-    # Filial/seller bo‘yicha cheklash
-    if store is not None:
-        qs = qs.filter(store=store)
-    elif user is not None and not getattr(user, "is_owner", False):
-        qs = qs.filter(store=user.store)
+    cash_out = _sum(exp, "cash_amount") + _sum(cns, "cash_amount")
+    card_out = _sum(exp, "card_amount") + _sum(cns, "card_amount")
 
-    agg = qs.aggregate(
-        total_sales=Sum("price"),   # <-- price nomi boshqacha bo‘lsa moslang
-        total_cost=Sum("cost"),
-        total_profit=Sum("profit"),
-    )
+    # Komissiyalar: approve bo'lganda kassadan chiqadi (soddalik uchun naqd deb qabul qilamiz)
+    comm = commissions_qs(user, df, dt)
+    cash_out += _sum(comm, "amount")
+
     return {
-        "today_sales": agg["total_sales"] or 0,
-        "today_cost": agg["total_cost"] or 0,
-        "today_profit": agg["total_profit"] or 0,
+        "cash_open": DEC0,
+        "cash_delta": (cash_in - cash_out),
+        "cash_close": (cash_in - cash_out),
+
+        "card_open": DEC0,
+        "card_delta": (card_in - card_out),
+        "card_close": (card_in - card_out),
     }

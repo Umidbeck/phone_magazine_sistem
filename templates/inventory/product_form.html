@@ -1,129 +1,582 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
-{% block title %}{% if is_edit %}Mahsulotni tahrirlash{% else %}Yangi mahsulot{% endif %}{% endblock %}
+{% block title %}
+  {% if is_edit %}{% trans "Mahsulotni tahrirlash" %}{% else %}{% trans "Mahsulot yaratish" %}{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --gradient-warm: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+  }
+
+  .instagram-gradient-bg {
+    background: linear-gradient(135deg,
+      #fafafa 0%,
+      #ffffff 25%,
+      #fef3f7 50%,
+      #f8f4ff 75%,
+      #fafafa 100%
+    );
+  }
+
+  .instagram-card {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .instagram-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px -10px rgba(102, 126, 234, 0.15);
+  }
+
+  .gradient-icon {
+    background: var(--gradient-primary);
+    box-shadow: 0 8px 24px -6px rgba(102, 126, 234, 0.4);
+  }
+
+  .gradient-icon-secondary {
+    background: var(--gradient-secondary);
+    box-shadow: 0 8px 24px -6px rgba(240, 147, 251, 0.4);
+  }
+
+  .gradient-icon-success {
+    background: var(--gradient-success);
+    box-shadow: 0 8px 24px -6px rgba(79, 172, 254, 0.4);
+  }
+
+  .form-input {
+    transition: all 0.2s ease;
+    border: 2px solid #e5e7eb;
+  }
+
+  .form-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    outline: none;
+  }
+
+  .upload-zone {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px dashed #d1d5db;
+    background: linear-gradient(135deg, #fafafa 0%, #f9fafb 100%);
+  }
+
+  .upload-zone:hover {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+    transform: scale(1.01);
+  }
+
+  .upload-zone.drag-over {
+    border-color: #667eea;
+    border-style: solid;
+    background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
+    transform: scale(1.02);
+  }
+
+  .image-preview-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .image-preview-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.2);
+  }
+
+  .image-badge {
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-gradient {
+    background: var(--gradient-primary);
+    box-shadow: 0 4px 16px -4px rgba(102, 126, 234, 0.4);
+    transition: all 0.2s ease;
+  }
+
+  .btn-gradient:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6d3f9a 100%);
+    box-shadow: 0 8px 24px -6px rgba(102, 126, 234, 0.6);
+    transform: translateY(-2px);
+  }
+
+  .stats-badge {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
+    font-weight: 700;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px -2px rgba(245, 158, 11, 0.3);
+  }
+
+  .hint-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%);
+    border: 1px solid #e0e7ff;
+  }
+
+  @media (max-width: 768px) {
+    .instagram-card {
+      margin: 0 -0.5rem;
+    }
+  }
+
+  /* Smooth animations */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto p-4 space-y-6">
-  <h1 class="text-2xl font-semibold">
-    {% if is_edit %}{% trans "Mahsulotni tahrirlash" %}{% else %}{% trans "Yangi mahsulot" %}{% endif %}
-  </h1>
+<div class="min-h-screen instagram-gradient-bg py-6 sm:py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-  <form method="post" enctype="multipart/form-data" class="space-y-6" id="product-form">
-    {% csrf_token %}
-
-    {# --- Asosiy ma'lumotlar --- #}
-    <div class="bg-white border rounded-2xl p-4 grid md:grid-cols-2 gap-4">
-      {% for field in form %}
-        {% if field.name != "has_documents" and field.name != "document_image" %}
-          <div>
-            <label class="block text-sm text-neutral-600 mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
-            {% if field.help_text %}<p class="text-xs text-neutral-500 mt-1">{{ field.help_text }}</p>{% endif %}
-            {% for e in field.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
-          </div>
-        {% endif %}
-      {% endfor %}
-    </div>
-
-    {# --- Hujjat bor/yo‘q + bitta rasm (ixtiyoriy) --- #}
-    <div class="bg-white border rounded-2xl p-4 space-y-3">
-      <div class="flex items-center gap-3">
-        <label class="inline-flex items-center gap-2 text-sm">
-          {{ form.has_documents }} <span class="text-neutral-700">{% trans "Hujjat bor" %}</span>
-        </label>
-        {% for e in form.has_documents.errors %}<p class="text-xs text-red-600">{{ e }}</p>{% endfor %}
-      </div>
-
-      <div id="doc-block" class="{% if not form.instance.has_documents and not form.has_documents.value %}hidden{% endif %}">
+    <!-- Header Card -->
+    <div class="instagram-card rounded-2xl shadow-lg mb-6 p-5 sm:p-6 fade-in">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div class="flex items-center gap-4">
-          <button type="button" id="doc-add-btn" class="px-3 py-2 rounded-xl border bg-neutral-50 hover:bg-neutral-100">
-            + {% trans "Hujjat rasmi" %}
-          </button>
-          <div id="doc-preview" class="flex items-center gap-3">
-            {% if form.instance and form.instance.document_image %}
-              <img src="{{ form.instance.document_image.url }}" class="h-16 w-16 object-cover rounded-xl border" alt="">
-            {% endif %}
+          <!-- Icon Badge -->
+          <div class="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl gradient-icon flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 sm:h-9 sm:w-9 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 to-fuchsia-600 bg-clip-text text-transparent">
+              {% if is_edit %}{% trans "Mahsulotni tahrirlash" %}{% else %}{% trans "Mahsulot yaratish" %}{% endif %}
+            </h1>
+            <p class="text-sm text-gray-600 mt-1 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              {% blocktrans %}Rasmlar {{ max_images }} tagacha. Hujjat rasmi alohida.{% endblocktrans %}
+            </p>
           </div>
         </div>
-        {{ form.document_image }}
-        {% for e in form.document_image.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
-        <p class="text-xs text-neutral-500 mt-1">{% trans "Ixtiyoriy. Hujjat bor bo‘lsa rasm talab qilinadi." %}</p>
+
+        <div class="flex items-center gap-3">
+          <a href="{% url 'inventory_search' %}"
+             class="inline-flex items-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            {% trans "Ortga" %}
+          </a>
+          {% if p %}
+          <a href="{% url 'product_detail' p.pk %}"
+             class="inline-flex items-center gap-2 rounded-xl btn-gradient text-white px-4 py-2.5 text-sm font-semibold">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+            {% trans "Ko'rish" %}
+          </a>
+          {% endif %}
+        </div>
       </div>
     </div>
 
-    {# --- Telefon rasmlari: bitta multiple input, limit 7 --- #}
-    <div class="bg-white border rounded-2xl p-4 space-y-3">
-      <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">{% trans "Telefon rasmlari" %}</div>
-        <button type="button" id="add-images" class="px-3 py-2 rounded-xl border bg-neutral-50 hover:bg-neutral-100">
-          + {% trans "Rasm tanlash" %} (≤7)
-        </button>
-      </div>
+    <!-- Form Card -->
+    <div class="instagram-card rounded-2xl shadow-lg overflow-hidden fade-in">
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
 
-      <div id="images-preview" class="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {% for i in existing_images %}
-          <img src="{{ i.image.url }}" class="w-full aspect-square object-cover rounded-lg border" alt="">
-        {% endfor %}
-      </div>
+        <!-- Error Messages -->
+        {% if form.non_field_errors %}
+          <div class="px-4 sm:px-6 pt-6">
+            <div class="rounded-xl border-2 border-red-200 bg-red-50 p-4 flex items-start gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <div>
+                <div class="font-bold text-red-800 mb-1">{% trans "Xatolik" %}</div>
+                <ul class="list-disc ms-4 text-sm text-red-700 space-y-1">
+                  {% for e in form.non_field_errors %}
+                    <li>{{ e }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          </div>
+        {% endif %}
 
-      {{ imgform.images }}
-      {% if imgform.images.help_text %}<p class="text-xs text-neutral-500 mt-1">{{ imgform.images.help_text }}</p>{% endif %}
-      {% for e in imgform.images.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 sm:p-6">
+
+          <!-- Left Column: Main Fields -->
+          <div class="lg:col-span-2 space-y-6">
+
+            <!-- Basic Information Section -->
+            <section class="rounded-2xl border-2 border-gray-100 p-5 sm:p-6 bg-white/50">
+              <div class="flex items-center gap-3 mb-5">
+                <div class="h-10 w-10 rounded-xl gradient-icon flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900">{% trans "Asosiy ma'lumotlar" %}</h2>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% for field in form.visible_fields %}
+                  {% if field.name != "images" and field.name != "document_image" %}
+                    <div class="{% if field.name == 'description' %}sm:col-span-2{% endif %}">
+                      <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                        {{ field.label }}
+                        {% if field.field.required %}
+                          <span class="text-red-500 text-lg">*</span>
+                        {% endif %}
+                      </label>
+
+                      {% if field.name == 'description' %}
+                        <textarea name="{{ field.name }}" id="{{ field.id_for_label }}"
+                                  class="form-input w-full rounded-xl bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-400"
+                                  rows="4" {% if field.field.required %}required{% endif %}>{{ field.value|default:'' }}</textarea>
+                      {% else %}
+                        <input type="{{ field.field.widget.input_type|default:'text' }}"
+                               name="{{ field.name }}"
+                               id="{{ field.id_for_label }}"
+                               value="{{ field.value|default:'' }}"
+                               class="form-input w-full rounded-xl bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-400"
+                               {% if field.field.required %}required{% endif %}>
+                      {% endif %}
+
+                      {% if field.help_text %}
+                        <p class="mt-1.5 text-xs text-gray-500 flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                          </svg>
+                          {{ field.help_text }}
+                        </p>
+                      {% endif %}
+
+                      {% if field.errors %}
+                        <p class="mt-1.5 text-sm text-red-600 flex items-center gap-1 font-medium">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                          </svg>
+                          {{ field.errors|striptags }}
+                        </p>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </section>
+
+            <!-- Document Image Section -->
+            <section class="rounded-2xl border-2 border-gray-100 p-5 sm:p-6 bg-white/50">
+              <div class="flex items-center justify-between mb-5">
+                <div class="flex items-center gap-3">
+                  <div class="h-10 w-10 rounded-xl gradient-icon-success flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                  </div>
+                  <h2 class="text-xl font-bold text-gray-900">{% trans "Hujjat rasmi" %}</h2>
+                </div>
+                {% if has_existing_doc %}
+                  <span class="inline-flex items-center rounded-full bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 px-3 py-1.5 text-xs font-bold border border-emerald-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    {% trans "Mavjud" %}
+                  </span>
+                {% endif %}
+              </div>
+
+              <div class="space-y-4">
+                <label for="id_document_image" class="block text-sm font-semibold text-gray-700">
+                  {% trans "Hujjatni yuklash (1 ta)" %}
+                </label>
+
+                <input id="id_document_image"
+                       name="document_image"
+                       type="file"
+                       accept="image/*"
+                       class="block w-full text-sm text-gray-600
+                              file:mr-4 file:py-2.5 file:px-4
+                              file:rounded-xl file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-gradient-to-r file:from-emerald-500 file:to-teal-500
+                              file:text-white file:cursor-pointer
+                              hover:file:from-emerald-600 hover:file:to-teal-600
+                              file:transition-all
+                              rounded-xl border-2 border-gray-200
+                              focus:outline-none focus:border-emerald-500">
+
+                {% if form.document_image.errors %}
+                  <p class="text-sm text-red-600 flex items-center gap-1 font-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    {{ form.document_image.errors|striptags }}
+                  </p>
+                {% endif %}
+
+                {% if p and p.document_image %}
+                  <div class="mt-3 rounded-xl overflow-hidden border-2 border-gray-200 inline-block">
+                    <img src="{{ p.document_image.url }}" alt="{% trans 'Hujjat rasmi' %}"
+                         class="h-40 w-auto object-cover">
+                  </div>
+                {% endif %}
+              </div>
+            </section>
+
+          </div>
+
+          <!-- Right Column: Images & Hints -->
+          <aside class="space-y-6">
+
+            <!-- Gallery Section -->
+            <section class="rounded-2xl border-2 border-gray-100 p-5 sm:p-6 bg-white/50">
+              <div class="flex items-center justify-between mb-5">
+                <div class="flex items-center gap-3">
+                  <div class="h-10 w-10 rounded-xl gradient-icon-secondary flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 class="text-lg font-bold text-gray-900">{% trans "Galereya" %}</h2>
+                    <p class="text-xs text-gray-600">{% trans "0–7 ta rasm" %}</p>
+                  </div>
+                </div>
+                <div class="stats-badge text-xs">
+                  <span id="slotLeft" class="font-black">{{ max_images|add:existing_images|length|add:"-" }}</span>
+                  <span class="opacity-75">{% trans "ta qoldi" %}</span>
+                </div>
+              </div>
+
+              <!-- Existing Images -->
+              {% if existing_images %}
+                <div class="mb-4 grid grid-cols-3 gap-2">
+                  {% for img in existing_images %}
+                    <div class="image-preview-card group">
+                      <img src="{{ img.image.url }}" alt="img-{{ forloop.counter }}"
+                           class="h-24 w-full object-cover">
+                      <span class="image-badge absolute top-1 right-1 text-[10px] px-2 py-0.5 rounded-full text-white">
+                        #{{ img.order }}
+                      </span>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="mb-4 text-sm text-gray-500 text-center py-3 bg-gray-50 rounded-xl">
+                  {% trans "Hozircha rasm yo'q" %}
+                </p>
+              {% endif %}
+
+              <!-- Upload Zone -->
+              <div class="space-y-3">
+                <label for="id_images" class="block text-sm font-semibold text-gray-700">
+                  {% trans "Yangi rasmlar" %}
+                </label>
+
+                <input id="id_images"
+                       name="images"
+                       type="file"
+                       accept="image/*"
+                       multiple
+                       class="sr-only">
+
+                <div id="dropArea"
+                     class="upload-zone rounded-2xl p-6 text-center cursor-pointer">
+                  <div class="flex flex-col items-center gap-2">
+                    <div class="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                      </svg>
+                    </div>
+                    <p class="text-sm font-semibold text-gray-700">
+                      {% trans "Rasmlarni bu yerga tashlang" %}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                      {% trans "yoki bosing • PNG, JPG • Maks. 7 ta" %}
+                    </p>
+                  </div>
+                </div>
+
+                {% if form.images.errors %}
+                  <p class="text-sm text-red-600 flex items-center gap-1 font-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    {{ form.images.errors|striptags }}
+                  </p>
+                {% endif %}
+
+                <!-- Live Previews -->
+                <div id="previews" class="grid grid-cols-3 gap-2"></div>
+              </div>
+            </section>
+
+            <!-- Hints Section -->
+            <section class="rounded-2xl hint-card p-5 sm:p-6 shadow-sm">
+              <div class="flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+                <h3 class="text-sm font-bold text-gray-900">{% trans "Tavsiyalar" %}</h3>
+              </div>
+              <ul class="text-sm text-gray-700 space-y-2">
+                <li class="flex items-start gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                  </svg>
+                  <span>{% trans "Mahsulot nomi va modelini aniq kiriting." %}</span>
+                </li>
+                <li class="flex items-start gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                  </svg>
+                  <span>{% trans "Konsignatsiya bo'lsa, tegishli narx maydonini to'ldiring." %}</span>
+                </li>
+                <li class="flex items-start gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                  </svg>
+                  <span>{% trans "Rasm sifatini tekshiring (loyqa bo'lmasin)." %}</span>
+                </li>
+              </ul>
+            </section>
+
+          </aside>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="border-t-2 border-gray-100 bg-gray-50/50 p-4 sm:p-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-2 text-xs text-gray-500">
+            <div class="h-2 w-2 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 animate-pulse"></div>
+            {% if is_edit %}
+              <span class="font-medium">{% trans "Tahrirlash rejimi yoqilgan" %}</span>
+            {% else %}
+              <span class="font-medium">{% trans "Yaratish rejimi yoqilgan" %}</span>
+            {% endif %}
+          </div>
+
+          <div class="flex items-center gap-3">
+            <a href="{% url 'inventory_search' %}"
+               class="flex-1 sm:flex-none inline-flex justify-center items-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              {% trans "Bekor qilish" %}
+            </a>
+
+            <button type="submit"
+                    class="flex-1 sm:flex-none btn-gradient inline-flex justify-center items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-bold text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              {% trans "Saqlash" %}
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
 
-    <div class="flex items-center justify-end gap-3">
-      <a href="{% url 'product_list' %}" class="px-4 py-2 rounded-xl border">{% trans "Bekor qilish" %}</a>
-      <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white">{% trans "Saqlash" %}</button>
-    </div>
-  </form>
+  </div>
 </div>
 
 <script>
-(function(){
-  // Hujjat bor/yo‘q toggle
-  const hasDocs = document.getElementById("id_has_documents");
-  const docBlock = document.getElementById("doc-block");
-  const docBtn   = document.getElementById("doc-add-btn");
-  const docInput = document.getElementById("id_document_image");
-  const docPrev  = document.getElementById("doc-preview");
-  function toggleDoc(){ if(hasDocs){ docBlock.classList.toggle("hidden", !hasDocs.checked); } }
-  if(hasDocs){ hasDocs.addEventListener("change", toggleDoc); toggleDoc(); }
-  if(docBtn && docInput){
-    docBtn.addEventListener("click", ()=>docInput.click());
-    docInput.addEventListener("change", (e)=>{
-      if(e.target.files && e.target.files[0]){
-        const url = URL.createObjectURL(e.target.files[0]);
-        docPrev.innerHTML = "";
-        const img = document.createElement("img");
-        img.src = url; img.className = "h-16 w-16 object-cover rounded-xl border";
-        docPrev.appendChild(img);
-      }
-    });
+(function() {
+  const maxImages = {{ max_images|default:7 }};
+  const existingCount = {{ existing_images|length|default:0 }};
+  const slotLeftEl = document.getElementById('slotLeft');
+  const input = document.getElementById('id_images');
+  const drop = document.getElementById('dropArea');
+  const previews = document.getElementById('previews');
+
+  function updateSlots(countSelected) {
+    const left = Math.max(0, maxImages - existingCount - countSelected);
+    if (slotLeftEl) slotLeftEl.textContent = left;
   }
 
-  // Telefon rasmlari: bitta multiple input
-  const addBtn = document.getElementById("add-images");
-  const imagesInput = document.getElementById("id_images");
-  const preview = document.getElementById("images-preview");
-  if(addBtn && imagesInput){
-    addBtn.addEventListener("click", ()=>imagesInput.click());
-    imagesInput.addEventListener("change", ()=>{
-      // avvalgi yangi previewlarni tozalash
-      preview.querySelectorAll(".new-preview").forEach(el=>el.remove());
-      const files = Array.from(imagesInput.files || []);
-      files.slice(0,7).forEach(file=>{
-        const url = URL.createObjectURL(file);
-        const img = document.createElement("img");
-        img.src = url;
-        img.className = "w-full aspect-square object-cover rounded-lg border new-preview";
-        preview.appendChild(img);
-      });
-      if(files.length > 7){
-        alert("Maksimum 7 ta rasm tanlash mumkin. Qolganlari e’tiborga olinmaydi.");
-      }
-    });
+  function clearPreviews() {
+    while (previews.firstChild) previews.removeChild(previews.firstChild);
   }
+
+  function renderPreviews(files) {
+    clearPreviews();
+    const take = Math.min(files.length, Math.max(0, maxImages - existingCount));
+
+    for (let i = 0; i < take; i++) {
+      const file = files[i];
+      if (!file.type.startsWith('image/')) continue;
+
+      const url = URL.createObjectURL(file);
+      const card = document.createElement('div');
+      card.className = 'image-preview-card fade-in';
+
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = file.name;
+      img.className = 'h-24 w-full object-cover';
+
+      const badge = document.createElement('span');
+      badge.className = 'image-badge absolute top-1 right-1 text-[10px] px-2 py-0.5 rounded-full text-white';
+      badge.textContent = '#' + (i + 1 + existingCount);
+
+      card.appendChild(img);
+      card.appendChild(badge);
+      previews.appendChild(card);
+    }
+
+    updateSlots(take);
+  }
+
+  // Click to upload
+  drop?.addEventListener('click', () => input?.click());
+
+  // Drag & drop handlers
+  ['dragenter', 'dragover'].forEach(evt => {
+    drop?.addEventListener(evt, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.add('drag-over');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(evt => {
+    drop?.addEventListener(evt, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.remove('drag-over');
+    });
+  });
+
+  drop?.addEventListener('drop', e => {
+    if (!input) return;
+    const dt = e.dataTransfer;
+    if (!dt?.files?.length) return;
+    input.files = dt.files;
+    renderPreviews(input.files);
+  });
+
+  // File input change
+  input?.addEventListener('change', () => renderPreviews(input.files));
+
+  // Initialize
+  updateSlots(0);
 })();
 </script>
 {% endblock %}

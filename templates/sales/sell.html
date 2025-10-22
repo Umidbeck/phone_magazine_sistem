@@ -1,51 +1,294 @@
+<!-- templates/sales/sell.html - MODERN SELL INTERFACE -->
 {% extends "base.html" %}
-{% block title %}Sotish · PhoneStore{% endblock %}
-{% block content %}
-<div class="card p-5 max-w-2xl">
-  <h1 class="text-xl font-semibold mb-4">Sotish</h1>
-  <div class="mb-4 rounded-xl border border-neutral-200 p-4 bg-neutral-50">
-    <div class="text-sm text-neutral-600">Telefon</div>
-    <div class="font-medium">{{ product.brand.name }} {{ product.model.name }} — IMEI: {{ product.imei_full }}</div>
-  </div>
-  <form method="post" class="space-y-4">
-    {% csrf_token %}
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">Umumiy narx</label>
-      <input type="text" name="price" class="w-full rounded-xl border-neutral-300" required>
-    </div>
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">To‘lov turi</label>
-      <select name="payment_type" id="ptype" class="w-full rounded-xl border-neutral-300">
-        <option value="cash">Naqd</option>
-        <option value="card">Karta</option>
-        <option value="mixed">Aralash</option>
-      </select>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-xs text-neutral-500 mb-1">Naqd</label>
-        <input type="text" name="cash_amount" id="cash" class="w-full rounded-xl border-neutral-300" value="0">
-      </div>
-      <div>
-        <label class="block text-xs text-neutral-500 mb-1">Karta</label>
-        <input type="text" name="card_amount" id="card" class="w-full rounded-xl border-neutral-300" value="0">
-      </div>
-    </div>
+{% load widget_tweaks %}
 
-    <div class="flex items-center gap-3">
-      <button class="btn btn-primary">Saqlash</button>
-      <a class="btn btn-ghost" href="{% url 'sell_installment' %}?product_id={{ product.id }}">Bo‘lib to‘lash</a>
+{% block title %}Sotish{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center space-x-4 mb-4">
+            <a href="{% url 'product_detail' product.pk %}" class="text-gray-600 dark:text-gray-400 hover:text-instagram-pink transition-colors">
+                <i data-lucide="arrow-left" class="w-6 h-6"></i>
+            </a>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Sotish</h1>
+                <p class="text-gray-500 dark:text-gray-400">To'lov ma'lumotlarini kiriting</p>
+            </div>
+        </div>
     </div>
-  </form>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Left: Product Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8 border border-gray-100 dark:border-gray-700 animate-slide-up">
+            
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+                <i data-lucide="smartphone" class="w-5 h-5 mr-2"></i>
+                Mahsulot
+            </h2>
+            
+            <!-- Product Image -->
+            <div class="aspect-square bg-gray-100 dark:bg-gray-700 rounded-2xl overflow-hidden mb-6">
+                {% if product.images.first %}
+                <img src="{{ product.images.first.image.url }}" 
+                     alt="{{ product.brand.name }}"
+                     class="w-full h-full object-cover">
+                {% else %}
+                <div class="w-full h-full flex items-center justify-center">
+                    <i data-lucide="smartphone" class="w-24 h-24 text-gray-300 dark:text-gray-600"></i>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Product Details -->
+            <div class="space-y-4">
+                <div>
+                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                        {{ product.brand.name }} {{ product.model.name }}
+                    </h3>
+                    <p class="text-gray-500">
+                        {% if product.color %}{{ product.color.name }}{% endif %}
+                        {% if product.year %} • {{ product.year }}{% endif %}
+                    </p>
+                </div>
+                
+                <!-- Cost Info -->
+                <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl space-y-2">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500">Tannarx:</span>
+                        <span class="font-semibold text-gray-900 dark:text-white">
+                            {% if product.ownership == 'owned' %}
+                            ${{ product.purchase_price|floatformat:2 }}
+                            {% else %}
+                            ${{ product.consignment_price|floatformat:2 }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500">IMEI:</span>
+                        <span class="font-mono font-semibold text-gray-900 dark:text-white">
+                            {{ product.imei_full }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500">Turi:</span>
+                        <span class="font-semibold text-gray-900 dark:text-white">
+                            {% if product.ownership == 'owned' %}O'zimizniki{% else %}Konsignatsiya{% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <!-- Right: Payment Form -->
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8 border border-gray-100 dark:border-gray-700 animate-slide-up" style="animation-delay: 0.1s">
+            
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+                <i data-lucide="credit-card" class="w-5 h-5 mr-2"></i>
+                To'lov ma'lumotlari
+            </h2>
+            
+            <form method="post" x-data="sellForm()" @submit.prevent="submitForm">
+                {% csrf_token %}
+                
+                <!-- Price Input -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Umumiy narx (USD) <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-400">$</span>
+                        <input type="number" 
+                               name="price" 
+                               x-model="price"
+                               @input="calculateProfit"
+                               step="0.01" 
+                               min="0"
+                               required
+                               class="w-full pl-12 pr-4 py-4 text-2xl font-bold rounded-2xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:border-instagram-pink focus:ring-2 focus:ring-instagram-pink/20 outline-none transition-all"
+                               placeholder="0.00">
+                    </div>
+                    
+                    <!-- Profit Display -->
+                    <div class="mt-3 p-3 rounded-xl" 
+                         :class="profit > 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-600 dark:text-gray-400">Foyda:</span>
+                            <span class="font-bold text-lg" 
+                                  :class="profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                                  x-text="'$' + profit.toFixed(2)">
+                                $0.00
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Payment Type -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        To'lov turi <span class="text-red-500">*</span>
+                    </label>
+                    
+                    <div class="grid grid-cols-3 gap-3">
+                        <label class="relative cursor-pointer">
+                            <input type="radio" 
+                                   name="payment_type" 
+                                   value="cash" 
+                                   x-model="paymentType"
+                                   @change="updateAmounts"
+                                   class="peer sr-only">
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-2 border-gray-200 dark:border-gray-600 peer-checked:border-instagram-pink peer-checked:bg-instagram-pink/10 transition-all text-center">
+                                <i data-lucide="banknote" class="w-8 h-8 mx-auto mb-2 text-gray-600 dark:text-gray-400"></i>
+                                <p class="font-semibold text-sm text-gray-900 dark:text-white">Naqd</p>
+                            </div>
+                        </label>
+                        
+                        <label class="relative cursor-pointer">
+                            <input type="radio" 
+                                   name="payment_type" 
+                                   value="card" 
+                                   x-model="paymentType"
+                                   @change="updateAmounts"
+                                   class="peer sr-only">
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-2 border-gray-200 dark:border-gray-600 peer-checked:border-instagram-pink peer-checked:bg-instagram-pink/10 transition-all text-center">
+                                <i data-lucide="credit-card" class="w-8 h-8 mx-auto mb-2 text-gray-600 dark:text-gray-400"></i>
+                                <p class="font-semibold text-sm text-gray-900 dark:text-white">Karta</p>
+                            </div>
+                        </label>
+                        
+                        <label class="relative cursor-pointer">
+                            <input type="radio" 
+                                   name="payment_type" 
+                                   value="mixed" 
+                                   x-model="paymentType"
+                                   @change="updateAmounts"
+                                   class="peer sr-only">
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-2 border-gray-200 dark:border-gray-600 peer-checked:border-instagram-pink peer-checked:bg-instagram-pink/10 transition-all text-center">
+                                <i data-lucide="shuffle" class="w-8 h-8 mx-auto mb-2 text-gray-600 dark:text-gray-400"></i>
+                                <p class="font-semibold text-sm text-gray-900 dark:text-white">Aralash</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Amount Details (for mixed payment) -->
+                <div x-show="paymentType === 'mixed'" 
+                     x-transition
+                     class="mb-6 space-y-4">
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Naqd ($)
+                        </label>
+                        <input type="number" 
+                               name="cash_amount" 
+                               x-model.number="cashAmount"
+                               @input="cardAmount = price - cashAmount"
+                               step="0.01" 
+                               min="0"
+                               class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:border-instagram-pink focus:ring-2 focus:ring-instagram-pink/20 outline-none transition-all">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Karta ($)
+                        </label>
+                        <input type="number" 
+                               name="card_amount" 
+                               x-model.number="cardAmount"
+                               @input="cashAmount = price - cardAmount"
+                               step="0.01" 
+                               min="0"
+                               class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:border-instagram-pink focus:ring-2 focus:ring-instagram-pink/20 outline-none transition-all">
+                    </div>
+                    
+                    <!-- Balance Check -->
+                    <div class="p-3 rounded-xl"
+                         :class="(cashAmount + cardAmount) === price ? 'bg-green-50 dark:bg-green-900/20' : 'bg-yellow-50 dark:bg-yellow-900/20'">
+                        <p class="text-sm text-center"
+                           :class="(cashAmount + cardAmount) === price ? 'text-green-700 dark:text-green-400' : 'text-yellow-700 dark:text-yellow-400'">
+                            <span x-show="(cashAmount + cardAmount) === price">✓ To'g'ri</span>
+                            <span x-show="(cashAmount + cardAmount) !== price">
+                                Farq: $<span x-text="Math.abs(price - (cashAmount + cardAmount)).toFixed(2)"></span>
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Hidden fields for single payment types -->
+                <input type="hidden" name="cash_amount" :value="paymentType === 'cash' ? price : (paymentType === 'mixed' ? cashAmount : 0)">
+                <input type="hidden" name="card_amount" :value="paymentType === 'card' ? price : (paymentType === 'mixed' ? cardAmount : 0)">
+                
+                <!-- Submit Button -->
+                <button type="submit" 
+                        :disabled="!isValid()"
+                        :class="isValid() ? 'bg-gradient-to-r from-instagram-purple to-instagram-pink hover:shadow-2xl' : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed'"
+                        class="w-full py-4 text-white rounded-xl font-bold transition-all flex items-center justify-center space-x-2 text-lg">
+                    <i data-lucide="check-circle" class="w-6 h-6"></i>
+                    <span>Sotishni tasdiqlash</span>
+                </button>
+                
+                <p class="text-xs text-center text-gray-500 mt-4">
+                    Tasdiqlashdan oldin barcha ma'lumotlarni tekshiring
+                </p>
+                
+            </form>
+            
+        </div>
+        
+    </div>
+    
 </div>
 
 <script>
-  const ptype = document.getElementById('ptype'), cash = document.getElementById('cash'), card = document.getElementById('card');
-  function sync() {
-    if (ptype.value === 'cash') { card.value = '0'; card.readOnly = true; cash.readOnly = false; }
-    else if (ptype.value === 'card') { cash.value = '0'; cash.readOnly = true; card.readOnly = false; }
-    else { cash.readOnly = false; card.readOnly = false; }
-  }
-  ptype.addEventListener('change', sync); sync();
+function sellForm() {
+    return {
+        price: 0,
+        paymentType: 'cash',
+        cashAmount: 0,
+        cardAmount: 0,
+        cost: {{ product.purchase_price|default:product.consignment_price }},
+        profit: 0,
+        
+        calculateProfit() {
+            this.profit = this.price - this.cost;
+        },
+        
+        updateAmounts() {
+            if (this.paymentType === 'cash') {
+                this.cashAmount = this.price;
+                this.cardAmount = 0;
+            } else if (this.paymentType === 'card') {
+                this.cashAmount = 0;
+                this.cardAmount = this.price;
+            } else {
+                // mixed - keep current values or split equally
+                if (this.cashAmount === 0 && this.cardAmount === 0) {
+                    this.cashAmount = this.price / 2;
+                    this.cardAmount = this.price / 2;
+                }
+            }
+        },
+        
+        isValid() {
+            if (this.price <= 0) return false;
+            if (!this.paymentType) return false;
+            if (this.paymentType === 'mixed') {
+                return (this.cashAmount + this.cardAmount) === this.price;
+            }
+            return true;
+        },
+        
+        submitForm(e) {
+            if (this.isValid()) {
+                e.target.submit();
+            }
+        }
+    }
+}
 </script>
 {% endblock %}

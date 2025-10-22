@@ -1,29 +1,316 @@
-# accounts/store_list.html
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Stores" %}{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block header_title %}{% trans "Do'konlar" %}{% endblock %}
+
 {% block content %}
-<div class="p-4 space-y-3">
-  <a href="{% url 'store_new' %}" class="px-3 py-2 rounded bg-black text-white">{% trans "Add store" %}</a>
-  <div class="bg-white border rounded-xl">
-    <table class="w-full text-sm">
-      <thead><tr class="text-left border-b">
-        <th class="p-2">{% trans "Name" %}</th><th class="p-2">{% trans "Active" %}</th><th class="p-2"></th>
-      </tr></thead>
-      <tbody>
-        {% for s in items %}
-          <tr class="border-b">
-            <td class="p-2">{{ s.name }}</td>
-            <td class="p-2">{{ s.is_active }}</td>
-            <td class="p-2 space-x-2">
-              <a class="text-xs px-2 py-1 border rounded" href="{% url 'store_edit' s.id %}">{% trans "Edit" %}</a>
-              <a class="text-xs px-2 py-1 border rounded" href="{% url 'store_delete' s.id %}">{% trans "Delete" %}</a>
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td class="p-2 text-sm text-gray-500" colspan="3">{% trans "No items" %}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-cyan-50">
+
+  <!-- Header with gradient -->
+  <div class="bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">
+            🏪
+          </div>
+          <div>
+            <h1 class="text-3xl md:text-4xl font-bold">{% trans "Do'konlar" %}</h1>
+            <p class="text-teal-100 text-sm md:text-base">{% trans "Barcha do'konlarni boshqarish" %}</p>
+          </div>
+        </div>
+
+        <!-- Add Store Button -->
+        <a href="{% url 'store_new' %}" class="group px-6 py-3 rounded-2xl bg-white text-teal-600 font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2">
+          <svg class="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>{% trans "Yangi do'kon" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 -mt-6 pb-8 space-y-6">
+
+    <!-- Stats Card -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-teal-400 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-teal-600">{{ items|length }}</div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Jami do'konlar" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-emerald-600">
+            {{ active_count|default:"0" }}
+          </div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Faol" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-amber-600">
+            {{ inactive_count|default:"0" }}
+          </div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Faol emas" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-blue-600">100%</div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Band" %}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desktop Table View -->
+    <div class="hidden lg:block bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-teal-500 to-cyan-600 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+          </svg>
+          <div>
+            <h2 class="text-white font-bold text-lg">{% trans "Do'konlar ro'yxati" %}</h2>
+            <p class="text-teal-100 text-sm">{% trans "Barcha do'konlar va ularning holati" %}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <div class="flex items-center gap-2">
+                  <span>🏪</span>
+                  <span>{% trans "Nomi" %}</span>
+                </div>
+              </th>
+              <th class="text-center px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <div class="flex items-center justify-center gap-2">
+                  <span>✅</span>
+                  <span>{% trans "Holat" %}</span>
+                </div>
+              </th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <div class="flex items-center justify-end gap-2">
+                  <span>⚙️</span>
+                  <span>{% trans "Amallar" %}</span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for s in items %}
+              <tr class="hover:bg-teal-50 transition-all duration-300 hover:scale-[1.01]">
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-teal-400 to-cyan-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md">
+                      <span class="text-white text-xl font-bold">{{ s.name|slice:":1"|upper }}</span>
+                    </div>
+                    <div>
+                      <div class="font-bold text-slate-800 text-lg">{{ s.name }}</div>
+                      <div class="text-xs text-slate-500">{% trans "Do'kon" %} #{{ forloop.counter }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  {% if s.is_active %}
+                    <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-emerald-100 to-green-200 text-emerald-700 border-2 border-emerald-300">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <span>{% trans "Faol" %}</span>
+                    </span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-slate-100 to-gray-200 text-slate-700 border-2 border-slate-300">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <span>{% trans "Faol emas" %}</span>
+                    </span>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <a href="{% url 'store_edit' s.id %}" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                      </svg>
+                      <span>{% trans "Tahrirlash" %}</span>
+                    </a>
+                    <a href="{% url 'store_delete' s.id %}" class="px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                      <span>{% trans "O'chirish" %}</span>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="3" class="px-6 py-12 text-center">
+                  <div class="text-8xl mb-4">🏪</div>
+                  <h3 class="text-2xl font-bold text-slate-700 mb-2">{% trans "Do'konlar yo'q" %}</h3>
+                  <p class="text-slate-500 mb-6">{% trans "Hali hech qanday do'kon qo'shilmagan" %}</p>
+                  <a href="{% url 'store_new' %}" class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    <span>{% trans "Birinchi do'konni qo'shish" %}</span>
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Mobile Card View -->
+    <div class="lg:hidden space-y-4">
+      {% for s in items %}
+        <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden hover:shadow-2xl transition-all duration-300">
+
+          <!-- Card Header -->
+          <div class="bg-gradient-to-r from-teal-500 to-cyan-600 px-5 py-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                  <span class="text-white text-2xl font-bold">{{ s.name|slice:":1"|upper }}</span>
+                </div>
+                <div>
+                  <div class="font-bold text-white text-lg">{{ s.name }}</div>
+                  <div class="text-teal-100 text-sm">{% trans "Do'kon" %} #{{ forloop.counter }}</div>
+                </div>
+              </div>
+
+              <!-- Status Icon -->
+              {% if s.is_active %}
+                <div class="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+              {% else %}
+                <div class="w-10 h-10 bg-slate-500 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="p-5 space-y-4">
+
+            <!-- Status Badge -->
+            <div>
+              {% if s.is_active %}
+                <div class="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-50 to-green-100 border-2 border-emerald-200 rounded-2xl">
+                  <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="font-bold text-emerald-700">{% trans "Faol do'kon" %}</span>
+                </div>
+              {% else %}
+                <div class="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-50 to-gray-100 border-2 border-slate-200 rounded-2xl">
+                  <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                  </svg>
+                  <span class="font-bold text-slate-700">{% trans "Faol emas" %}</span>
+                </div>
+              {% endif %}
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+              <a href="{% url 'store_edit' s.id %}" class="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-300 hover:scale-105">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                <span>{% trans "Tahrirlash" %}</span>
+              </a>
+
+              <a href="{% url 'store_delete' s.id %}" class="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 hover:scale-105">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                <span>{% trans "O'chirish" %}</span>
+              </a>
+            </div>
+
+          </div>
+        </div>
+      {% empty %}
+        <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-12 text-center">
+          <div class="text-8xl mb-4">🏪</div>
+          <h3 class="text-2xl font-bold text-slate-700 mb-2">{% trans "Do'konlar yo'q" %}</h3>
+          <p class="text-slate-500 mb-6">{% trans "Hali hech qanday do'kon qo'shilmagan" %}</p>
+          <a href="{% url 'store_new' %}" class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            <span>{% trans "Birinchi do'konni qo'shish" %}</span>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+
   </div>
 </div>
+
+<style>
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #14b8a6, #06b6d4);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #0d9488, #0891b2);
+  }
+
+  /* Hover effects */
+  tbody tr {
+    transition: all 0.3s ease;
+  }
+
+  /* Smooth transitions */
+  * {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+</style>
 {% endblock %}

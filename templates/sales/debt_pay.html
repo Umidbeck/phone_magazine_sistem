@@ -2,92 +2,295 @@
 {% load i18n %}
 {% load money %}
 
+{% block title %}{% trans "To'lov qabul qilish" %}{% endblock %}
+
 {% block content %}
-<div class="max-w-xl mx-auto p-4 space-y-4">
-  <h1 class="text-xl font-semibold">💵 {% trans "Qarzdor to‘lovini kiritish" %}</h1>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8 px-4">
+  <div class="max-w-2xl mx-auto">
 
-  <div class="rounded-2xl border bg-white p-4">
-    <div class="text-sm text-neutral-500">Qarzdor</div>
-    <div class="font-medium">{{ debtor_label }}</div>
-    <div class="mt-2 text-sm">Qolgan qarz: <span class="font-semibold">{{ balance|usd }}</span></div>
+    <!-- Back Button -->
+    <div class="mb-6">
+      <a href="{% url 'sales:debt_list' %}" class="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        {% trans "Orqaga" %}
+      </a>
+    </div>
+
+    <!-- Header Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+      <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-6">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-3xl">
+            💵
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold text-white">{% trans "To'lov qabul qilish" %}</h1>
+            <p class="text-green-100 text-sm mt-1">{% trans "Qarzdordan to'lov summasini kiriting" %}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Debtor Info Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+      <div class="flex items-start gap-4">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
+          {{ debtor_label|slice:":1"|upper }}
+        </div>
+        <div class="flex-1">
+          <h2 class="text-lg font-bold text-gray-900 mb-1">{{ debtor_label }}</h2>
+          <div class="flex items-center gap-2 text-sm text-gray-600 mb-3">
+            <span>👤</span>
+            <span>{% trans "Qarzdor ma'lumoti" %}</span>
+          </div>
+          <div class="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-orange-900">{% trans "Qolgan qarz:" %}</span>
+              <span class="text-2xl font-bold text-orange-600">{{ balance|usd }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment Form -->
+    <form method="post" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6" oninput="syncTotals()">
+      {% csrf_token %}
+
+      <!-- Total Amount -->
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">
+          💰 {% trans "To'lov summasi" %}
+          <span class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-lg">$</span>
+          <input
+            id="id_amount"
+            name="amount"
+            type="number"
+            step="0.01"
+            min="0.01"
+            max="{{ balance }}"
+            placeholder="0.00"
+            class="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl bg-white text-gray-900 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+            required>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">
+          {% trans "Maksimum:" %} <span class="font-semibold text-orange-600">{{ balance|usd }}</span>
+        </p>
+      </div>
+
+      <!-- Payment Type -->
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-3">
+          💳 {% trans "To'lov turi" %}
+          <span class="text-red-500">*</span>
+        </label>
+        <div class="grid grid-cols-3 gap-3">
+          <label class="relative cursor-pointer">
+            <input
+              type="radio"
+              name="payment_type"
+              value="cash"
+              class="peer sr-only"
+              checked>
+            <div class="p-4 border-2 border-gray-300 rounded-xl text-center transition-all peer-checked:border-green-500 peer-checked:bg-green-50 hover:border-gray-400">
+              <div class="text-3xl mb-2">💵</div>
+              <div class="text-sm font-semibold text-gray-700 peer-checked:text-green-700">{% trans "Naqd" %}</div>
+            </div>
+          </label>
+          <label class="relative cursor-pointer">
+            <input
+              type="radio"
+              name="payment_type"
+              value="card"
+              class="peer sr-only">
+            <div class="p-4 border-2 border-gray-300 rounded-xl text-center transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-gray-400">
+              <div class="text-3xl mb-2">💳</div>
+              <div class="text-sm font-semibold text-gray-700 peer-checked:text-blue-700">{% trans "Karta" %}</div>
+            </div>
+          </label>
+          <label class="relative cursor-pointer">
+            <input
+              type="radio"
+              name="payment_type"
+              value="mixed"
+              class="peer sr-only">
+            <div class="p-4 border-2 border-gray-300 rounded-xl text-center transition-all peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-400">
+              <div class="text-3xl mb-2">💰</div>
+              <div class="text-sm font-semibold text-gray-700 peer-checked:text-purple-700">{% trans "Aralash" %}</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Cash and Card Amounts -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            💵 {% trans "Naqd pul" %}
+          </label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+            <input
+              id="id_cash_amount"
+              name="cash_amount"
+              type="number"
+              step="0.01"
+              min="0"
+              value="0"
+              placeholder="0.00"
+              class="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl bg-white text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            💳 {% trans "Karta orqali" %}
+          </label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+            <input
+              id="id_card_amount"
+              name="card_amount"
+              type="number"
+              step="0.01"
+              min="0"
+              value="0"
+              placeholder="0.00"
+              class="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl bg-white text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+          </div>
+        </div>
+      </div>
+
+      <!-- Sum Display -->
+      <div id="sum-display" class="hidden bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-medium text-purple-900">{% trans "Jami (naqd + karta):" %}</span>
+          <span id="sum-value" class="text-xl font-bold text-purple-600">$0.00</span>
+        </div>
+      </div>
+
+      <!-- Errors -->
+      {% if form.non_field_errors %}
+        <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+          <div class="flex gap-3">
+            <div class="text-2xl">⚠️</div>
+            <div>
+              <h3 class="font-semibold text-red-900 text-sm mb-1">{% trans "Xatolik" %}</h3>
+              <p class="text-red-700 text-sm">{{ form.non_field_errors }}</p>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Info Box -->
+      <div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+        <div class="flex gap-3">
+          <div class="text-2xl">💡</div>
+          <div>
+            <h3 class="font-semibold text-blue-900 text-sm mb-1">{% trans "Maslahat" %}</h3>
+            <ul class="text-blue-700 text-sm space-y-1">
+              <li>• {% trans "To'lov turi avtomatik hisoblanadi" %}</li>
+              <li>• {% trans "Aralash to'lovda naqd va karta summalarini kiriting" %}</li>
+              <li>• {% trans "To'lov qarzdan oshmasligi kerak" %}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="flex flex-col sm:flex-row gap-3 pt-4">
+        <button
+          type="submit"
+          class="flex-1 px-6 py-4 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-lg shadow-md hover:shadow-lg transition-all">
+          ✅ {% trans "To'lovni qabul qilish" %}
+        </button>
+        <a
+          href="{% url 'sales:debt_list' %}"
+          class="flex-1 px-6 py-4 rounded-xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-bold text-lg transition-all text-center">
+          ❌ {% trans "Bekor qilish" %}
+        </a>
+      </div>
+
+    </form>
+
   </div>
-
-  <form method="post" class="rounded-2xl border bg-white p-4 space-y-3" oninput="syncTotals()">
-    {% csrf_token %}
-    <div>
-      <label class="text-sm">Umumiy to‘lov</label>
-      <input id="id_amount" name="amount" type="number" step="0.01" min="0.01"
-             max="{{ balance }}" class="w-full rounded-xl border p-2" required>
-      <div class="text-xs text-neutral-500">Maksimum: {{ balance|usd }}</div>
-    </div>
-
-    <div>
-      <label class="text-sm">To‘lov turi</label>
-      <select id="id_payment_type" name="payment_type" class="w-full rounded-xl border p-2">
-        <option value="cash">Naqd</option>
-        <option value="card">Karta</option>
-        <option value="mixed">Aralash</option>
-      </select>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="text-sm">Naqd</label>
-        <input id="id_cash_amount" name="cash_amount" type="number" step="0.01" min="0" value="0"
-               class="w-full rounded-xl border p-2">
-      </div>
-      <div>
-        <label class="text-sm">Karta</label>
-        <input id="id_card_amount" name="card_amount" type="number" step="0.01" min="0" value="0"
-               class="w-full rounded-xl border p-2">
-      </div>
-    </div>
-
-    {% if form.non_field_errors %}
-      <div class="text-red-600 text-sm">{{ form.non_field_errors }}</div>
-    {% endif %}
-
-    <div class="flex justify-end">
-      <button class="px-4 py-2 rounded-xl bg-black text-white">Saqlash</button>
-    </div>
-  </form>
 </div>
 
 <script>
 function syncTotals(){
-  const ptype = document.getElementById('id_payment_type').value;
+  const ptypeInputs = document.querySelectorAll('input[name="payment_type"]');
+  let ptype = 'cash';
+  ptypeInputs.forEach(input => {
+    if (input.checked) ptype = input.value;
+  });
+
   const amount = parseFloat(document.getElementById('id_amount').value || 0);
   const cashEl = document.getElementById('id_cash_amount');
   const cardEl = document.getElementById('id_card_amount');
+  const sumDisplay = document.getElementById('sum-display');
+  const sumValue = document.getElementById('sum-value');
   let cash = parseFloat(cashEl.value || 0);
   let card = parseFloat(cardEl.value || 0);
 
   if (ptype === 'cash'){
-    cash = amount; card = 0;
-    cashEl.value = (isFinite(cash)? cash.toFixed(2): '0.00');
+    cash = amount;
+    card = 0;
+    cashEl.value = (isFinite(cash) ? cash.toFixed(2) : '0.00');
     cardEl.value = '0.00';
-    cashEl.readOnly = true; cardEl.readOnly = true;
+    cashEl.readOnly = true;
+    cardEl.readOnly = true;
+    cashEl.classList.add('bg-gray-100', 'cursor-not-allowed');
+    cardEl.classList.add('bg-gray-100', 'cursor-not-allowed');
+    sumDisplay.classList.add('hidden');
   } else if (ptype === 'card'){
-    cash = 0; card = amount;
+    cash = 0;
+    card = amount;
     cashEl.value = '0.00';
-    cardEl.value = (isFinite(card)? card.toFixed(2): '0.00');
-    cashEl.readOnly = true; cardEl.readOnly = true;
+    cardEl.value = (isFinite(card) ? card.toFixed(2) : '0.00');
+    cashEl.readOnly = true;
+    cardEl.readOnly = true;
+    cashEl.classList.add('bg-gray-100', 'cursor-not-allowed');
+    cardEl.classList.add('bg-gray-100', 'cursor-not-allowed');
+    sumDisplay.classList.add('hidden');
   } else {
     // mixed
-    cashEl.readOnly = false; cardEl.readOnly = false;
+    cashEl.readOnly = false;
+    cardEl.readOnly = false;
+    cashEl.classList.remove('bg-gray-100', 'cursor-not-allowed');
+    cardEl.classList.remove('bg-gray-100', 'cursor-not-allowed');
+    sumDisplay.classList.remove('hidden');
+
     const sum = (parseFloat(cashEl.value || 0) + parseFloat(cardEl.value || 0));
+    sumValue.textContent = '$' + sum.toFixed(2);
+
     if (Math.abs(sum - amount) > 0.009){
       // muvofiqlashtirish: naqdni avtomatik moslaymiz
       const newCash = Math.max(amount - (parseFloat(cardEl.value || 0)), 0);
       cashEl.value = newCash.toFixed(2);
+      sumValue.textContent = '$' + amount.toFixed(2);
     }
   }
 
-  // amount maxdan oshmasin (balance ni max sifatida berdik)
+  // amount maxdan oshmasin
   const max = parseFloat(document.getElementById('id_amount').max || 0);
   if (amount > max){
-    document.getElementById('id_amount').value = (isFinite(max)? max.toFixed(2): document.getElementById('id_amount').value);
+    document.getElementById('id_amount').value = (isFinite(max) ? max.toFixed(2) : document.getElementById('id_amount').value);
   }
 }
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+  syncTotals();
+
+  // Add event listeners for radio buttons
+  const ptypeInputs = document.querySelectorAll('input[name="payment_type"]');
+  ptypeInputs.forEach(input => {
+    input.addEventListener('change', syncTotals);
+  });
+});
 </script>
 {% endblock %}

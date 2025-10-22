@@ -1,0 +1,827 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Konsignatsiya — partiyalar bo'yicha AP" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        min-height: 100vh;
+    }
+
+    .consignment-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    /* Page Header */
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: #262626;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .title-icon {
+        font-size: 32px;
+    }
+
+    .page-subtitle {
+        font-size: 14px;
+        color: #737373;
+    }
+
+    /* Summary Stats */
+    .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.2s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+    }
+
+    .stat-card:nth-child(1)::before {
+        background: linear-gradient(90deg, #0095f6 0%, #00c6ff 100%);
+    }
+
+    .stat-card:nth-child(2)::before {
+        background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+    }
+
+    .stat-card:nth-child(3)::before {
+        background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+    }
+
+    .stat-card:nth-child(4)::before {
+        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .stat-label {
+        font-size: 11px;
+        color: #737373;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .stat-value {
+        font-size: 28px;
+        font-weight: 800;
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+    }
+
+    .stat-currency {
+        font-size: 20px;
+        font-weight: 700;
+        color: #10b981;
+    }
+
+    .stat-value.count {
+        color: #0095f6;
+    }
+
+    .stat-value.total {
+        color: #8b5cf6;
+    }
+
+    .stat-value.paid {
+        color: #10b981;
+    }
+
+    .stat-value.balance {
+        color: #f59e0b;
+    }
+
+    .stat-unit {
+        font-size: 14px;
+        color: #737373;
+        font-weight: 500;
+    }
+
+    /* Batch Cards */
+    .batch-list {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .batch-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        transition: all 0.3s;
+    }
+
+    .batch-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .batch-header {
+        background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .batch-info {
+        flex: 1;
+        min-width: 250px;
+    }
+
+    .batch-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #262626;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .batch-id {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        background: linear-gradient(135deg, #0095f6 0%, #0080d6 100%);
+        color: #fff;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .batch-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #737373;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .meta-item svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .meta-dot {
+        width: 3px;
+        height: 3px;
+        background: #737373;
+        border-radius: 50%;
+    }
+
+    .batch-stats {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .stat-item {
+        text-align: right;
+        min-width: 100px;
+    }
+
+    .stat-item-label {
+        font-size: 11px;
+        color: #737373;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+
+    .stat-item-value {
+        font-size: 18px;
+        font-weight: 800;
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-end;
+        gap: 3px;
+    }
+
+    .stat-item-value.sold {
+        color: #8b5cf6;
+    }
+
+    .stat-item-value.paid {
+        color: #10b981;
+    }
+
+    .stat-item-value.balance {
+        color: #f59e0b;
+    }
+
+    .stat-item-currency {
+        font-size: 14px;
+        color: #10b981;
+        font-weight: 700;
+    }
+
+    .pay-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .pay-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .pay-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .paid-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: #d1fae5;
+        color: #065f46;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .paid-badge svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Table */
+    .table-wrapper {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: #f9fafb;
+    }
+
+    th {
+        padding: 12px 16px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    th.text-right {
+        text-align: right;
+    }
+
+    tbody tr {
+        border-bottom: 1px solid #f3f4f6;
+        transition: background 0.2s;
+    }
+
+    tbody tr:hover {
+        background: #f9fafb;
+    }
+
+    tbody tr.sold-row {
+        background: #f0fdf4;
+    }
+
+    tbody tr.sold-row:hover {
+        background: #dcfce7;
+    }
+
+    td {
+        padding: 14px 16px;
+        font-size: 14px;
+        color: #374151;
+    }
+
+    .row-number {
+        color: #9ca3af;
+        font-weight: 600;
+        font-size: 13px;
+    }
+
+    .product-name {
+        font-weight: 600;
+        color: #262626;
+    }
+
+    .imei-code {
+        font-family: 'Courier New', monospace;
+        color: #737373;
+        font-size: 13px;
+        background: #f3f4f6;
+        padding: 4px 8px;
+        border-radius: 6px;
+        display: inline-block;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .status-sold {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-available {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+
+    .status-badge svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    .price-cell {
+        text-align: right;
+        font-weight: 700;
+        color: #262626;
+        font-size: 15px;
+    }
+
+    .price-currency {
+        color: #10b981;
+        font-size: 13px;
+    }
+
+    .empty-state {
+        padding: 60px 20px;
+        text-align: center;
+        color: #9ca3af;
+    }
+
+    .empty-state svg {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        opacity: 0.3;
+        stroke: currentColor;
+    }
+
+    .empty-state-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #6b7280;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-text {
+        font-size: 14px;
+        color: #9ca3af;
+    }
+
+    .no-batches {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        padding: 60px 20px;
+        text-align: center;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .consignment-container {
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 22px;
+        }
+
+        .title-icon {
+            font-size: 26px;
+        }
+
+        .summary-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .batch-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        .batch-info {
+            min-width: 0;
+        }
+
+        .batch-stats {
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #fff;
+            border-radius: 8px;
+            text-align: left;
+            min-width: 0;
+        }
+
+        .stat-item-label {
+            margin-bottom: 0;
+        }
+
+        .stat-item-value {
+            justify-content: flex-end;
+        }
+
+        .pay-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .paid-badge {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .table-wrapper {
+            margin: 0 -16px;
+        }
+
+        table {
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 10px 12px;
+        }
+
+        .batch-meta {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .meta-dot {
+            display: none;
+        }
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .batch-card {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .batch-card:nth-child(1) { animation-delay: 0.05s; }
+    .batch-card:nth-child(2) { animation-delay: 0.1s; }
+    .batch-card:nth-child(3) { animation-delay: 0.15s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="consignment-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">
+            <span class="title-icon">🏷️</span>
+            {% trans "Konsignatsiya partiyalari" %}
+        </h1>
+        <p class="page-subtitle">{% trans "Partiyalar bo'yicha to'lovlar va balansi (Accounts Payable)" %}</p>
+    </div>
+
+    <!-- Summary Stats -->
+    {% if rows %}
+    <div class="summary-stats">
+        <div class="stat-card">
+            <div class="stat-label">{% trans "Jami partiyalar" %}</div>
+            <div class="stat-value count">
+                <span>{{ rows|length }}</span>
+                <span class="stat-unit">{% trans "ta" %}</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">{% trans "Jami sotilgan" %}</div>
+            <div class="stat-value total">
+                <span class="stat-currency">$</span>
+                <span id="totalSold">0.00</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">{% trans "Jami to'langan" %}</div>
+            <div class="stat-value paid">
+                <span class="stat-currency">$</span>
+                <span id="totalPaid">0.00</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">{% trans "Jami balans" %}</div>
+            <div class="stat-value balance">
+                <span class="stat-currency">$</span>
+                <span id="totalBalance">0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Calculate totals from batch data
+        (function() {
+            let totalSold = 0;
+            let totalPaid = 0;
+            let totalBalance = 0;
+
+            {% for r in rows %}
+                totalSold += parseFloat({{ r.base_sold|default:0 }});
+                totalPaid += parseFloat({{ r.paid|default:0 }});
+                totalBalance += parseFloat({{ r.balance|default:0 }});
+            {% endfor %}
+
+            // Update DOM with formatted numbers
+            document.getElementById('totalSold').textContent = totalSold.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+
+            document.getElementById('totalPaid').textContent = totalPaid.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+
+            document.getElementById('totalBalance').textContent = totalBalance.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        })();
+    </script>
+    {% endif %}
+
+    <!-- Batch List -->
+    <div class="batch-list">
+        {% for r in rows %}
+        <div class="batch-card">
+            <!-- Batch Header -->
+            <div class="batch-header">
+                <div class="batch-info">
+                    <div class="batch-title">
+                        <span class="batch-id">#{{ r.batch.id }}</span>
+                        {% if r.batch.title %}
+                        <span>{{ r.batch.title }}</span>
+                        {% else %}
+                        <span>{% trans "Partiya" %}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="batch-meta">
+                        <div class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/>
+                                <line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            {{ r.batch.created_at|date:"Y-m-d H:i" }}
+                        </div>
+
+                        <span class="meta-dot"></span>
+
+                        <div class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                            {{ r.batch.store.name }}
+                        </div>
+
+                        <span class="meta-dot"></span>
+
+                        <div class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="8.5" cy="7" r="4"/>
+                                <polyline points="17 11 19 13 23 9"/>
+                            </svg>
+                            {{ r.batch.created_by.get_full_name|default:r.batch.created_by.username }}
+                        </div>
+
+                        <span class="meta-dot"></span>
+
+                        <div class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 7h-9"/>
+                                <path d="M14 17H5"/>
+                                <circle cx="17" cy="17" r="3"/>
+                                <circle cx="7" cy="7" r="3"/>
+                            </svg>
+                            <strong>{{ r.count }}</strong> {% trans "mahsulot" %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="batch-stats">
+                    <div class="stat-item">
+                        <div class="stat-item-label">{% trans "Sotilgan" %}</div>
+                        <div class="stat-item-value sold">
+                            <span class="stat-item-currency">$</span>
+                            <span>{{ r.base_sold|floatformat:2 }}</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-item">
+                        <div class="stat-item-label">{% trans "To'langan" %}</div>
+                        <div class="stat-item-value paid">
+                            <span class="stat-item-currency">$</span>
+                            <span>{{ r.paid|floatformat:2 }}</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-item">
+                        <div class="stat-item-label">{% trans "Balans" %}</div>
+                        <div class="stat-item-value balance">
+                            <span class="stat-item-currency">$</span>
+                            <span>{{ r.balance|floatformat:2 }}</span>
+                        </div>
+                    </div>
+
+                    {% if r.balance > 0 %}
+                    <a href="{% url 'ap_consignment_batch_pay' r.batch.id %}" class="pay-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        {% trans "To'lov qilish" %}
+                    </a>
+                    {% else %}
+                    <div class="paid-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        {% trans "To'langan" %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Product Table -->
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">#</th>
+                            <th>{% trans "Mahsulot" %}</th>
+                            <th>IMEI</th>
+                            <th>{% trans "Holat" %}</th>
+                            <th class="text-right">{% trans "Baza narx" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for it in r.items %}
+                        <tr class="{% if it.status == 'sold' %}sold-row{% endif %}">
+                            <td class="row-number">{{ forloop.counter }}</td>
+                            <td class="product-name">{{ it.brand__name }} {{ it.model__name }}</td>
+                            <td><span class="imei-code">{{ it.imei_full }}</span></td>
+                            <td>
+                                {% if it.status == 'sold' %}
+                                <span class="status-badge status-sold">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                    {% trans "Sotilgan" %}
+                                </span>
+                                {% else %}
+                                <span class="status-badge status-available">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                    </svg>
+                                    {% trans "Mavjud" %}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="price-cell">
+                                <span class="price-currency">$</span>
+                                {{ it.consignment_price|default:0|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                    </svg>
+                                    <p>{% trans "Mahsulotlar topilmadi" %}</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% empty %}
+        <div class="no-batches">
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <div class="empty-state-title">{% trans "Partiyalar topilmadi" %}</div>
+                <p class="empty-state-text">{% trans "Hozircha konsignatsiya partiyalari mavjud emas" %}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

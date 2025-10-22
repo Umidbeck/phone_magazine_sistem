@@ -1,65 +1,583 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="max-w-7xl mx-auto p-4 space-y-6">
-  <div class="flex items-center justify-between">
-    <h1 class="text-2xl font-semibold">💵 Har kunlik kassa</h1>
-  </div>
+{% load i18n %}
 
-  <form method="get" class="grid md:grid-cols-5 gap-3 bg-white border rounded-2xl p-4">
-    {% if stores %}
-    <div>
-      <label class="text-xs text-neutral-500">Do‘kon</label>
-      <select name="store_id" class="w-full rounded-xl border p-2">
-        <option value="">Hammasi</option>
-        {% for s in stores %}
-          <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-        {% endfor %}
-      </select>
+{% block title %}{% trans "Har kunlik kassa" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        min-height: 100vh;
+    }
+
+    .daily-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    /* Page Header */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: #262626;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .title-icon {
+        font-size: 32px;
+    }
+
+    /* Filter Card */
+    .filter-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .filter-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #737373;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .filter-select,
+    .filter-input {
+        padding: 10px 14px;
+        border: 2px solid #dbdbdb;
+        border-radius: 10px;
+        font-size: 14px;
+        background: #fafafa;
+        transition: all 0.2s;
+    }
+
+    .filter-select:focus,
+    .filter-input:focus {
+        outline: none;
+        border-color: #10b981;
+        background: #fff;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    /* Summary Cards */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .summary-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.2s;
+    }
+
+    .summary-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .summary-label {
+        font-size: 12px;
+        color: #737373;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .summary-value {
+        font-size: 28px;
+        font-weight: 800;
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+    }
+
+    .summary-value.cash {
+        color: #10b981;
+    }
+
+    .summary-value.card {
+        color: #3b82f6;
+    }
+
+    .summary-value.total {
+        color: #8b5cf6;
+    }
+
+    .summary-value.profit {
+        color: #f59e0b;
+    }
+
+    .currency-symbol {
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    /* Table Card */
+    .table-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    }
+
+    th {
+        padding: 16px 20px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    th.text-right {
+        text-align: right;
+    }
+
+    tbody tr {
+        border-bottom: 1px solid #f3f4f6;
+        transition: background 0.2s;
+    }
+
+    tbody tr:hover {
+        background: #f9fafb;
+    }
+
+    td {
+        padding: 16px 20px;
+        font-size: 14px;
+        color: #374151;
+    }
+
+    .date-cell {
+        font-weight: 600;
+        color: #262626;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .date-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+    }
+
+    .amount-cell {
+        text-align: right;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .amount-cell.cash {
+        color: #10b981;
+    }
+
+    .amount-cell.card {
+        color: #3b82f6;
+    }
+
+    .amount-cell.total {
+        color: #8b5cf6;
+        font-size: 15px;
+    }
+
+    .amount-cell.profit {
+        color: #f59e0b;
+    }
+
+    .currency {
+        font-size: 12px;
+        color: #10b981;
+        margin-right: 2px;
+    }
+
+    /* Footer */
+    tfoot {
+        background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+        border-top: 2px solid #e5e7eb;
+    }
+
+    tfoot td {
+        padding: 20px;
+        font-weight: 700;
+        font-size: 15px;
+    }
+
+    .footer-label {
+        text-align: right;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 13px;
+    }
+
+    .footer-value {
+        text-align: right;
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    /* Empty State */
+    .empty-state {
+        padding: 80px 20px;
+        text-align: center;
+    }
+
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+        opacity: 0.3;
+        stroke: #9ca3af;
+    }
+
+    .empty-state-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #6b7280;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-text {
+        font-size: 14px;
+        color: #9ca3af;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .daily-container {
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 22px;
+        }
+
+        .filter-card {
+            padding: 20px;
+        }
+
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .filter-actions {
+            flex-direction: column;
+        }
+
+        .btn-primary {
+            width: 100%;
+        }
+
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .table-wrapper {
+            margin: 0 -16px;
+        }
+
+        table {
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 12px 16px;
+        }
+
+        .date-icon {
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+        }
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    tbody tr {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    tbody tr:nth-child(1) { animation-delay: 0.05s; }
+    tbody tr:nth-child(2) { animation-delay: 0.1s; }
+    tbody tr:nth-child(3) { animation-delay: 0.15s; }
+    tbody tr:nth-child(4) { animation-delay: 0.2s; }
+    tbody tr:nth-child(5) { animation-delay: 0.25s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="daily-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">
+            <span class="title-icon">💵</span>
+            {% trans "Har kunlik kassa" %}
+        </h1>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="filter-card">
+        <div class="filter-grid">
+            {% if stores %}
+            <div class="filter-group">
+                <label class="filter-label">{% trans "Do'kon" %}</label>
+                <select name="store_id" class="filter-select">
+                    <option value="">{% trans "Hammasi" %}</option>
+                    {% for s in stores %}
+                    <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
+                        {{ s.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="filter-group">
+                <label class="filter-label">{% trans "Sana — dan" %}</label>
+                <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" class="filter-input">
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">{% trans "Sana — gacha" %}</label>
+                <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}" class="filter-input">
+            </div>
+        </div>
+
+        <div class="filter-actions">
+            <button type="submit" class="btn-primary">
+                🔍 {% trans "Ko'rsatish" %}
+            </button>
+        </div>
+    </form>
+
+    <!-- Summary Cards -->
+    {% if rows %}
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="summary-label">💵 {% trans "Jami Naqd" %}</div>
+            <div class="summary-value cash">
+                <span class="currency-symbol">$</span>
+                <span id="totalCash">0.00</span>
+            </div>
+        </div>
+
+        <div class="summary-card">
+            <div class="summary-label">💳 {% trans "Jami Karta" %}</div>
+            <div class="summary-value card">
+                <span class="currency-symbol">$</span>
+                <span id="totalCard">0.00</span>
+            </div>
+        </div>
+
+        <div class="summary-card">
+            <div class="summary-label">💰 {% trans "Jami Kassa" %}</div>
+            <div class="summary-value total">
+                <span class="currency-symbol">$</span>
+                <span>{{ sum_kassa|floatformat:2 }}</span>
+            </div>
+        </div>
+
+        <div class="summary-card">
+            <div class="summary-label">📊 {% trans "Jami Foyda" %}</div>
+            <div class="summary-value profit">
+                <span class="currency-symbol">$</span>
+                <span>{{ sum_profit|floatformat:2 }}</span>
+            </div>
+        </div>
     </div>
     {% endif %}
-    <div>
-      <label class="text-xs text-neutral-500">Sana — dan</label>
-      <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" class="w-full rounded-xl border p-2">
-    </div>
-    <div>
-      <label class="text-xs text-neutral-500">Sana — gacha</label>
-      <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}" class="w-full rounded-xl border p-2">
-    </div>
-    <div class="md:col-span-5 flex justify-end">
-      <button class="px-4 py-2 rounded-xl bg-black text-white">Ko‘rsat</button>
-    </div>
-  </form>
 
-  <div class="rounded-2xl border overflow-x-auto bg-white">
-    <table class="min-w-full text-sm">
-      <thead class="bg-neutral-50 text-neutral-600">
-        <tr>
-          <th class="text-left px-4 py-2">Sana</th>
-          <th class="text-right px-4 py-2">Naqd</th>
-          <th class="text-right px-4 py-2">Karta</th>
-          <th class="text-right px-4 py-2">Kassa</th>
-          <th class="text-right px-4 py-2">Net profit</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in rows %}
-        <tr class="border-t">
-          <td class="px-4 py-2">{{ r.date|date:"Y-m-d" }}</td>
-          <td class="px-4 py-2 text-right">{{ r.cash_in }}</td>
-          <td class="px-4 py-2 text-right">{{ r.card_in }}</td>
-          <td class="px-4 py-2 text-right font-medium">{{ r.kassa }}</td>
-          <td class="px-4 py-2 text-right">{{ r.net_profit }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-      <tfoot>
-        <tr class="border-t bg-neutral-50">
-          <td class="px-4 py-2 text-right font-medium" colspan="3">Jami</td>
-          <td class="px-4 py-2 text-right font-semibold">{{ sum_kassa }}</td>
-          <td class="px-4 py-2 text-right font-semibold">{{ sum_profit }}</td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
+    <!-- Table -->
+    <div class="table-card">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Sana" %}</th>
+                        <th class="text-right">{% trans "Naqd" %}</th>
+                        <th class="text-right">{% trans "Karta" %}</th>
+                        <th class="text-right">{% trans "Kassa" %}</th>
+                        <th class="text-right">{% trans "Net profit" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rows %}
+                    <tr data-cash="{{ r.cash_in }}" data-card="{{ r.card_in }}">
+                        <td>
+                            <div class="date-cell">
+                                <div class="date-icon">📅</div>
+                                {{ r.date|date:"Y-m-d" }}
+                            </div>
+                        </td>
+                        <td class="amount-cell cash">
+                            <span class="currency">$</span>{{ r.cash_in|floatformat:2 }}
+                        </td>
+                        <td class="amount-cell card">
+                            <span class="currency">$</span>{{ r.card_in|floatformat:2 }}
+                        </td>
+                        <td class="amount-cell total">
+                            <span class="currency">$</span>{{ r.kassa|floatformat:2 }}
+                        </td>
+                        <td class="amount-cell profit">
+                            <span class="currency">$</span>{{ r.net_profit|floatformat:2 }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                <div class="empty-state-title">{% trans "Ma'lumot topilmadi" %}</div>
+                                <p class="empty-state-text">{% trans "Tanlangan davr uchun kassa ma'lumotlari yo'q" %}</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if rows %}
+                <tfoot>
+                    <tr>
+                        <td class="footer-label" colspan="3">{% trans "JAMI" %}</td>
+                        <td class="footer-value" style="color: #8b5cf6;">
+                            <span class="currency">$</span>{{ sum_kassa|floatformat:2 }}
+                        </td>
+                        <td class="footer-value" style="color: #f59e0b;">
+                            <span class="currency">$</span>{{ sum_profit|floatformat:2 }}
+                        </td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
 </div>
+
+<script>
+    // Calculate total cash and card from rows
+    (function() {
+        let totalCash = 0;
+        let totalCard = 0;
+
+        document.querySelectorAll('tbody tr[data-cash]').forEach(function(row) {
+            totalCash += parseFloat(row.dataset.cash || 0);
+            totalCard += parseFloat(row.dataset.card || 0);
+        });
+
+        const totalCashEl = document.getElementById('totalCash');
+        const totalCardEl = document.getElementById('totalCard');
+
+        if (totalCashEl) {
+            totalCashEl.textContent = totalCash.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        if (totalCardEl) {
+            totalCardEl.textContent = totalCard.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+    })();
+</script>
 {% endblock %}

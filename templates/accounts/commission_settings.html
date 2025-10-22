@@ -3,19 +3,635 @@
 
 {% block title %}{% trans "Komissiya sozlamalari" %}{% endblock %}
 
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        min-height: 100vh;
+        padding: 20px 0;
+    }
+
+    .settings-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 0 20px;
+    }
+
+    .settings-header {
+        margin-bottom: 24px;
+    }
+
+    .header-top {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+
+    .back-button {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+    }
+
+    .back-button:hover {
+        background: #fafafa;
+        transform: translateX(-2px);
+    }
+
+    .back-button svg {
+        width: 20px;
+        height: 20px;
+        stroke: #262626;
+    }
+
+    .settings-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #262626;
+        margin: 0;
+    }
+
+    .settings-subtitle {
+        font-size: 14px;
+        color: #737373;
+        line-height: 1.5;
+    }
+
+    .settings-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .card-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #efefef;
+        background: linear-gradient(135deg, #f8f9ff 0%, #fff5f8 100%);
+    }
+
+    .card-header-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #262626;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .card-header-title svg {
+        width: 20px;
+        height: 20px;
+        stroke: #8e44ad;
+    }
+
+    .card-header-desc {
+        font-size: 13px;
+        color: #737373;
+        line-height: 1.5;
+    }
+
+    .card-body {
+        padding: 24px;
+    }
+
+    .messages {
+        margin-bottom: 20px;
+    }
+
+    .alert {
+        padding: 14px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: start;
+        gap: 10px;
+    }
+
+    .alert svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+
+    .alert-error {
+        background-color: #fed7d7;
+        color: #c53030;
+        border: 1px solid #fc8181;
+    }
+
+    .alert-error svg {
+        stroke: #c53030;
+    }
+
+    .alert-success {
+        background-color: #c6f6d5;
+        color: #22543d;
+        border: 1px solid #68d391;
+    }
+
+    .alert-success svg {
+        stroke: #22543d;
+    }
+
+    .alert-info {
+        background-color: #bee3f8;
+        color: #2c5282;
+        border: 1px solid #90cdf4;
+    }
+
+    .alert-info svg {
+        stroke: #2c5282;
+    }
+
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #262626;
+        margin-bottom: 8px;
+    }
+
+    .input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 16px;
+        color: #8e44ad;
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 14px 16px 14px 40px;
+        font-size: 16px;
+        border: 2px solid #dbdbdb;
+        border-radius: 10px;
+        background-color: #fafafa;
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #8e44ad;
+        background-color: #fff;
+        box-shadow: 0 0 0 3px rgba(142, 68, 173, 0.1);
+    }
+
+    .form-control.error {
+        border-color: #ed4956;
+        background-color: #fff5f5;
+    }
+
+    .form-help {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #737373;
+        margin-top: 8px;
+        line-height: 1.4;
+    }
+
+    .form-help svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+
+    .error-message {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #ed4956;
+        margin-top: 8px;
+    }
+
+    .error-message svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+
+    .info-box {
+        background: linear-gradient(135deg, #f8f9ff 0%, #fff5f8 100%);
+        border: 1px solid #e0d4f7;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .info-box-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #8e44ad;
+        margin-bottom: 8px;
+    }
+
+    .info-box-header svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .info-box-content {
+        font-size: 13px;
+        color: #5a3d6e;
+        line-height: 1.6;
+    }
+
+    .info-box-list {
+        margin-top: 8px;
+        padding-left: 20px;
+    }
+
+    .info-box-list li {
+        margin-bottom: 4px;
+    }
+
+    .example-box {
+        background: #f7f7f7;
+        border: 1px dashed #d0d0d0;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-top: 12px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        color: #262626;
+    }
+
+    .example-label {
+        font-size: 12px;
+        color: #737373;
+        font-weight: 600;
+        margin-bottom: 6px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        padding-top: 8px;
+    }
+
+    .btn {
+        flex: 1;
+        padding: 14px 24px;
+        font-size: 15px;
+        font-weight: 600;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn:active {
+        transform: scale(0.98);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(142, 68, 173, 0.3);
+    }
+
+    .btn-primary:hover {
+        opacity: 0.95;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(142, 68, 173, 0.4);
+    }
+
+    .btn-primary:active {
+        transform: translateY(0) scale(0.98);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .current-value-box {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 20px;
+    }
+
+    .current-value-label {
+        font-size: 12px;
+        color: #737373;
+        font-weight: 600;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .current-value {
+        font-size: 32px;
+        font-weight: 700;
+        color: #8e44ad;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .current-value-unit {
+        font-size: 20px;
+        color: #737373;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 480px) {
+        .settings-container {
+            padding: 0 16px;
+        }
+
+        .settings-title {
+            font-size: 24px;
+        }
+
+        .settings-card {
+            border-radius: 8px;
+        }
+
+        .card-header,
+        .card-body {
+            padding: 16px;
+        }
+
+        .current-value {
+            font-size: 28px;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+        }
+    }
+
+    /* Success animation */
+    @keyframes successPulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    .success-animation {
+        animation: successPulse 0.4s ease-out;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-xl mx-auto p-4">
-  <h1 class="text-2xl font-semibold mb-4">{% trans "Komissiya sozlamalari" %}</h1>
-  <form method="post" class="space-y-4">
-    {% csrf_token %}
-    <div>
-      {{ form.commission_flat.label_tag }} {{ form.commission_flat }}
-      <p class="text-xs text-gray-500 mt-1">{% trans "Masalan: 5.00 yoki 7.00" %}</p>
-      {% if form.commission_flat.errors %}
-        <p class="text-red-600 text-sm">{{ form.commission_flat.errors|join:", " }}</p>
-      {% endif %}
+<div class="settings-container">
+    <div class="settings-header">
+        <div class="header-top">
+            <div>
+                <h1 class="settings-title">{% trans "Komissiya sozlamalari" %}</h1>
+                <p class="settings-subtitle">{% trans "Tizim komissiya foizini boshqarish" %}</p>
+            </div>
+        </div>
     </div>
-    <button class="px-4 py-2 rounded bg-black text-white">{% trans "Saqlash" %}</button>
-  </form>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {% if message.tags == 'success' %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            {% elif message.tags == 'error' %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            {% else %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            {% endif %}
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-header-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="1" x2="12" y2="23"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                {% trans "Komissiya summasi" %}
+            </div>
+            <p class="card-header-desc">
+                {% trans "Har bir savdo uchun olinadigan komissiya summasini belgilang (AQSh dollari)" %}
+            </p>
+        </div>
+
+        <div class="card-body">
+            {% if form.commission_flat.value %}
+            <div class="current-value-box">
+                <div class="current-value-label">{% trans "Joriy komissiya" %}</div>
+                <div class="current-value">
+                    <span style="font-size: 24px; color: #22c55e;">$</span>
+                    <span>{{ form.commission_flat.value }}</span>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="info-box">
+                <div class="info-box-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    {% trans "Ma'lumot" %}
+                </div>
+                <div class="info-box-content">
+                    {% trans "Komissiya summasi barcha savdolar uchun qo'llaniladi (AQSh dollari):" %}
+                    <ul class="info-box-list">
+                        <li>{% trans "Minimal summa: $0.00" %}</li>
+                        <li>{% trans "Tavsiya etiladi: $5.00 - $15.00" %}</li>
+                        <li>{% trans "Kasr raqamlar qo'llab-quvvatlanadi (masalan: 7.50)" %}</li>
+                    </ul>
+                    <div class="example-box">
+                        <div class="example-label">{% trans "Misol:" %}</div>
+                        {% trans "Agar komissiya $5.00 bo'lsa" %}<br>
+                        {% trans "Savdo summasi: $100.00" %}<br>
+                        <strong>{% trans "Komissiya:" %} $5.00</strong><br>
+                        <strong>{% trans "Sotuvchiga to'lov:" %} $95.00</strong>
+                    </div>
+                </div>
+            </div>
+
+            <form method="post" id="commissionForm">
+                {% csrf_token %}
+
+                <div class="form-group">
+                    <label for="id_commission_flat" class="form-label">
+                        {% trans "Komissiya summasi (AQSh dollari)" %}
+                    </label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">$</span>
+                        <input
+                            type="number"
+                            name="commission_flat"
+                            id="id_commission_flat"
+                            step="0.01"
+                            min="0"
+                            class="form-control {% if form.commission_flat.errors %}error{% endif %}"
+                            value="{{ form.commission_flat.value|default:'' }}"
+                            placeholder="5.00"
+                            required
+                        >
+                    </div>
+                    {% if form.commission_flat.errors %}
+                        <div class="error-message">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                            <span>{{ form.commission_flat.errors|join:", " }}</span>
+                        </div>
+                    {% else %}
+                        <div class="form-help">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                <line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                            <span>{% trans "Masalan: 5.00, 7.50 yoki 10.00 (dollar)" %}</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="action-buttons">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        {% trans "Saqlash" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<script>
+    // Form submission with loading state
+    document.getElementById('commissionForm').addEventListener('submit', function(e) {
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner"></span>{% trans "Saqlanmoqda..." %}';
+    });
+
+    // Input validation and formatting
+    const input = document.getElementById('id_commission_flat');
+
+    input.addEventListener('input', function(e) {
+        let value = this.value;
+
+        // Remove invalid characters
+        value = value.replace(/[^0-9.]/g, '');
+
+        // Ensure only one decimal point
+        const parts = value.split('.');
+        if (parts.length > 2) {
+            value = parts[0] + '.' + parts.slice(1).join('');
+        }
+
+        // Limit to 2 decimal places
+        if (parts[1] && parts[1].length > 2) {
+            value = parts[0] + '.' + parts[1].substring(0, 2);
+        }
+
+        this.value = value;
+
+        // Real-time validation (only check if negative)
+        const numValue = parseFloat(value);
+        if (numValue < 0) {
+            this.classList.add('error');
+        } else {
+            this.classList.remove('error');
+        }
+    });
+
+    // Auto-focus on input
+    input.focus();
+    input.select();
+</script>
 {% endblock %}

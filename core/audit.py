@@ -1,3 +1,4 @@
+# core/audit.py
 from .models import AuditLog
 
 def write_audit(request, action: str, obj, changes: dict = None):

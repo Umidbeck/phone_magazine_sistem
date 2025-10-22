@@ -1,393 +1,555 @@
 {% extends "base.html" %}
-{% load i18n money %}
+{% load i18n static %}
+
+{% block title %}{% trans "Sotilgan telefonlar" %}{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto p-4 space-y-6">
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
 
-  <!-- Title + Quick ranges -->
-  <div class="flex items-center justify-between gap-4">
-      <h1 class="text-2xl font-semibold">📱 {% trans "Sotilgan telefonlar" %}</h1>
-
-      <!-- Quick date filters (JS bilan ishlaydi) -->
-      <div class="flex items-center gap-2">
-          <button type="button" data-range="today"
-                  class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
-              Bugun
-          </button>
-          <button type="button" data-range="7"
-                  class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
-              7 kun
-          </button>
-          <button type="button" data-range="30"
-                  class="px-3 py-1.5 rounded-lg border text-sm hover:bg-neutral-50">
-              30 kun
-          </button>
-      </div>
-  </div>
-
-  <!-- Filters -->
-  <form id="filter-form" method="get"
-        class="grid md:grid-cols-6 gap-3 bg-white border border-neutral-200 rounded-2xl p-4">
-      {% if stores %}
+  <!-- Header -->
+  <div class="bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">💰</div>
           <div>
-              <label class="text-xs text-neutral-500">Do‘kon</label>
-              <select name="store_id" class="w-full rounded-xl border p-2">
-                  <option value="">Hammasi</option>
-                  {% for s in stores %}
-                      <option value="{{ s.id }}"
-                              {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
-                          {{ s.name }}
-                      </option>
-                  {% endfor %}
-              </select>
+            <h1 class="text-3xl md:text-4xl font-bold">{% trans "Sotilgan telefonlar" %}</h1>
+            <p class="text-blue-100 text-sm md:text-base">{% trans "Savdo tarixini kuzatish va tahlil qilish" %}</p>
           </div>
-      {% endif %}
+        </div>
+        <div class="text-sm text-white/80">
+          {% trans "Jami natijalar (filtr bo‘yicha):" %} <span class="font-semibold text-white">{{ items|length }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      {% if sellers %}
+  <div class="max-w-7xl mx-auto px-4 -mt-6 pb-10 space-y-6">
+
+    <!-- Filters -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="text-xl">🔍</span>
+        <h2 class="text-lg font-bold text-slate-800">{% trans "Filtrlar" %}</h2>
+      </div>
+
+      <form id="filter-form" method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">{% trans "Do'kon" %}</label>
+          <select name="store_id" class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 bg-white">
+            <option value="">{% trans "Hammasi" %}</option>
+            {% for s in stores %}
+              <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">{% trans "Sotuvchi" %}</label>
+          <select name="seller_id" class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-purple-500 focus:ring-4 focus:ring-purple-100 bg-white">
+            <option value="">{% trans "Hammasi" %}</option>
+            {% for u in sellers %}
+              <option value="{{ u.id }}" {% if seller_id|stringformat:"s" == u.id|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">{% trans "Brend" %}</label>
+          <select name="brand" class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 bg-white">
+            <option value="">{% trans "Hammasi" %}</option>
+            {% for b in brands %}
+              <option value="{{ b.id }}" {% if brand_id|stringformat:"s" == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">{% trans "Model" %}</label>
+          <select name="model" class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 bg-white">
+            <option value="">{% trans "Hammasi" %}</option>
+            {% for m in models %}
+              <option value="{{ m.id }}" {% if model_id|stringformat:"s" == m.id|stringformat:"s" %}selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">{% trans "Sana — dan" %}</label>
+          <input id="date_from" type="date" name="date_from" value="{{ date_from }}" class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 bg-white">
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">{% trans "Sana — gacha" %}</label>
+          <input id="date_to" type="date" name="date_to" value="{{ date_to|default_if_none:'' }}" class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 bg-white">
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">{% trans "Egalik turi" %}</label>
+          <select name="ownership" class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 bg-white">
+            <option value="">{% trans "Hammasi" %}</option>
+            <option value="owned" {% if ownership == "owned" %}selected{% endif %}>🏠 {% trans "Owned" %}</option>
+            <option value="consignment" {% if ownership == "consignment" %}selected{% endif %}>🤝 {% trans "Consignment" %}</option>
+          </select>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">{% trans "To'lov turi" %}</label>
+          <select name="pay_type" class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-amber-500 focus:ring-4 focus:ring-amber-100 bg-white">
+            <option value="">{% trans "Hammasi" %}</option>
+            <option value="installment" {% if pay_type == "installment" %}selected{% endif %}>📊 {% trans "Bo'lib-bo'lib" %}</option>
+            <option value="full" {% if pay_type == "full" %}selected{% endif %}>✅ {% trans "To'liq to'lov" %}</option>
+          </select>
+        </div>
+
+        <div class="sm:col-span-2 lg:col-span-4 flex flex-col sm:flex-row gap-3 pt-2">
+          <button type="submit" class="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
+            🔍 {% trans "Filtrlash" %}
+          </button>
+          <a href="{% url 'product_sold_list' %}" class="flex-1 sm:flex-initial px-6 py-3 rounded-2xl border-2 border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 hover:scale-105 transition-all duration-300 text-center">
+            🔄 {% trans "Qayta tiklash" %}
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <!-- KPI -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="group bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+        <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Bugungi savdo (summa)" %}</div>
+        <div class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">${{ kpi_today_amount }}</div>
+      </div>
+      <div class="group bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+        <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Bugungi tan narxi (cost)" %}</div>
+        <div class="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">${{ kpi_today_cost }}</div>
+      </div>
+      <div class="group bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+        <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Bugungi foyda (profit)" %}</div>
+        <div class="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">${{ kpi_today_profit }}</div>
+      </div>
+    </div>
+
+    <!-- Analytics: Line + Donut -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6 lg:col-span-2">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+            </svg>
+          </div>
+          <h3 class="font-bold text-slate-800 text-sm">{% trans "Oxirgi 30 kun sotuvi" %}</h3>
+        </div>
+        <canvas id="soldChart" class="w-full" style="max-height: 220px;"></canvas>
+      </div>
+
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+            </svg>
+          </div>
+          <h3 class="font-bold text-slate-800 text-sm">{% trans "Egalik turi taqsimoti" %}</h3>
+        </div>
+        <div class="space-y-2 mb-4">
+          <div class="flex items-center justify-between px-3 py-2 bg-blue-50 rounded-xl">
+            <span class="text-sm text-slate-700 font-medium">🏠 {% trans "Owned" %}</span>
+            <span class="font-bold text-blue-600">{{ sold_owned_cnt }}</span>
+          </div>
+          <div class="flex items-center justify-between px-3 py-2 bg-indigo-50 rounded-xl">
+            <span class="text-sm text-slate-700 font-medium">🤝 {% trans "Consignment" %}</span>
+            <span class="font-bold text-indigo-600">{{ sold_cons_cnt }}</span>
+          </div>
+        </div>
+        <canvas id="soldDonut" style="max-height: 180px;"></canvas>
+      </div>
+    </div>
+
+    <!-- Installment Table -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+          </svg>
           <div>
-              <label class="text-xs text-neutral-500">Sotuvchi</label>
-              <select name="seller_id" class="w-full rounded-xl border p-2">
-                  <option value="">Hammasi</option>
-                  {% for u in sellers %}
-                      <option value="{{ u.id }}"
-                              {% if seller_id|stringformat:"s" == u.id|stringformat:"s" %}selected{% endif %}>
-                          {{ u.username }}
-                      </option>
-                  {% endfor %}
-              </select>
+            <h2 class="text-white font-bold text-lg">{% trans "Bo'lib-bo'lib sotilganlar" %}</h2>
+            <p class="text-amber-100 text-sm">{% trans "Bo'lib-bo'lib sotuvlar ro'yxati" %}</p>
           </div>
-      {% endif %}
-
-      <div>
-          <label class="text-xs text-neutral-500">Brend</label>
-          <select name="brand" class="w-full rounded-xl border p-2">
-              <option value="">Hammasi</option>
-              {% for b in brands %}
-                  <option value="{{ b.id }}"
-                          {% if brand_id|stringformat:"s" == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
-              {% endfor %}
-          </select>
+        </div>
       </div>
 
-      <div>
-          <label class="text-xs text-neutral-500">Model</label>
-          <select name="model" class="w-full rounded-xl border p-2">
-              <option value="">Hammasi</option>
-              {% for m in models %}
-                  <option value="{{ m.id }}"
-                          {% if model_id|stringformat:"s" == m.id|stringformat:"s" %}selected{% endif %}>{{ m.name }}</option>
-              {% endfor %}
-          </select>
-      </div>
-
-      <div>
-          <label class="text-xs text-neutral-500">Sana — dan</label>
-          <input id="date_from" type="date" name="date_from" value="{{ date_from }}"
-                 class="w-full rounded-xl border p-2">
-      </div>
-      <div>
-          <label class="text-xs text-neutral-500">Sana — gacha</label>
-          <input id="date_to" type="date" name="date_to" value="{{ date_to|default_if_none:'' }}"
-                 class="w-full rounded-xl border p-2">
-      </div>
-
-      <div class="md:col-span-6 flex items-end justify-end">
-          <button class="px-4 py-2 rounded-xl bg-black text-white">Filtrlash</button>
-          <a href="{% url 'product_sold_list' %}" class="ml-2 px-4 py-2 rounded-xl border">Reset</a>
-      </div>
-  </form>
-
-  <!-- TODAY KPI cards (computed client-side from #sold-rows) -->
-  <div class="grid sm:grid-cols-3 gap-4">
-      <div class="rounded-2xl border bg-white p-4">
-          <div class="text-xs text-neutral-500">Bugungi savdo (summa)</div>
-          <div id="kpi-today-amount" class="text-2xl font-semibold mt-1">–</div>
-      </div>
-      <div class="rounded-2xl border bg-white p-4">
-          <div class="text-xs text-neutral-500">Bugungi tan narxi (cost)</div>
-          <div id="kpi-today-cost" class="text-2xl font-semibold mt-1 text-amber-600">–</div>
-      </div>
-      <div class="rounded-2xl border bg-white p-4">
-          <div class="text-xs text-neutral-500">Bugungi foyda (profit)</div>
-          <div id="kpi-today-profit" class="text-2xl font-semibold mt-1 text-emerald-700">–</div>
-      </div>
-  </div>
-
-  <!-- MINI ANALYTICS (30 days) -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-    <div class="bg-white border rounded-2xl p-4">
-      <div class="text-xs text-neutral-500">Oxirgi 30 kun sotuv summasi (lin.)</div>
-      <canvas id="soldChart"></canvas>
-      <script id="soldLabels" type="application/json">{{ sold_labels_json|safe }}</script>
-      <script id="soldAmounts" type="application/json">{{ sold_amounts_json|safe }}</script>
-    </div>
-    <div class="bg-white border rounded-2xl p-4">
-      <div class="text-xs text-neutral-500">Ownership bo‘yicha taqsimot</div>
-      <div class="mt-2 text-sm">
-        <div class="flex items-center justify-between"><span>Owned</span><span class="font-semibold">{{ sold_owned_cnt }}</span></div>
-        <div class="flex items-center justify-between"><span>Consignment</span><span class="font-semibold">{{ sold_cons_cnt }}</span></div>
-      </div>
-      <canvas id="soldDonut" class="mt-2"></canvas>
-      <script type="application/json" id="soldDonutData">[{{ sold_owned_cnt|default:0 }}, {{ sold_cons_cnt|default:0 }}]</script>
-    </div>
-    <div class="bg-white border rounded-2xl p-4">
-      <div class="text-xs text-neutral-500">Installment va Full-paid soni</div>
-      <div class="mt-2 text-sm">
-        <div class="flex items-center justify-between text-amber-700"><span>Installment</span><span class="font-semibold">{{ installment_rows|length }}</span></div>
-        <div class="flex items-center justify-between text-emerald-700"><span>Full-paid</span><span class="font-semibold">{{ full_rows|length }}</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MAIN TABLE: All sold rows (for KPI calc too) -->
-  <div class="bg-white border rounded-2xl">
-    <div class="px-4 py-3 border-b bg-neutral-50 rounded-t-2xl">
-      <div class="font-semibold">{% trans "Barcha sotilganlar" %}</div>
-      <div class="text-sm text-neutral-600">{% trans "KPI kartalar shu jadvaldan hisoblanadi" %}</div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="min-w-full text-sm">
-        <thead class="bg-neutral-100">
-          <tr>
-            <th class="text-left px-3 py-2">{% trans "Product" %}</th>
-            <th class="text-left px-3 py-2">{% trans "Store (owner)" %}</th>
-            <th class="text-left px-3 py-2">{% trans "Sold at" %}</th>
-            <th class="text-right px-3 py-2">{% trans "Amount" %}</th>
-            <th class="text-right px-3 py-2">{% trans "Cost" %}</th>
-            <th class="text-right px-3 py-2">{% trans "Profit" %}</th>
-            <th class="text-left px-3 py-2">{% trans "Kim sotdi" %}</th>
-            <th class="text-left px-3 py-2">{% trans "Qaysi do‘kon" %}</th>
-            <th class="text-right px-3 py-2">{% trans "Actions" %}</th>
-          </tr>
-        </thead>
-        <tbody id="sold-rows" class="divide-y">
-          {% for r in rows %}
-          {% with p=r.obj %}
-          <tr data-date="{{ r.sold_date }}" data-amount="{{ r.amount }}" data-cost="{{ r.cost }}" data-profit="{{ r.profit }}">
-            <td class="px-3 py-2">
-              {{ p.brand.name }} {{ p.model.name }}
-              {% if p.imei_full %}<span class="text-xs text-neutral-500">({{ p.imei_full }})</span>{% endif %}
-            </td>
-            <td class="px-3 py-2">{{ p.store.name }}</td>
-            <td class="px-3 py-2">
-              {% if p.sold_at %}{{ p.sold_at|date:"Y-m-d H:i" }}{% else %}-{% endif %}
-            </td>
-            <td class="px-3 py-2 text-right">{{ p.price|default:0|usd }}</td>
-            <td class="px-3 py-2 text-right">{{ r.cost|floatformat:2 }}</td>
-            <td class="px-3 py-2 text-right">{{ r.profit|floatformat:2 }}</td>
-            <td class="px-3 py-2">
-              {% if r.sold_by %}
-                {{ r.sold_by.get_full_name|default:r.sold_by.username }}
-              {% else %}-{% endif %}
-            </td>
-            <td class="px-3 py-2">
-              {% if r.sold_in_store %}
-                {{ r.sold_in_store.name }}
-              {% else %}-{% endif %}
-            </td>
-            <td class="px-3 py-2 text-right">
-                                    {% if user.is_owner or user.store_id == p.store_id %}
-                                      <form method="post"
-                                            action="{% url 'sale_return_product' p.id %}"
-                                            onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
-                                            class="inline">
-                                          {% csrf_token %}
-                                          <button type="submit"
-                                                  class="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">
-                                            {% trans "Qaytarish" %}
-                                          </button>
-                                      </form>
-                                    {% else %}
-                                      <span class="text-neutral-400">—</span>
-                                    {% endif %}
-            </td>
-          </tr>
-          {% endwith %}
-          {% empty %}
-          <tr><td class="px-3 py-4 text-center text-neutral-500" colspan="8">{% trans "Ma’lumot yo‘q" %}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Installment -->
-  <div class="bg-white border rounded-2xl">
-      <div class="px-4 py-3 border-b bg-amber-50 rounded-t-2xl">
-          <div class="font-semibold">{% trans "Installment sales" %}</div>
-          <div class="text-sm text-amber-700">{% trans "These products were sold on installment" %}</div>
-      </div>
       <div class="overflow-x-auto">
-          <table class="min-w-full text-sm">
-              <thead class="bg-amber-100 text-amber-900">
-              <tr>
-                  <th class="text-left px-3 py-2">{% trans "Product" %}</th>
-                  <th class="text-left px-3 py-2">{% trans "Store" %}</th>
-                  <th class="text-left px-3 py-2">{% trans "Sold at" %}</th>
-                  <th class="text-right px-3 py-2">{% trans "Purchase/Consignment" %}</th>
-                  <th class="text-right px-3 py-2">{% trans "Actions" %}</th>
+        <table class="min-w-full">
+          <thead class="bg-amber-50">
+            <tr>
+              <th class="text-left px-4 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider">📱 {% trans "Mahsulot" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider">🏪 {% trans "Do'kon" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider">👤 {% trans "Sotgan" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider">📅 {% trans "Sotilgan vaqti" %}</th>
+              <th class="text-right px-4 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider">💰 {% trans "Tan narx" %}</th>
+              <th class="text-right px-4 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider">⚙️ {% trans "Amallar" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-amber-100">
+            {% for p in installment_rows %}
+              <tr class="hover:bg-amber-50 transition-colors">
+                <td class="px-4 py-3">
+                  <a class="hover:underline font-semibold text-slate-800" href="{% url 'product_detail' p.id %}">
+                    {{ p.brand.name }} {{ p.model.name }}
+                  </a>
+                  {% if p.imei_last4 %}
+                    <span class="text-xs text-slate-500 font-mono ml-1">({{ p.imei_last4 }})</span>
+                  {% endif %}
+                  <div class="mt-1">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">📊 {% trans "Bo'lib-bo'lib" %}</span>
+                    {% if p.ownership == "consignment" %}
+                      <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">🤝 {% trans "Consignment" %}</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.store.name }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">
+                  {% with tx=p.transaction_set.all|dictsortreversed:"created_at"|first %}
+                    {% if tx and tx.1.sold_by %}{{ tx.1.sold_by.get_full_name|default:tx.1.sold_by.username }}{% else %}-{% endif %}
+                  {% endwith %}
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.sold_at|date:"d.m.Y H:i" }}</td>
+                <td class="px-4 py-3 text-right font-bold text-amber-600">
+                  {% if p.ownership == "owned" %}${{ p.purchase_price|floatformat:2 }}{% else %}${{ p.consignment_price|floatformat:2 }}{% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  {% if user.is_owner or user.store_id == p.store_id %}
+                    <form method="post" action="{% url 'sales:sale_return_product' p.id %}"
+                          onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
+                          class="inline">
+                      {% csrf_token %}
+                      <button type="submit" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 hover:scale-105">
+                        🔄 {% trans "Qaytarish" %}
+                      </button>
+                    </form>
+                  {% else %}
+                    <span class="text-slate-400">—</span>
+                  {% endif %}
+                </td>
               </tr>
-              </thead>
-              <tbody>
-              {% for p in installment_rows %}
-                  <tr class="border-b last:border-0">
-                      <td class="px-3 py-2">{{ p.brand.name }} {{ p.model.name }} {% if p.imei_last4 %}<span class="text-xs text-neutral-500">({{ p.imei_last4 }})</span>{% endif %}</td>
-                      <td class="px-3 py-2">{{ p.store.name }}</td>
-                      <td class="px-3 py-2">{{ p.sold_at|date:"Y-m-d H:i" }}</td>
-                      <td class="px-3 py-2 text-right">
-                          {% if p.ownership == "owned" %}
-                              {{ p.purchase_price|usd }}
-                          {% else %}
-                              {{ p.consignment_price|usd }}
-                          {% endif %}
-                      </td>
-                      <td class="px-3 py-2 text-right">
-                                    {% if user.is_owner or user.store_id == p.store_id %}
-                                      <form method="post"
-                                            action="{% url 'sale_return_product' p.id %}"
-                                            onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
-                                            class="inline">
-                                          {% csrf_token %}
-                                          <button type="submit"
-                                                  class="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">
-                                            {% trans "Qaytarish" %}
-                                          </button>
-                                      </form>
-                                    {% else %}
-                                      <span class="text-neutral-400">—</span>
-                                    {% endif %}
-                      </td>
-                  </tr>
-              {% empty %}
-                  <tr>
-                      <td class="px-3 py-4 text-neutral-500" colspan="4">{% trans "No installment sales" %}</td>
-                  </tr>
-              {% endfor %}
-              </tbody>
-          </table>
+            {% empty %}
+              <tr>
+                <td class="px-4 py-12 text-center text-slate-500" colspan="6">
+                  <div class="text-6xl mb-3">📊</div>
+                  <p class="font-medium">{% trans "Bo'lib-bo'lib sotuv yo'q" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-  </div>
+    </div>
 
-  <!-- Full paid -->
-  <div class="bg-white border rounded-2xl">
-      <div class="px-4 py-3 border-b bg-emerald-50 rounded-t-2xl">
-          <div class="font-semibold">{% trans "Fully paid sales" %}</div>
-          <div class="text-sm text-emerald-700">{% trans "Products sold with full payment" %}</div>
+    <!-- Full Payment Table -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <div>
+            <h2 class="text-white font-bold text-lg">{% trans "To'liq to'lovli sotuvlar" %}</h2>
+            <p class="text-emerald-100 text-sm">{% trans "To'liq to'lov bilan sotilgan mahsulotlar" %}</p>
+          </div>
+        </div>
       </div>
+
       <div class="overflow-x-auto">
-          <table class="min-w-full text-sm">
-              <thead class="bg-emerald-100 text-emerald-900">
-              <tr>
-                  <th class="text-left px-3 py-2">{% trans "Product" %}</th>
-                  <th class="text-left px-3 py-2">{% trans "Store" %}</th>
-                  <th class="text-left px-3 py-2">{% trans "Sold at" %}</th>
-                  <th class="text-right px-3 py-2">{% trans "Purchase/Consignment" %}</th>
-                  <th class="text-right px-3 py-2">{% trans "Actions" %}</th>
+        <table class="min-w-full">
+          <thead class="bg-emerald-50">
+            <tr>
+              <th class="text-left px-4 py-3 text-xs font-bold text-emerald-700 uppercase tracking-wider">📱 {% trans "Mahsulot" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-emerald-700 uppercase tracking-wider">🏪 {% trans "Do'kon" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-emerald-700 uppercase tracking-wider">👤 {% trans "Sotgan" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-emerald-700 uppercase tracking-wider">📅 {% trans "Sotilgan vaqti" %}</th>
+              <th class="text-right px-4 py-3 text-xs font-bold text-emerald-700 uppercase tracking-wider">💰 {% trans "Tan narx" %}</th>
+              <th class="text-right px-4 py-3 text-xs font-bold text-emerald-700 uppercase tracking-wider">⚙️ {% trans "Amallar" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-emerald-100">
+            {% for p in full_rows %}
+              <tr class="hover:bg-emerald-50 transition-colors">
+                <td class="px-4 py-3">
+                  <a class="hover:underline font-semibold text-slate-800" href="{% url 'product_detail' p.id %}">
+                    {{ p.brand.name }} {{ p.model.name }}
+                  </a>
+                  {% if p.imei_last4 %}
+                    <span class="text-xs text-slate-500 font-mono ml-1">({{ p.imei_last4 }})</span>
+                  {% endif %}
+                  <div class="mt-1">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✅ {% trans "To'liq to'lov" %}</span>
+                    {% if p.ownership == "consignment" %}
+                      <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">🤝 {% trans "Consignment" %}</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.store.name }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">
+                  {% with tx=p.transaction_set.all|dictsortreversed:"created_at"|first %}
+                    {% if tx and tx.1.sold_by %}{{ tx.1.sold_by.get_full_name|default:tx.1.sold_by.username }}{% else %}-{% endif %}
+                  {% endwith %}
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.sold_at|date:"d.m.Y H:i" }}</td>
+                <td class="px-4 py-3 text-right font-bold text-emerald-600">
+                  {% if p.ownership == "owned" %}${{ p.purchase_price|floatformat:2 }}{% else %}${{ p.consignment_price|floatformat:2 }}{% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  {% if user.is_owner or user.store_id == p.store_id %}
+                    <form method="post" action="{% url 'sales:sale_return_product' p.id %}"
+                          onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
+                          class="inline">
+                      {% csrf_token %}
+                      <button type="submit" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 hover:scale-105">
+                        🔄 {% trans "Qaytarish" %}
+                      </button>
+                    </form>
+                  {% else %}
+                    <span class="text-slate-400">—</span>
+                  {% endif %}
+                </td>
               </tr>
-              </thead>
-              <tbody>
-              {% for p in full_rows %}
-                  <tr class="border-b last:border-0">
-                      <td class="px-3 py-2">{{ p.brand.name }} {{ p.model.name }} {% if p.imei_last4 %}<span class="text-xs text-neutral-500">({{ p.imei_last4 }})</span>{% endif %}</td>
-                      <td class="px-3 py-2">{{ p.store.name }}</td>
-                      <td class="px-3 py-2">{{ p.sold_at|date:"Y-m-d H:i" }}</td>
-                      <td class="px-3 py-2 text-right">
-                          {% if p.ownership == "owned" %}
-                              {{ p.purchase_price|usd }}
-                          {% else %}
-                              {{ p.consignment_price|usd }}
-                          {% endif %}
-                      </td>
-                      <td class="px-3 py-2 text-right">
-                                    {% if user.is_owner or user.store_id == p.store_id %}
-                                      <form method="post"
-                                            action="{% url 'sale_return_product' p.id %}"
-                                            onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
-                                            class="inline">
-                                          {% csrf_token %}
-                                          <button type="submit"
-                                                  class="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">
-                                            {% trans "Qaytarish" %}
-                                          </button>
-                                      </form>
-                                    {% else %}
-                                      <span class="text-neutral-400">—</span>
-                                    {% endif %}
-                      </td>
-                  </tr>
-              {% empty %}
-                  <tr>
-                      <td class="px-3 py-4 text-neutral-500" colspan="4">{% trans "No full-paid sales" %}</td>
-                  </tr>
-              {% endfor %}
-              </tbody>
-          </table>
+            {% empty %}
+              <tr>
+                <td class="px-4 py-12 text-center text-slate-500" colspan="6">
+                  <div class="text-6xl mb-3">✅</div>
+                  <p class="font-medium">{% trans "To'liq to'lov bilan sotuv yo'q" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-  </div>
+    </div>
 
+    <!-- All Sold (rows) -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+          </svg>
+          <div>
+            <h2 class="text-white font-bold text-lg">{% trans "Barcha sotilganlar (detallangan)" %}</h2>
+            <p class="text-slate-300 text-sm">{% trans "KPI va grafiklar shu ro'yxat asosida hisoblanadi" %}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">📱 {% trans "Mahsulot" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">🏪 {% trans "Do'kon" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">📅 {% trans "Sana" %}</th>
+              <th class="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">💵 {% trans "Summa" %}</th>
+              <th class="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">💰 {% trans "Tan narx" %}</th>
+              <th class="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">📈 {% trans "Foyda" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">👤 {% trans "Sotgan" %}</th>
+              <th class="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">🏪 {% trans "Sotilgan do'kon" %}</th>
+              <th class="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">⚙️ {% trans "Amallar" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for r in rows %}
+              {% with p=r.obj %}
+              <tr class="hover:bg-blue-50 transition-colors">
+                <td class="px-4 py-3">
+                  <a class="hover:underline font-semibold text-slate-800" href="{% url 'product_detail' p.id %}">
+                    {{ p.brand.name }} {{ p.model.name }}
+                  </a>
+                  {% if p.imei_last4 %}
+                    <span class="text-xs text-slate-500 font-mono ml-1">({{ p.imei_last4 }})</span>
+                  {% endif %}
+                  <div class="flex items-center gap-1 mt-1">
+                    {% if r.is_installment %}
+                      <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">📊 {% trans "Bo'lib-bo'lib" %}</span>
+                    {% endif %}
+                    {% if p.ownership == "consignment" %}
+                      <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">🤝 {% trans "Consignment" %}</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.store.name }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.sold_date }}</td>
+                <td class="px-4 py-3 text-right font-bold text-blue-600">${{ r.amount|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-bold text-amber-600">${{ r.cost|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-bold text-emerald-600">${{ r.profit|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">
+                  {% if r.sold_by %}
+                    {{ r.sold_by.get_full_name|default:r.sold_by.username }}
+                  {% else %}-{% endif %}
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700">
+                  {% if r.sold_in_store %}{{ r.sold_in_store.name }}{% else %}-{% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  {% if user.is_owner or user.store_id == p.store_id %}
+                    <form method="post" action="{% url 'sales:sale_return_product' p.id %}"
+                          onsubmit="return confirm('{% trans 'Sotuvni qaytarishni tasdiqlaysizmi?' %}')"
+                          class="inline">
+                      {% csrf_token %}
+                      <button type="submit" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 hover:scale-105">
+                        🔄 {% trans "Qaytarish" %}
+                      </button>
+                    </form>
+                  {% else %}
+                    <span class="text-slate-400">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endwith %}
+            {% empty %}
+              <tr>
+                <td class="px-4 py-12 text-center text-slate-500" colspan="9">
+                  <div class="text-6xl mb-3">📦</div>
+                  <p class="font-medium">{% trans "Ma'lumot yo'q" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 </div>
 
-<script>
-  // Quick ranges
-  (function () {
-      const fmt = (d) => d.toISOString().slice(0, 10);
-      const $from = document.getElementById('date_from');
-      const $to = document.getElementById('date_to');
-      const $form = document.getElementById('filter-form');
-
-      document.querySelectorAll('[data-range]').forEach(btn => {
-          btn.addEventListener('click', () => {
-              const today = new Date();
-              const kind = btn.getAttribute('data-range');
-              let start = new Date(today);
-
-              if (kind === 'today') {
-                  // start = today
-              } else {
-                  const days = parseInt(kind, 10);
-                  start.setDate(today.getDate() - (days - 1));
-              }
-              $from.value = fmt(start);
-              $to.value = fmt(today);
-              $form.submit();
-          });
-      });
-
-      // KPI from table rows
-      const todayStr = (new Date()).toISOString().slice(0, 10);
-      let amt = 0, cost = 0, profit = 0;
-      document.querySelectorAll('#sold-rows tr').forEach(tr => {
-          if (tr.dataset.date === todayStr) {
-              amt += parseFloat(tr.dataset.amount || 0);
-              cost += parseFloat(tr.dataset.cost || 0);
-              profit += parseFloat(tr.dataset.profit || 0);
-          }
-      });
-      const nf = (n) => (isNaN(n) ? '–' : n.toLocaleString());
-      const a = document.getElementById('kpi-today-amount');
-      const c = document.getElementById('kpi-today-cost');
-      const p = document.getElementById('kpi-today-profit');
-      if (a) a.textContent = nf(amt);
-      if (c) c.textContent = nf(cost);
-      if (p) p.textContent = nf(profit);
-  })();
-</script>
-<!-- Chart.js faqat shu sahifada -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
 (function(){
+  // Parse data provided by view
   const L = JSON.parse(document.getElementById('soldLabels').textContent);
   const V = JSON.parse(document.getElementById('soldAmounts').textContent);
-  new Chart(document.getElementById('soldChart').getContext('2d'), {
+
+  // Line chart
+  const lineCtx = document.getElementById('soldChart').getContext('2d');
+  new Chart(lineCtx, {
     type: 'line',
-    data: { labels: L, datasets: [{ label: 'Sales', data: V, tension: .25 }] }
+    data: {
+      labels: L,
+      datasets: [{
+        label: '{% trans "Sotuv summasi (USD)" %}',
+        data: V,
+        fill: true,
+        borderWidth: 3,
+        tension: 0.35,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: function(context) {
+          const chart = context.chart;
+          const {ctx, chartArea} = chart;
+          if (!chartArea) return null;
+          const g = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+          g.addColorStop(0, 'rgba(59, 130, 246, 0.05)');
+          g.addColorStop(1, 'rgba(6, 182, 212, 0.25)');
+          return g;
+        },
+        pointBackgroundColor: 'rgb(59,130,246)',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 3.5,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          padding: 10,
+          borderRadius: 10,
+          callbacks: {
+            label: (ctx) => '💵 ' + ctx.parsed.y.toFixed(2)
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false },
+          ticks: { callback: (v) => '$' + v }
+        }
+      }
+    }
   });
 
+  // Donut chart
   const D = JSON.parse(document.getElementById('soldDonutData').textContent);
-  new Chart(document.getElementById('soldDonut').getContext('2d'), {
+  const donutCtx = document.getElementById('soldDonut').getContext('2d');
+  new Chart(donutCtx, {
     type: 'doughnut',
-    data: { labels: ['Owned','Consignment'], datasets: [{ data: D }] }
+    data: {
+      labels: ['{% trans "Owned" %}', '{% trans "Consignment" %}'],
+      datasets: [{
+        data: D,
+        backgroundColor: ['rgb(59,130,246)', 'rgb(99,102,241)'],
+        borderWidth: 0,
+        hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { padding: 14, font: { size: 11, weight: 'bold' }, usePointStyle: true, pointStyle: 'circle' }
+        },
+        tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 10, borderRadius: 10 }
+      },
+      cutout: '65%'
+    }
+  });
+
+  // Quick range helper (optional buttons can be added in header if needed)
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const $from = document.getElementById('date_from');
+  const $to = document.getElementById('date_to');
+  const $form = document.getElementById('filter-form');
+  document.querySelectorAll('[data-range]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const today = new Date();
+      const kind = btn.getAttribute('data-range');
+      let start = new Date(today);
+      if (kind !== 'today') {
+        const days = parseInt(kind, 10);
+        start.setDate(today.getDate() - (days - 1));
+      }
+      if ($from && $to) {
+        $from.value = fmt(start);
+        $to.value = fmt(today);
+        $form && $form.submit();
+      }
+    });
   });
 })();
 </script>
+
+<!-- Data from view -->
+<script id="soldLabels" type="application/json">{{ sold_labels_json|safe }}</script>
+<script id="soldAmounts" type="application/json">{{ sold_amounts_json|safe }}</script>
+<script id="soldDonutData" type="application/json">[{{ sold_owned_cnt|default:0 }}, {{ sold_cons_cnt|default:0 }}]</script>
+
+<style>
+  /* Smooth scrollbar */
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:#f1f5f9;border-radius:10px}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(135deg,#3b82f6,#06b6d4);border-radius:10px}
+  ::-webkit-scrollbar-thumb:hover{background:linear-gradient(135deg,#2563eb,#0891b2)}
+  tbody tr{transition:all .2s ease}
+  tbody tr:hover{transform:scale(1.01)}
+</style>
 {% endblock %}

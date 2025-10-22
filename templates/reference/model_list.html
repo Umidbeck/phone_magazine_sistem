@@ -1,28 +1,487 @@
-# reference/model_list.html
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Models" %}{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Model ro'yxati" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #fafafa;
+        min-height: 100vh;
+    }
+
+    .list-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    /* Page Header */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: #262626;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .title-icon {
+        font-size: 32px;
+    }
+
+    .add-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    }
+
+    .add-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+
+    .add-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Stats Bar */
+    .stats-bar {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .stat-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 10px;
+        font-size: 13px;
+        color: #737373;
+    }
+
+    .stat-badge strong {
+        color: #262626;
+        font-size: 16px;
+    }
+
+    /* Table Card */
+    .table-card {
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    }
+
+    th {
+        padding: 16px 20px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    tbody tr {
+        border-bottom: 1px solid #f3f4f6;
+        transition: background 0.2s;
+    }
+
+    tbody tr:hover {
+        background: #f9fafb;
+    }
+
+    tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    td {
+        padding: 16px 20px;
+        font-size: 14px;
+        color: #374151;
+    }
+
+    .brand-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: #262626;
+    }
+
+    .brand-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .model-name {
+        font-weight: 600;
+        color: #262626;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .status-badge svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .status-active {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-inactive {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .actions-cell {
+        text-align: right;
+    }
+
+    .edit-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: #fff;
+        border: 1px solid #dbdbdb;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #262626;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .edit-btn:hover {
+        background: #f9f9f9;
+        border-color: #8b5cf6;
+        color: #8b5cf6;
+    }
+
+    .edit-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Empty State */
+    .empty-state {
+        padding: 80px 20px;
+        text-align: center;
+    }
+
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+        opacity: 0.3;
+        stroke: #9ca3af;
+    }
+
+    .empty-state-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #6b7280;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-text {
+        font-size: 14px;
+        color: #9ca3af;
+        margin-bottom: 20px;
+    }
+
+    .empty-state-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    }
+
+    .empty-state-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+
+    .empty-state-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .list-container {
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 22px;
+        }
+
+        .title-icon {
+            font-size: 26px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .add-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .table-wrapper {
+            margin: 0 -16px;
+        }
+
+        table {
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 12px 16px;
+        }
+
+        .brand-icon {
+            width: 28px;
+            height: 28px;
+            font-size: 12px;
+        }
+
+        .actions-cell {
+            text-align: left;
+        }
+
+        .empty-state {
+            padding: 60px 20px;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+        }
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    tbody tr {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    tbody tr:nth-child(1) { animation-delay: 0.05s; }
+    tbody tr:nth-child(2) { animation-delay: 0.1s; }
+    tbody tr:nth-child(3) { animation-delay: 0.15s; }
+    tbody tr:nth-child(4) { animation-delay: 0.2s; }
+    tbody tr:nth-child(5) { animation-delay: 0.25s; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="p-3 space-y-3">
-  <a href="{% url 'model_new' %}" class="px-3 py-2 rounded bg-black text-white">{% trans "Add model" %}</a>
-  <div class="bg-white border rounded-xl">
-    <table class="w-full text-sm">
-      <thead><tr class="text-left border-b">
-        <th class="p-2">{% trans "Brand" %}</th><th class="p-2">{% trans "Model" %}</th><th class="p-2">{% trans "Active" %}</th><th class="p-2"></th>
-      </tr></thead>
-      <tbody>
-        {% for m in items %}
-          <tr class="border-b">
-            <td class="p-2">{{ m.brand.name }}</td>
-            <td class="p-2">{{ m.name }}</td>
-            <td class="p-2">{{ m.is_active }}</td>
-            <td class="p-2"><a class="text-xs px-2 py-1 border rounded" href="{% url 'model_edit' m.id %}">{% trans "Edit" %}</a></td>
-          </tr>
-        {% empty %}
-          <tr><td class="p-2 text-sm text-gray-500" colspan="4">{% trans "No items" %}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="h-24"></div>
+<div class="list-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">
+            <span class="title-icon">📱</span>
+            {% trans "Model ro'yxati" %}
+        </h1>
+
+        <a href="{% url 'model_new' %}" class="add-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            {% trans "Yangi model" %}
+        </a>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="9" y1="9" x2="15" y2="9"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+            {% trans "Jami:" %}
+            <strong>{{ items|length }}</strong>
+        </div>
+
+        <div class="stat-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            {% trans "Faol:" %}
+            <strong>{{ items|length }}</strong>
+        </div>
+    </div>
+
+    <!-- Table Card -->
+    <div class="table-card">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Brend" %}</th>
+                        <th>{% trans "Model" %}</th>
+                        <th>{% trans "Holat" %}</th>
+                        <th style="text-align: right;">{% trans "Amallar" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in items %}
+                    <tr>
+                        <td>
+                            <div class="brand-name">
+                                <div class="brand-icon">
+                                    {{ m.brand.name|slice:":1"|upper }}
+                                </div>
+                                {{ m.brand.name }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="model-name">{{ m.name }}</div>
+                        </td>
+                        <td>
+                            {% if m.is_active %}
+                            <span class="status-badge status-active">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                                {% trans "Faol" %}
+                            </span>
+                            {% else %}
+                            <span class="status-badge status-inactive">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="15" y1="9" x2="9" y2="15"/>
+                                    <line x1="9" y1="9" x2="15" y2="15"/>
+                                </svg>
+                                {% trans "Nofaol" %}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="actions-cell">
+                            <a href="{% url 'model_edit' m.id %}" class="edit-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                {% trans "Tahrirlash" %}
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                <div class="empty-state-title">{% trans "Modellar topilmadi" %}</div>
+                                <p class="empty-state-text">{% trans "Hozircha birorta model qo'shilmagan" %}</p>
+                                <a href="{% url 'model_new' %}" class="empty-state-btn">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"/>
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                    </svg>
+                                    {% trans "Birinchi modelni qo'shish" %}
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}

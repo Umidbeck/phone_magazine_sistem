@@ -1,67 +1,439 @@
-# inventor/search.html
-{% extends "base.html" %}{% load i18n %}
-{% block title %}{% trans "Search" %} · PhoneStore{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Qidiruv" %} · PhoneStore{% endblock %}
+
 {% block content %}
-<div class="py-4 space-y-4">
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50">
 
-  <form method="get" class="card p-4 space-y-3">
-    <div class="flex gap-2 items-center">
-      <input name="q" value="{{ q }}" placeholder="{% trans 'IMEI (last 4), brand, model' %}" class="flex-1 border rounded-xl px-3 py-2">
-      <button class="btn btn-primary">{% trans "Search" %}</button>
-    </div>
-
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-      <select name="store_id" class="border rounded-xl px-3 py-2 {% if not request.user.is_owner %}opacity-50 pointer-events-none{% endif %}">
-        <option value="">{% trans "All stores" %}</option>
-        {% for s in stores %}
-          <option value="{{ s.id }}" {% if store_id|default:''|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-        {% endfor %}
-      </select>
-      <select name="brand" class="border rounded-xl px-3 py-2">
-        <option value="">{% trans "All brands" %}</option>
-        {% for b in brands %}
-          <option value="{{ b.id }}" {% if brand_id|default:''|stringformat:"s" == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
-        {% endfor %}
-      </select>
-      <select name="model" class="border rounded-xl px-3 py-2">
-        <option value="">{% trans "All models" %}</option>
-        {% for m in models %}
-          <option value="{{ m.id }}" {% if model_id|default:''|stringformat:"s" == m.id|stringformat:"s" %}selected{% endif %}>{{ m.brand.name }} {{ m.name }}</option>
-        {% endfor %}
-      </select>
-      <select name="status" class="border rounded-xl px-3 py-2">
-        <option value="">{% trans "Any status" %}</option>
-        <option value="available" {% if status == "available" %}selected{% endif %}>{% trans "Available" %}</option>
-        <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>{% trans "On repair" %}</option>
-        <option value="sold" {% if status == "sold" %}selected{% endif %}>{% trans "Sold" %}</option>
-      </select>
-      <select name="ownership" class="border rounded-xl px-3 py-2">
-        <option value="">{% trans "Any ownership" %}</option>
-        <option value="owned" {% if ownership == "owned" %}selected{% endif %}>{% trans "Owned" %}</option>
-        <option value="consignment" {% if ownership == "consignment" %}selected{% endif %}>{% trans "Consignment" %}</option>
-      </select>
-      <input type="date" name="date_from" value="{{ date_from }}" class="border rounded-xl px-3 py-2">
-      <input type="date" name="date_to" value="{{ date_to }}" class="border rounded-xl px-3 py-2">
-      <input type="number" step="0.01" name="price_min" value="{{ price_min }}" class="border rounded-xl px-3 py-2" placeholder="{% trans 'Min price' %}">
-      <input type="number" step="0.01" name="price_max" value="{{ price_max }}" class="border rounded-xl px-3 py-2" placeholder="{% trans 'Max price' %}">
-    </div>
-  </form>
-
-  <div class="space-y-2">
-    {% for p in results %}
-      <div class="card p-3">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <div class="text-sm font-semibold">{{ p.brand.name }} {{ p.model.name }}</div>
-            <div class="text-xs text-neutral-500">IMEI: {{ p.imei_full }} · {{ p.store.name }}</div>
-            <div class="text-xs text-neutral-500">{% trans "Status" %}: {{ p.status }}</div>
-          </div>
-          <a href="{% url 'product_detail' p.id %}" class="btn btn-ghost">{% trans "Details" %}</a>
+  <!-- Header with gradient -->
+  <div class="bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">
+          🔍
+        </div>
+        <div>
+          <h1 class="text-3xl md:text-4xl font-bold">{% trans "Qidiruv" %}</h1>
+          <p class="text-purple-100 text-sm md:text-base">{% trans "Telefonlarni toping" %}</p>
         </div>
       </div>
-    {% empty %}
-      {% if q %}<div class="text-center text-sm text-neutral-500">{% trans "No results" %}</div>{% endif %}
-    {% endfor %}
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 -mt-6 pb-8 space-y-6">
+
+    <!-- Search Form -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-2xl rounded-3xl p-6">
+      <form method="get" class="space-y-5">
+
+        <!-- Main Search Bar -->
+        <div class="flex flex-col sm:flex-row gap-3">
+          <div class="relative flex-1">
+            <div class="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+            </div>
+            <input
+              name="q"
+              value="{{ q }}"
+              placeholder="{% trans 'IMEI (oxirgi 4 ta), brend, model' %}"
+              class="w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-2xl text-sm focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all bg-white"
+              autofocus
+            >
+          </div>
+          <button type="submit" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300 whitespace-nowrap">
+            🔍 {% trans "Qidirish" %}
+          </button>
+        </div>
+
+        <!-- Advanced Filters -->
+        <div class="space-y-4">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <span class="text-lg">⚙️</span>
+            <span>{% trans "Qo'shimcha filtrlar" %}</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <!-- Store Filter -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>🏪</span>
+                <span>{% trans "Do'kon" %}</span>
+              </label>
+              <select
+                name="store_id"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all bg-white {% if not request.user.is_owner %}opacity-50 cursor-not-allowed{% endif %}"
+                {% if not request.user.is_owner %}disabled{% endif %}
+              >
+                <option value="">{% trans "Barcha do'konlar" %}</option>
+                {% for s in stores %}
+                  <option value="{{ s.id }}" {% if store_id|default:''|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
+                    {{ s.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Brand Filter -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>📱</span>
+                <span>{% trans "Brend" %}</span>
+              </label>
+              <select
+                name="brand"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all bg-white"
+              >
+                <option value="">{% trans "Barcha brendlar" %}</option>
+                {% for b in brands %}
+                  <option value="{{ b.id }}" {% if brand_id|default:''|stringformat:"s" == b.id|stringformat:"s" %}selected{% endif %}>
+                    {{ b.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Model Filter -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>📲</span>
+                <span>{% trans "Model" %}</span>
+              </label>
+              <select
+                name="model"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all bg-white"
+              >
+                <option value="">{% trans "Barcha modellar" %}</option>
+                {% for m in models %}
+                  <option value="{{ m.id }}" {% if model_id|default:''|stringformat:"s" == m.id|stringformat:"s" %}selected{% endif %}>
+                    {{ m.brand.name }} {{ m.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>📊</span>
+                <span>{% trans "Holat" %}</span>
+              </label>
+              <select
+                name="status"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all bg-white"
+              >
+                <option value="">{% trans "Har qanday holat" %}</option>
+                <option value="available" {% if status == "available" %}selected{% endif %}>✅ {% trans "Mavjud" %}</option>
+                <option value="on_repair" {% if status == "on_repair" %}selected{% endif %}>🔧 {% trans "Ta'mirda" %}</option>
+                <option value="sold" {% if status == "sold" %}selected{% endif %}>💰 {% trans "Sotilgan" %}</option>
+              </select>
+            </div>
+
+            <!-- Ownership Filter -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>🏷️</span>
+                <span>{% trans "Egalik" %}</span>
+              </label>
+              <select
+                name="ownership"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition-all bg-white"
+              >
+                <option value="">{% trans "Har qanday egalik" %}</option>
+                <option value="owned" {% if ownership == "owned" %}selected{% endif %}>🏠 {% trans "O'zimizniki" %}</option>
+                <option value="consignment" {% if ownership == "consignment" %}selected{% endif %}>🤝 {% trans "Konsignatsiya" %}</option>
+              </select>
+            </div>
+
+            <!-- Date From -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>📅</span>
+                <span>{% trans "Sana — dan" %}</span>
+              </label>
+              <input
+                type="date"
+                name="date_from"
+                value="{{ date_from }}"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all bg-white"
+              >
+            </div>
+
+            <!-- Date To -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>📅</span>
+                <span>{% trans "Sana — gacha" %}</span>
+              </label>
+              <input
+                type="date"
+                name="date_to"
+                value="{{ date_to }}"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all bg-white"
+              >
+            </div>
+
+            <!-- Min Price -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>💵</span>
+                <span>{% trans "Minimal narx" %}</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                name="price_min"
+                value="{{ price_min }}"
+                placeholder="0.00"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all bg-white"
+              >
+            </div>
+
+            <!-- Max Price -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                <span>💰</span>
+                <span>{% trans "Maksimal narx" %}</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                name="price_max"
+                value="{{ price_max }}"
+                placeholder="99999.99"
+                class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all bg-white"
+              >
+            </div>
+
+          </div>
+
+          <!-- Reset Button -->
+          <div class="flex justify-end pt-2">
+            <a
+              href="{% url 'inventory_search' %}"
+              class="px-6 py-3 rounded-2xl border-2 border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 hover:scale-105 transition-all duration-300"
+            >
+              🔄 {% trans "Filterni tozalash" %}
+            </a>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- Results Count -->
+    {% if q or status or ownership or brand_id or model_id %}
+    <div class="flex items-center justify-between bg-white/60 backdrop-blur-sm border border-white rounded-2xl px-6 py-3">
+      <div class="flex items-center gap-2 text-sm">
+        <span class="font-semibold text-slate-700">{% trans "Natijalar" %}:</span>
+        <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-bold text-xs">
+          {{ results|length }}
+        </span>
+      </div>
+      {% if q %}
+      <div class="text-sm text-slate-600">
+        <span class="font-medium">{% trans "Qidiruv" %}:</span>
+        <span class="font-bold text-purple-600">"{{ q }}"</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Results Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for p in results %}
+        <div class="group bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-2">
+
+          <!-- Card Header -->
+          <div class="bg-gradient-to-r from-purple-500 to-pink-500 px-5 py-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-white text-xl">
+                  📱
+                </div>
+                <div>
+                  <div class="font-bold text-white text-lg">{{ p.brand.name }}</div>
+                  <div class="text-purple-100 text-sm">{{ p.model.name }}</div>
+                </div>
+              </div>
+
+              <!-- Status Badge -->
+              {% if p.status == "available" %}
+                <span class="px-3 py-1 bg-emerald-500 text-white rounded-full text-xs font-bold">
+                  ✅ {% trans "Mavjud" %}
+                </span>
+              {% elif p.status == "on_repair" %}
+                <span class="px-3 py-1 bg-amber-500 text-white rounded-full text-xs font-bold">
+                  🔧 {% trans "Ta'mirda" %}
+                </span>
+              {% elif p.status == "sold" %}
+                <span class="px-3 py-1 bg-slate-500 text-white rounded-full text-xs font-bold">
+                  💰 {% trans "Sotilgan" %}
+                </span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="p-5 space-y-3">
+
+            <!-- IMEI -->
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-slate-500">🔢</span>
+              <span class="text-xs text-slate-500 font-medium">IMEI:</span>
+              <span class="font-mono font-bold text-slate-700">{{ p.imei_full }}</span>
+            </div>
+
+            <!-- Store -->
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-slate-500">🏪</span>
+              <span class="text-xs text-slate-500 font-medium">{% trans "Do'kon" %}:</span>
+              <span class="font-semibold text-slate-700">{{ p.store.name }}</span>
+            </div>
+
+            <!-- Ownership -->
+            {% if p.ownership %}
+            <div class="flex items-center gap-2 text-sm">
+              {% if p.ownership == "owned" %}
+                <span class="text-slate-500">🏠</span>
+                <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                  {% trans "O'zimizniki" %}
+                </span>
+              {% elif p.ownership == "consignment" %}
+                <span class="text-slate-500">🤝</span>
+                <span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                  {% trans "Konsignatsiya" %}
+                </span>
+              {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Price -->
+            {% if p.price %}
+            <div class="pt-2 border-t border-slate-100">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-slate-500 font-medium">{% trans "Narx" %}:</span>
+                <span class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  ${{ p.price }}
+                </span>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Action Button -->
+            <a
+              href="{% url 'product_detail' p.id %}"
+              class="block w-full mt-4 px-4 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-center font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+            >
+              👁️ {% trans "Batafsil ko'rish" %}
+            </a>
+          </div>
+        </div>
+      {% empty %}
+        {% if q or status or ownership or brand_id or model_id %}
+        <div class="col-span-full">
+          <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-12 text-center">
+            <div class="text-8xl mb-4">🔍</div>
+            <h3 class="text-2xl font-bold text-slate-700 mb-2">{% trans "Hech narsa topilmadi" %}</h3>
+            <p class="text-slate-500 mb-6">{% trans "Qidiruv parametrlarini o'zgartirib ko'ring" %}</p>
+            <a
+              href="{% url 'product_search' %}"
+              class="inline-block px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+            >
+              🔄 {% trans "Qaytadan qidirish" %}
+            </a>
+          </div>
+        </div>
+        {% else %}
+        <div class="col-span-full">
+          <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-12 text-center">
+            <div class="text-8xl mb-4">🎯</div>
+            <h3 class="text-2xl font-bold text-slate-700 mb-2">{% trans "Qidiruvni boshlang" %}</h3>
+            <p class="text-slate-500">{% trans "Yuqoridagi qidiruv maydoniga IMEI, brend yoki model nomini kiriting" %}</p>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
   </div>
 </div>
+
+<style>
+  /* Smooth animations */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .group:hover {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #9333ea, #ec4899);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #7e22ce, #db2777);
+  }
+
+  /* Focus ring animation */
+  input:focus, select:focus {
+    animation: pulse 0.5s ease-in-out;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.01);
+    }
+  }
+
+  /* Card hover effect */
+  .group:hover .card-shine {
+    transform: translateX(100%);
+  }
+
+  /* Gradient text animation */
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .bg-clip-text {
+    background-size: 200% 200%;
+    animation: gradient 3s ease infinite;
+  }
+</style>
 {% endblock %}

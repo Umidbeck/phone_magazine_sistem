@@ -1,211 +1,791 @@
 {% extends "base.html" %}
-{% load i18n %}
-{% load money %} {# <<< YANGI: $ format filtri #}
+{% load i18n money %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto p-4 space-y-6">
-  <h1 class="text-2xl font-semibold">🎯 {% trans "Komissiyalar" %}</h1>
-
-  <!-- Filters -->
-  <form method="get" class="grid md:grid-cols-5 gap-3 bg-white border border-neutral-200 rounded-2xl p-4">
-    {% if sellers %}
-      <div>
-        <label class="text-xs text-neutral-500">Sotuvchi</label>
-        <select name="seller_id" class="w-full rounded-xl border p-2">
-          <option value="">Hammasi</option>
-          {% for s in sellers %}
-            <option value="{{ s.id }}" {% if seller_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
-              {{ s.username }}
-            </option>
-          {% endfor %}
-        </select>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <!-- Header with gradient -->
+  <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">
+          🎯
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold">{% trans "Komissiyalar" %}</h1>
       </div>
-    {% endif %}
-
-    <div>
-      <label class="text-xs text-neutral-500">To‘langan?</label>
-      <select name="paid" class="w-full rounded-xl border p-2">
-        <option value="" {% if paid == "" %}selected{% endif %}>Hammasi</option>
-        <option value="1" {% if paid == "1" %}selected{% endif %}>Ha</option>
-        <option value="0" {% if paid == "0" %}selected{% endif %}>Yo‘q</option>
-      </select>
-    </div>
-
-    <div>
-      <label class="text-xs text-neutral-500">Tasdiqlangan?</label>
-      <select name="approved" class="w-full rounded-xl border p-2">
-        <option value="" {% if approved == "" %}selected{% endif %}>Hammasi</option>
-        <option value="1" {% if approved == "1" %}selected{% endif %}>Ha</option>
-        <option value="0" {% if approved == "0" %}selected{% endif %}>Yo‘q</option>
-      </select>
-    </div>
-
-    <div>
-      <label class="text-xs text-neutral-500">Sana — dan</label>
-      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border p-2">
-    </div>
-    <div>
-      <label class="text-xs text-neutral-500">Sana — gacha</label>
-      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border p-2">
-    </div>
-
-    <div class="md:col-span-5 flex justify-end gap-2">
-      <button class="px-4 py-2 rounded-xl bg-black text-white">Filtrlash</button>
-      <a href="{% url 'commissions_list' %}" class="px-4 py-2 rounded-xl border">Reset</a>
-    </div>
-  </form>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">Jami</div>
-        <div class="mt-1 text-2xl font-semibold">${{ total_amount|floatformat:2 }}</div>
-      </div>
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">To‘langan</div>
-        <div class="mt-1 text-2xl font-semibold">${{ paid_amount|floatformat:2 }}</div>
-      </div>
-      <div class="bg-white border rounded-2xl p-4">
-        <div class="text-xs text-neutral-500">Qoldiq</div>
-        <div class="mt-1 text-2xl font-semibold">${{ unpaid_amount|floatformat:2 }}</div>
-      </div>
-    </div>
-
-    <div class="bg-white border rounded-2xl p-4 mb-6">
-      <div class="text-xs text-neutral-500 mb-2">Oxirgi 30 kun: Approved komissiya</div>
-      <canvas id="com30"></canvas>
-      <script id="cLabels" type="application/json">{{ c_labels }}</script>
-      <script id="cSeries" type="application/json">{{ c_series }}</script>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-    (function(){
-      const L = JSON.parse(document.getElementById('cLabels').textContent);
-      const S = JSON.parse(document.getElementById('cSeries').textContent);
-      new Chart(document.getElementById('com30').getContext('2d'), {
-        type: 'bar',
-        data: { labels: L, datasets: [{ label: 'Commission', data: S }] }
-      });
-    })();
-    </script>
-
-
-  <!-- Summary -->
-  <div class="grid sm:grid-cols-3 gap-4">
-    <div class="rounded-2xl border bg-white p-4">
-      <div class="text-xs text-neutral-500">Jami</div>
-      <div class="text-2xl font-semibold">{{ total_amount|usd }}</div>
-    </div>
-    <div class="rounded-2xl border bg-white p-4">
-      <div class="text-xs text-neutral-500">To‘langan</div>
-      <div class="text-2xl font-semibold text-emerald-700">{{ paid_amount|usd }}</div>
-    </div>
-    <div class="rounded-2xl border bg-white p-4">
-      <div class="text-xs text-neutral-500">To‘lanmagan</div>
-      <div class="text-2xl font-semibold text-amber-600">{{ unpaid_amount|usd }}</div>
+      <p class="text-indigo-100 text-sm md:text-base">{% trans "Sotuvchilar komissiyalarini boshqarish va kuzatish" %}</p>
     </div>
   </div>
 
-  <!-- Pending approvals -->
-  <div class="rounded-2xl border overflow-x-auto bg-white">
-    <div class="px-4 py-3 text-sm font-semibold border-b bg-amber-50">⏳ Tasdiqlash kutilmoqda</div>
-    <table class="min-w-full text-sm">
-      <thead class="bg-neutral-50 text-neutral-600">
-        <tr>
-          <th class="text-left px-4 py-2">Sana</th>
-          <th class="text-left px-4 py-2">Sotuvchi</th>
-          <th class="text-left px-4 py-2">Telefon</th>
-          <th class="text-right px-4 py-2">Komissiya</th>
-          <th class="text-right px-4 py-2">Amal</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in pending_rows %}
-        <tr class="border-t">
-          <td class="px-4 py-2">{{ c.transaction.created_at|date:"Y-m-d H:i" }}</td>
-          <td class="px-4 py-2">{{ c.seller.username }}</td>
-          <td class="px-4 py-2">
-            {% if c.transaction.product %}
-              {{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}
-              • {{ c.transaction.product.imei_full|slice:"-4:" }}
-            {% else %}-{% endif %}
-          </td>
-          <td class="px-4 py-2 text-right font-medium">{{ c.amount|usd }}</td>
-          <td class="px-4 py-2 text-right">
-            {% if request.user.is_owner %}
-              <form method="post" action="{% url 'commission_update_amount' c.id %}" class="inline">
-                {% csrf_token %}
-                <input name="amount" type="number" step="0.01" min="0.01" value="{{ c.amount }}"
-                       class="w-28 rounded-lg border px-2 py-1 text-right">
-                <button class="ml-1 px-3 py-1.5 rounded-lg border">Saqlash</button>
-              </form>
-              <form method="post" action="{% url 'commission_approve' c.id %}" class="inline">
-                {% csrf_token %}
-                <button class="ml-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white">Tasdiqlash</button>
-              </form>
-              <form method="post" action="{% url 'commission_reject' c.id %}" class="inline" onsubmit="return confirm('O‘chirilsinmi?')">
-                {% csrf_token %}
-                <button class="ml-1 px-3 py-1.5 rounded-lg border">Bekor qilish</button>
-              </form>
-            {% else %}
-              <span class="text-neutral-400">Owner tasdiqlaydi</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% empty %}
-          <tr><td colspan="5" class="px-4 py-6 text-center text-neutral-500">Pending yo‘q</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <div class="max-w-7xl mx-auto px-4 -mt-6 pb-8 space-y-6">
 
-  <!-- Approved list -->
-  <div class="rounded-2xl border overflow-x-auto bg-white">
-    <div class="px-4 py-3 text-sm font-semibold border-b bg-emerald-50">✅ Tasdiqlangan</div>
-    <table class="min-w-full text-sm">
-      <thead class="bg-neutral-50 text-neutral-600">
-        <tr>
-          <th class="text-left px-4 py-2">Sana</th>
-          <th class="text-left px-4 py-2">Sotuvchi</th>
-          <th class="text-left px-4 py-2">Telefon</th>
-          <th class="text-right px-4 py-2">Komissiya</th>
-          <th class="text-right px-4 py-2">To‘langanmi</th>
-          <th class="text-right px-4 py-2">Amal</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in approved_rows %}
-        <tr class="border-t">
-          <td class="px-4 py-2">{{ c.transaction.created_at|date:"Y-m-d H:i" }}</td>
-          <td class="px-4 py-2">{{ c.seller.username }}</td>
-          <td class="px-4 py-2">
-            {% if c.transaction.product %}
-              {{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}
-              • {{ c.transaction.product.imei_full|slice:"-4:" }}
-            {% else %}-{% endif %}
-          </td>
-          <td class="px-4 py-2 text-right font-medium">{{ c.amount|usd }}</td>
-          <td class="px-4 py-2 text-right">
-            {% if c.is_paid %}
-              <span class="text-emerald-700 font-medium">Ha</span>
-            {% else %}
-              <span class="text-amber-600 font-medium">Yo‘q</span>
-            {% endif %}
-          </td>
-          <td class="px-4 py-2 text-right">
-            {% if request.user.is_owner and not c.is_paid %}
-              <form method="post" action="{% url 'commission_mark_paid' c.id %}">{% csrf_token %}
-                <button class="px-3 py-1.5 rounded-lg border">To‘langan deb belgilash</button>
-              </form>
-            {% endif %}
-          </td>
-        </tr>
-        {% empty %}
-          <tr><td colspan="6" class="px-4 py-6 text-center text-neutral-500">Hech narsa yo‘q</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    <!-- KPI Cards with glassmorphism -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="group bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl p-6 transition-all duration-300 hover:-translate-y-1">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-xl">
+            💰
+          </div>
+          <div class="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">{% trans "Jami" %}</div>
+        </div>
+        <div class="text-sm text-slate-600 mb-1">{% trans "Jami komissiya" %}</div>
+        <div class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          {{ total_amount|usd }}
+        </div>
+      </div>
 
+      <div class="group bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl p-6 transition-all duration-300 hover:-translate-y-1">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center text-white text-xl">
+            ✅
+          </div>
+          <div class="text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">{% trans "Muvaffaqiyatli" %}</div>
+        </div>
+        <div class="text-sm text-slate-600 mb-1">{% trans "To'langan" %}</div>
+        <div class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
+          {{ paid_amount|usd }}
+        </div>
+      </div>
+
+      <div class="group bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl p-6 transition-all duration-300 hover:-translate-y-1">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center text-white text-xl">
+            ⏳
+          </div>
+          <div class="text-xs font-medium text-amber-600 bg-amber-50 px-3 py-1 rounded-full">{% trans "Kutilmoqda" %}</div>
+        </div>
+        <div class="text-sm text-slate-600 mb-1">{% trans "To'lanmagan" %}</div>
+        <div class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+          {{ unpaid_amount|usd }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters with modern design -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="text-2xl">🔍</span>
+        <h2 class="text-lg font-bold text-slate-800">{% trans "Filtrlar" %}</h2>
+      </div>
+
+      <form method="get" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {% if sellers %}
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{% trans "Sotuvchi" %}</label>
+            <select name="seller_id" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all">
+              <option value="">{% trans "Hammasi" %}</option>
+              {% for s in sellers %}
+                <option value="{{ s.id }}" {% if seller_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>
+                  {{ s.username }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{% trans "To'langan?" %}</label>
+            <select name="paid" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all">
+              <option value="" {% if paid == "" %}selected{% endif %}>{% trans "Hammasi" %}</option>
+              <option value="1" {% if paid == "1" %}selected{% endif %}>✅ {% trans "Ha" %}</option>
+              <option value="0" {% if paid == "0" %}selected{% endif %}>❌ {% trans "Yo'q" %}</option>
+            </select>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{% trans "Tasdiqlangan?" %}</label>
+            <select name="approved" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all">
+              <option value="" {% if approved == "" %}selected{% endif %}>{% trans "Hammasi" %}</option>
+              <option value="1" {% if approved == "1" %}selected{% endif %}>✅ {% trans "Ha" %}</option>
+              <option value="0" {% if approved == "0" %}selected{% endif %}>⏳ {% trans "Yo'q" %}</option>
+            </select>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{% trans "Kategoriya" %}</label>
+            <select name="category" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all">
+              <option value="" {% if category == "" %}selected{% endif %}>{% trans "Hammasi" %}</option>
+              <option value="profit30" {% if category == "profit30" %}selected{% endif %}>📱 30%</option>
+              <option value="flat5" {% if category == "flat5" %}selected{% endif %}>💵 5$</option>
+              <option value="none" {% if category == "none" %}selected{% endif %}>🚫 {% trans "Komissiyasiz" %}</option>
+            </select>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{% trans "Bekor qilingan?" %}</label>
+            <select name="rescinded" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-4 focus:ring-red-100 transition-all">
+              <option value="" {% if rescinded == "" %}selected{% endif %}>{% trans "Hammasi" %}</option>
+              <option value="1" {% if rescinded == "1" %}selected{% endif %}>🗑️ {% trans "Ha" %}</option>
+              <option value="0" {% if rescinded == "0" %}selected{% endif %}>✅ {% trans "Yo'q" %}</option>
+            </select>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{% trans "Sana — dan" %}</label>
+            <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all">
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{% trans "Sana — gacha" %}</label>
+            <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all">
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{% trans "Oy (reyting)" %}</label>
+            <input type="month" name="month" value="{{ month_key }}" class="w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all">
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+          <button type="submit" class="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
+            🔍 {% trans "Filtrlash" %}
+          </button>
+          <a href="{% url 'sales:commissions_list' %}" class="flex-1 sm:flex-initial px-6 py-3 rounded-2xl border-2 border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 hover:scale-105 transition-all duration-300 text-center">
+            🔄 {% trans "Qayta tiklash" %}
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Leaderboard and Bonuses -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Leaderboard -->
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">🏆</span>
+            <div>
+              <h3 class="text-white font-bold text-lg">{% trans "Joriy oy reytingi" %}</h3>
+              <p class="text-amber-100 text-sm">{{ month_key }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="p-6">
+          <div class="space-y-3">
+            {% for s in leaderboard %}
+              <div class="flex items-center gap-4 p-4 rounded-2xl {% if forloop.counter == 1 %}bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300{% elif forloop.counter == 2 %}bg-gradient-to-r from-slate-50 to-gray-50 border-2 border-slate-300{% elif forloop.counter == 3 %}bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-300{% else %}bg-slate-50 border border-slate-200{% endif %} hover:scale-105 transition-all duration-300">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full {% if forloop.counter == 1 %}bg-gradient-to-br from-yellow-400 to-amber-500{% elif forloop.counter == 2 %}bg-gradient-to-br from-slate-400 to-gray-500{% elif forloop.counter == 3 %}bg-gradient-to-br from-orange-400 to-amber-600{% else %}bg-gradient-to-br from-slate-300 to-slate-400{% endif %} flex items-center justify-center text-white font-bold">
+                  {% if forloop.counter == 1 %}👑{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
+                </div>
+                <div class="flex-1">
+                  <div class="font-semibold text-slate-800">{{ s.seller.username }}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-2xl font-bold {% if forloop.counter <= 3 %}text-amber-600{% else %}text-slate-600{% endif %}">{{ s.sales_count }}</div>
+                  <div class="text-xs text-slate-500">{% trans "ta sotildi" %}</div>
+                </div>
+              </div>
+            {% empty %}
+              <div class="text-center py-12">
+                <div class="text-6xl mb-3">📊</div>
+                <p class="text-slate-500">{% trans "Ma'lumot yo'q" %}</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Bonuses -->
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+        <div class="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-4">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">💎</span>
+            <div>
+              <h3 class="text-white font-bold text-lg">{% trans "Bonuslar" %}</h3>
+              <p class="text-emerald-100 text-sm">{% trans "50 ta finish" %}</p>
+            </div>
+          </div>
+        </div>
+        <div class="p-6">
+          <div class="space-y-3">
+            {% for b in month_bonuses %}
+              <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 hover:scale-105 transition-all duration-300">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center text-white text-xl">
+                      🎁
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">{{ b.winner.username }}</div>
+                      <div class="text-xs text-slate-500">{{ b.month_key }}</div>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-xl font-bold text-emerald-600">{{ b.amount|usd }}</div>
+                    <div class="text-xs text-slate-500">{{ b.awarded_at|date:"d.m.Y" }}</div>
+                  </div>
+                </div>
+              </div>
+            {% empty %}
+              <div class="text-center py-12">
+                <div class="text-6xl mb-3">🎁</div>
+                <p class="text-slate-500">{% trans "Hech narsa yo'q" %}</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 30-day Chart -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-xl">
+          📊
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-800">{% trans "Oxirgi 30 kun statistikasi" %}</h3>
+          <p class="text-xs text-slate-500">{% trans "Tasdiqlangan komissiyalar" %}</p>
+        </div>
+      </div>
+      <canvas id="com30" class="w-full" style="max-height: 300px;"></canvas>
+    </div>
+
+    <script id="cLabels" type="application/json">{{ c_labels }}</script>
+    <script id="cSeries" type="application/json">{{ c_series }}</script>
+
+    <!-- 30% Commission Table -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">📱</span>
+          <h3 class="text-white font-bold text-lg">{% trans "30% komissiyalar (yangi telefonlar)" %}</h3>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sana" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sotuvchi" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Telefon" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Komissiya" %}</th>
+              <th class="text-center px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "To'langanmi" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Amal" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in approved_rows %}
+            <tr class="hover:bg-emerald-50 transition-colors">
+              <td class="px-6 py-4 text-sm text-slate-700">{{ c.transaction.created_at|date:"d.m.Y H:i" }}</td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                    {{ c.seller.username|slice:":1"|upper }}
+                  </div>
+                  <span class="font-medium text-slate-800">{{ c.seller.username }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-slate-700">
+                {% if c.transaction.product %}
+                  <div class="font-medium">{{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}</div>
+                  <div class="text-xs text-slate-500">IMEI: ****{{ c.transaction.product.imei_full|slice:"-4:" }}</div>
+                {% else %}-{% endif %}
+              </td>
+              <td class="px-6 py-4 text-right">
+                <span class="text-lg font-bold text-emerald-600">{{ c.amount|usd }}</span>
+              </td>
+              <td class="px-6 py-4 text-center">
+                {% if c.is_rescinded %}
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                    🗑️ {% trans "Bekor qilingan" %}
+                  </span>
+                {% else %}
+                  {% if c.is_paid %}
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                      💰 {% trans "Ha" %}
+                    </span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                      ⏳ {% trans "Yo'q" %}
+                    </span>
+                  {% endif %}
+                {% endif %}
+              </td>
+              <td class="px-6 py-4 text-right">
+                {% if request.user.is_owner and not c.is_paid and not c.is_rescinded %}
+                  <form method="post" action="{% url 'sales:commission_mark_paid' c.id %}">
+                    {% csrf_token %}
+                    <button class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white text-sm font-semibold shadow-lg hover:shadow-xl transition-all">
+                      💵 {% trans "To'langan deb belgilash" %}
+                    </button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+              <tr>
+                <td colspan="6" class="px-6 py-12 text-center">
+                  <div class="text-6xl mb-3">📋</div>
+                  <p class="text-slate-500">{% trans "Hech narsa yo'q" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 </div>
-{% endblock %}
+
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function(){
+  const labels = JSON.parse(document.getElementById('cLabels').textContent);
+  const series = JSON.parse(document.getElementById('cSeries').textContent);
+
+  const ctx = document.getElementById('com30').getContext('2d');
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '{% trans "Komissiya" %}',
+        data: series,
+        backgroundColor: function(context) {
+          const chart = context.chart;
+          const {ctx, chartArea} = chart;
+          if (!chartArea) {
+            return null;
+          }
+          const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+          gradient.addColorStop(0, 'rgba(99, 102, 241, 0.8)');
+          gradient.addColorStop(1, 'rgba(168, 85, 247, 0.8)');
+          return gradient;
+        },
+        borderRadius: 12,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 12,
+          borderRadius: 12,
+          titleFont: {
+            size: 14,
+            weight: 'bold'
+          },
+          bodyFont: {
+            size: 13
+          },
+          callbacks: {
+            label: function(context) {
+              return '💰 ' + context.parsed.y.toFixed(2) + ' USD';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(148, 163, 184, 0.1)',
+            drawBorder: false
+          },
+          ticks: {
+            font: {
+              size: 11
+            },
+            color: '#64748b',
+            callback: function(value) {
+              return 'left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Telefon" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Komissiya" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Holat" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in profit30_rows %}
+            <tr class="hover:bg-purple-50 transition-colors">
+              <td class="px-6 py-4 text-sm text-slate-700">{{ c.transaction.created_at|date:"d.m.Y H:i" }}</td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                    {{ c.seller.username|slice:":1"|upper }}
+                  </div>
+                  <span class="font-medium text-slate-800">{{ c.seller.username }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-slate-700">
+                {% if c.transaction.product %}
+                  <div class="font-medium">{{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}</div>
+                  <div class="text-xs text-slate-500">IMEI: ****{{ c.transaction.product.imei_full|slice:"-4:" }}</div>
+                {% else %}-{% endif %}
+              </td>
+              <td class="px-6 py-4 text-right">
+                <span class="text-lg font-bold text-purple-600">{{ c.amount|usd }}</span>
+              </td>
+              <td class="px-6 py-4">
+                {% if c.is_rescinded %}
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                    🗑️ {% trans "Bekor qilingan" %}
+                  </span>
+                {% elif c.is_approved %}
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                    ✅ {% trans "Tasdiqlangan" %}
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                    ⏳ {% trans "Kutilmoqda" %}
+                  </span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="px-6 py-12 text-center">
+                  <div class="text-6xl mb-3">📱</div>
+                  <p class="text-slate-500">{% trans "Hech narsa yo'q" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pending Commissions -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⏳</span>
+          <h3 class="text-white font-bold text-lg">{% trans "Tasdiqlash kutilmoqda" %}</h3>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sana" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sotuvchi" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Telefon" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Komissiya" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Amal" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in pending_rows %}
+            <tr class="hover:bg-amber-50 transition-colors">
+              <td class="px-6 py-4 text-sm text-slate-700">{{ c.transaction.created_at|date:"d.m.Y H:i" }}</td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                    {{ c.seller.username|slice:":1"|upper }}
+                  </div>
+                  <span class="font-medium text-slate-800">{{ c.seller.username }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-slate-700">
+                {% if c.transaction.product %}
+                  <div class="font-medium">{{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}</div>
+                  <div class="text-xs text-slate-500">IMEI: ****{{ c.transaction.product.imei_full|slice:"-4:" }}</div>
+                {% else %}-{% endif %}
+              </td>
+              <td class="px-6 py-4 text-right">
+                <span class="text-lg font-bold text-amber-600">{{ c.amount|usd }}</span>
+              </td>
+              <td class="px-6 py-4 text-right">
+                {% if request.user.is_owner %}
+                  <div class="flex items-center justify-end gap-2 flex-wrap">
+                    <form method="post" action="{% url 'commission_update_amount' c.id %}" class="inline-flex items-center gap-2">
+                      {% csrf_token %}
+                      <input name="amount" type="number" step="0.01" min="0.00" value="{{ c.amount }}"
+                             class="w-24 rounded-xl border-2 border-slate-200 px-3 py-2 text-sm text-right focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+                      <button class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition-all">
+                        💾 {% trans "Saqlash" %}
+                      </button>
+                    </form>
+                    <form method="post" action="{% url 'sales:commission_approve' c.id %}" class="inline">
+                      {% csrf_token %}
+                      <button class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white text-sm font-semibold shadow-lg hover:shadow-xl transition-all">
+                        ✅ {% trans "Tasdiqlash" %}
+                      </button>
+                    </form>
+                    <form method="post" action="{% url 'sales:commission_reject' c.id %}" class="inline" onsubmit="return confirm('{{ _("O'chirilsinmi?") }}')">
+                      {% csrf_token %}
+                      <button class="px-4 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 text-sm font-semibold transition-all">
+                        🗑️ {% trans "Bekor qilish" %}
+                      </button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="text-sm text-slate-400">{% trans "Owner tasdiqlaydi" %}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="px-6 py-12 text-center">
+                  <div class="text-6xl mb-3">🎉</div>
+                  <p class="text-slate-500">{% trans "Pending yo'q" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Approved Commissions -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden mb-8">
+      <div class="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">✅</span>
+          <h3 class="text-white font-bold text-lg">{% trans "Tasdiqlangan komissiyalar" %}</h3>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sana" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sotuvchi" %}</th>
+              <th class="text- + value;
+            }
+          }
+        },
+        x: {
+          grid: {
+            display: false,
+            drawBorder: false
+          },
+          ticks: {
+            font: {
+              size: 11
+            },
+            color: '#64748b',
+            maxRotation: 45,
+            minRotation: 45
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+
+<style>
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .group:hover {
+    animation: fadeInUp 0.3s ease-out;
+  }
+
+  /* Smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+  }
+
+  /* Mobile responsive table scroll hint */
+  @media (max-width: 768px) {
+    .overflow-x-auto::after {
+      content: '👈 Scroll';
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(99, 102, 241, 0.9);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      pointer-events: none;
+      animation: pulse 2s infinite;
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+</style>
+{% endblock %}left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Telefon" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Komissiya" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Holat" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in profit30_rows %}
+            <tr class="hover:bg-purple-50 transition-colors">
+              <td class="px-6 py-4 text-sm text-slate-700">{{ c.transaction.created_at|date:"d.m.Y H:i" }}</td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                    {{ c.seller.username|slice:":1"|upper }}
+                  </div>
+                  <span class="font-medium text-slate-800">{{ c.seller.username }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-slate-700">
+                {% if c.transaction.product %}
+                  <div class="font-medium">{{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}</div>
+                  <div class="text-xs text-slate-500">IMEI: ****{{ c.transaction.product.imei_full|slice:"-4:" }}</div>
+                {% else %}-{% endif %}
+              </td>
+              <td class="px-6 py-4 text-right">
+                <span class="text-lg font-bold text-purple-600">{{ c.amount|usd }}</span>
+              </td>
+              <td class="px-6 py-4">
+                {% if c.is_rescinded %}
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                    🗑️ {% trans "Bekor qilingan" %}
+                  </span>
+                {% elif c.is_approved %}
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                    ✅ {% trans "Tasdiqlangan" %}
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                    ⏳ {% trans "Kutilmoqda" %}
+                  </span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="px-6 py-12 text-center">
+                  <div class="text-6xl mb-3">📱</div>
+                  <p class="text-slate-500">{% trans "Hech narsa yo'q" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pending Commissions -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+      <div class="bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⏳</span>
+          <h3 class="text-white font-bold text-lg">{% trans "Tasdiqlash kutilmoqda" %}</h3>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sana" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sotuvchi" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Telefon" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Komissiya" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Amal" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in pending_rows %}
+            <tr class="hover:bg-amber-50 transition-colors">
+              <td class="px-6 py-4 text-sm text-slate-700">{{ c.transaction.created_at|date:"d.m.Y H:i" }}</td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                    {{ c.seller.username|slice:":1"|upper }}
+                  </div>
+                  <span class="font-medium text-slate-800">{{ c.seller.username }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-slate-700">
+                {% if c.transaction.product %}
+                  <div class="font-medium">{{ c.transaction.product.brand.name }} {{ c.transaction.product.model.name }}</div>
+                  <div class="text-xs text-slate-500">IMEI: ****{{ c.transaction.product.imei_full|slice:"-4:" }}</div>
+                {% else %}-{% endif %}
+              </td>
+              <td class="px-6 py-4 text-right">
+                <span class="text-lg font-bold text-amber-600">{{ c.amount|usd }}</span>
+              </td>
+              <td class="px-6 py-4 text-right">
+                {% if request.user.is_owner %}
+                  <div class="flex items-center justify-end gap-2 flex-wrap">
+                    <form method="post" action="{% url 'commission_update_amount' c.id %}" class="inline-flex items-center gap-2">
+                      {% csrf_token %}
+                      <input name="amount" type="number" step="0.01" min="0.00" value="{{ c.amount }}"
+                             class="w-24 rounded-xl border-2 border-slate-200 px-3 py-2 text-sm text-right focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+                      <button class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition-all">
+                        💾 {% trans "Saqlash" %}
+                      </button>
+                    </form>
+                    <form method="post" action="{% url 'sales:commission_approve' c.id %}" class="inline">
+                      {% csrf_token %}
+                      <button class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white text-sm font-semibold shadow-lg hover:shadow-xl transition-all">
+                        ✅ {% trans "Tasdiqlash" %}
+                      </button>
+                    </form>
+                    <form method="post" action="{% url 'sales:commission_reject' c.id %}" class="inline" onsubmit="return confirm('{{ _("O'chirilsinmi?") }}')">
+                      {% csrf_token %}
+                      <button class="px-4 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 text-sm font-semibold transition-all">
+                        🗑️ {% trans "Bekor qilish" %}
+                      </button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="text-sm text-slate-400">{% trans "Owner tasdiqlaydi" %}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="px-6 py-12 text-center">
+                  <div class="text-6xl mb-3">🎉</div>
+                  <p class="text-slate-500">{% trans "Pending yo'q" %}</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Approved Commissions -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden mb-8">
+      <div class="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">✅</span>
+          <h3 class="text-white font-bold text-lg">{% trans "Tasdiqlangan komissiyalar" %}</h3>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sana" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{% trans "Sotuvchi" %}</th>
+              <th class="text-

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}💸 Pul yechish{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-red-50 to-rose-50 py-12">
+    <div class="container mx-auto px-4 max-w-4xl">
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-600 to-rose-600 rounded-full mb-4 shadow-lg">
+                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                </svg>
+            </div>
+            <h1 class="text-4xl font-bold text-slate-800 mb-2">Pul Yechish</h1>
+            <p class="text-slate-600">Foydadan yoki kapitaldan pul oling</p>
+        </div>
+
+        <!-- Current Balance Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 border-2 border-purple-200">
+                <div class="text-sm font-semibold text-purple-600 mb-2">Yig'ilgan Foyda</div>
+                <div class="text-3xl font-bold text-slate-800">${{ bs.retained_earnings|floatformat:2 }}</div>
+                <div class="text-xs text-slate-500 mt-1">Foydadan olish mumkin</div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 border-2 border-blue-200">
+                <div class="text-sm font-semibold text-blue-600 mb-2">Owner Equity</div>
+                <div class="text-3xl font-bold text-slate-800">${{ bs.owner_equity|floatformat:2 }}</div>
+                <div class="text-xs text-slate-500 mt-1">Kapitaldan olish mumkin</div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 border-2 border-amber-200">
+                <div class="text-sm font-semibold text-amber-600 mb-2">Kassada Mavjud</div>
+                <div class="text-2xl font-bold text-slate-800">
+                    💵 ${{ cash.cash_closing|floatformat:2 }}
+                </div>
+                <div class="text-2xl font-bold text-slate-800 mt-1">
+                    💳 ${{ cash.card_closing|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+            <div class="bg-gradient-to-r from-red-600 to-rose-600 px-8 py-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                    💸 Yechish Ma'lumotlari
+                </h2>
+            </div>
+
+            <form method="post" class="p-8 space-y-6">
+                {% csrf_token %}
+
+                <!-- Source Selection -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-3">
+                        Qayerdan yechish? <span class="text-red-500">*</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="source" value="profit" checked class="peer sr-only">
+                            <div class="p-6 border-2 border-slate-300 rounded-xl peer-checked:border-purple-600 peer-checked:bg-purple-50 transition-all hover:border-purple-400">
+                                <div class="flex flex-col items-center gap-3">
+                                    <div class="text-4xl">📈</div>
+                                    <div class="text-center">
+                                        <div class="font-bold text-slate-700">Foydadan</div>
+                                        <div class="text-sm text-slate-500 mt-1">${{ bs.retained_earnings|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="source" value="capital" class="peer sr-only">
+                            <div class="p-6 border-2 border-slate-300 rounded-xl peer-checked:border-purple-600 peer-checked:bg-purple-50 transition-all hover:border-purple-400">
+                                <div class="flex flex-col items-center gap-3">
+                                    <div class="text-4xl">💼</div>
+                                    <div class="text-center">
+                                        <div class="font-bold text-slate-700">Kapitaldan</div>
+                                        <div class="text-sm text-slate-500 mt-1">${{ bs.owner_equity|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Amount -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">
+                        Summa ($) <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg font-bold">$</span>
+                        <input type="number"
+                               name="amount"
+                               step="0.01"
+                               min="0.01"
+                               required
+                               class="w-full pl-10 pr-4 py-3.5 border-2 border-slate-300 rounded-xl focus:border-red-500 focus:ring-4 focus:ring-red-200 transition-all text-lg font-semibold"
+                               placeholder="0.00">
+                    </div>
+                    <p class="mt-2 text-sm text-slate-500">Yechmoqchi bo'lgan summa</p>
+                </div>
+
+                <!-- Channel -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-3">
+                        Qayerdan yechish? <span class="text-red-500">*</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="channel" value="cash" checked class="peer sr-only">
+                            <div class="p-6 border-2 border-slate-300 rounded-xl peer-checked:border-red-600 peer-checked:bg-red-50 transition-all hover:border-red-400">
+                                <div class="flex flex-col items-center gap-3">
+                                    <div class="text-4xl">💵</div>
+                                    <div class="text-center">
+                                        <div class="font-bold text-slate-700">Naqd</div>
+                                        <div class="text-sm text-slate-500 mt-1">${{ cash.cash_closing|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="channel" value="card" class="peer sr-only">
+                            <div class="p-6 border-2 border-slate-300 rounded-xl peer-checked:border-red-600 peer-checked:bg-red-50 transition-all hover:border-red-400">
+                                <div class="flex flex-col items-center gap-3">
+                                    <div class="text-4xl">💳</div>
+                                    <div class="text-center">
+                                        <div class="font-bold text-slate-700">Karta</div>
+                                        <div class="text-sm text-slate-500 mt-1">${{ cash.card_closing|floatformat:2 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Store -->
+                {% if stores|length > 1 %}
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">Do'kon</label>
+                    <select name="store_id"
+                            class="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-red-500 focus:ring-4 focus:ring-red-200 transition-all">
+                        <option value="">Umumiy</option>
+                        {% for store in stores %}
+                        <option value="{{ store.id }}">{{ store.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <!-- Memo -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">
+                        Sabab / Maqsad <span class="text-red-500">*</span>
+                    </label>
+                    <textarea name="memo"
+                              rows="4"
+                              required
+                              class="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-red-500 focus:ring-4 focus:ring-red-200 transition-all resize-none"
+                              placeholder="Masalan: Shaxsiy ehtiyoj, yangi biznes uchun, davlat to'lovi..."></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-4 pt-4">
+                    <button type="submit"
+                            class="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all">
+                        ✓ Pul Yechish
+                    </button>
+
+                    <a href="{% url 'finance:dashboard' %}"
+                       class="px-8 py-4 border-2 border-slate-300 hover:border-slate-400 text-slate-700 rounded-xl font-bold transition-all">
+                        Bekor qilish
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Warning Box -->
+        <div class="mt-8 bg-amber-50 border border-amber-200 rounded-xl p-6">
+            <div class="flex gap-4">
+                <svg class="w-6 h-6 text-amber-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                    <h3 class="font-bold text-amber-900 mb-2">Diqqat</h3>
+                    <ul class="space-y-1 text-sm text-amber-800">
+                        <li>• Yechilgan summa kassadan darhol ayriladi</li>
+                        <li>• Bu harakat qaytarib bo'lmaydi</li>
+                        <li>• Sabab majburiy - tarixda saqlanadi</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

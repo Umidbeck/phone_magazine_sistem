@@ -1,85 +1,244 @@
+# finance/models.py - TUZATILGAN VERSIYA
+"""
+Finance Models - Moliyaviy modellar
+
+VERSIYA: 5.0 - KASSA O'TKAZMA QOBILIYATI
+==========================================
+
+MODELLAR:
+✅ Account - Hisob rejasi
+✅ JournalEntry - Jurnal yozuv
+✅ JournalLine - Jurnal qatori
+✅ CapitalTransaction - Kapital harakati (YANGI: transfer qo'shildi!)
+✅ Investment - Investitsiya
+"""
+
+from decimal import Decimal
 from django.db import models
-from django.utils import timezone
+from django.conf import settings
+from django.utils import timezone as dj_tz
+
+from accounts.models import Store
+
 
 class Account(models.Model):
     """
-    Hisoblar reestri (Chart of Accounts).
+    Hisob rejasi (Chart of Accounts)
     """
-    # Kategoriyalar: Asset, Liability, Equity, Revenue, Expense
-    CAT_ASSET = "asset"
-    CAT_LIAB  = "liability"
-    CAT_EQU   = "equity"
-    CAT_REV   = "revenue"
-    CAT_EXP   = "expense"
-    CATEGORY_CHOICES = [
-        (CAT_ASSET, "Asset"),
-        (CAT_LIAB, "Liability"),
-        (CAT_EQU,  "Equity"),
-        (CAT_REV,  "Revenue"),
-        (CAT_EXP,  "Expense"),
-    ]
+    # Account codes
+    CODE_CASH = "1000"
+    CODE_CARD = "1010"
+    CODE_INVENTORY = "1100"
+    CODE_AR_CUSTOMERS = "1200"
+    CODE_AP_SUPPLIERS = "2000"
+    CODE_OWNER_EQUITY = "3000"
+    CODE_SALES = "4000"
+    CODE_COMMISSION_IN = "4100"
+    CODE_COGS = "5000"
+    CODE_EXPENSES = "5100"
+    CODE_COMMISSION_EX = "5200"
 
-    # Standart hisoblar uchun kodlar
-    CODE_CASH          = "1000"
-    CODE_INVENTORY     = "1100"
-    CODE_AR_CUSTOMERS  = "1200"
-    CODE_AP_SUPPLIERS  = "2000"
-    CODE_OWNER_EQUITY  = "3000"
-    CODE_SALES         = "4000"
-    CODE_COMMISSION_IN = "4100"  # agar komissiyani daromad sifatida tasniflasak
-    CODE_COGS          = "5000"
-    CODE_EXPENSES      = "5100"
-    CODE_COMMISSION_EX = "5200"  # agar komissiyani xarajat sifatida tasniflasak
+    CATEGORY_CHOICES = (
+        ("asset", "Aktiv"),
+        ("liability", "Majburiyat"),
+        ("equity", "Kapital"),
+        ("revenue", "Daromad"),
+        ("expense", "Xarajat"),
+    )
 
-    code = models.CharField(max_length=10, unique=True)
-    name = models.CharField(max_length=128)
-    category = models.CharField(max_length=16, choices=CATEGORY_CHOICES)
+    code = models.CharField(max_length=20, unique=True, db_index=True)
+    name = models.CharField(max_length=120)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    description = models.TextField(blank=True)
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["code"]
+        indexes = [
+            models.Index(fields=["category", "code"]),
+        ]
 
     def __str__(self):
-        return f"{self.code} — {self.name}"
+        return f"{self.code} - {self.name}"
 
 
 class JournalEntry(models.Model):
     """
-    Bitta xo'jalik operatsiyasi (masalan: sotib olish, sotish, rashod, investitsiya).
+    Jurnal yozuv (Double-entry accounting)
     """
-    created_at = models.DateTimeField(default=timezone.now)
-    date = models.DateField(default=timezone.now)
-    memo = models.CharField(max_length=255, blank=True)
-    ref = models.CharField(max_length=64, blank=True)  # masalan document/tranzaksiya id
+    date = models.DateField(default=dj_tz.now)
+    memo = models.CharField(max_length=200, blank=True)
+    ref = models.CharField(max_length=50, blank=True, db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        indexes = [
+            models.Index(fields=["date", "-created_at"]),
+            models.Index(fields=["ref"]),
+        ]
 
     def __str__(self):
-        return f"JE#{self.pk} {self.date} {self.memo or ''}"
+        return f"JE#{self.pk} - {self.date} - {self.memo[:50]}"
 
 
 class JournalLine(models.Model):
     """
-    Double-entry yozuvi: har JE uchun kamida 2 qator (debet / kredit).
+    Jurnal qatori
     """
-    entry = models.ForeignKey(JournalEntry, related_name="lines", on_delete=models.CASCADE)
-    account = models.ForeignKey(Account, on_delete=models.PROTECT)
-    # Debet (+) / Kredit (-) summani bitta maydonda "signed" saqlaymiz
-    amount = models.DecimalField(max_digits=14, decimal_places=2)
-    # ixtiyoriy bog'lanishlar
-    object_app = models.CharField(max_length=32, blank=True)
-    object_model = models.CharField(max_length=32, blank=True)
-    object_id = models.CharField(max_length=64, blank=True)
+    entry = models.ForeignKey(
+        JournalEntry,
+        on_delete=models.CASCADE,
+        related_name="lines"
+    )
+    account = models.ForeignKey(
+        Account,
+        on_delete=models.PROTECT
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Debit = musbat, Credit = manfiy"
+    )
+
+    # Object linking (generic foreign key alternative)
+    object_app = models.CharField(max_length=50, blank=True, db_index=True)
+    object_model = models.CharField(max_length=50, blank=True, db_index=True)
+    object_id = models.CharField(max_length=50, blank=True, db_index=True)
 
     class Meta:
         indexes = [
-            models.Index(fields=["account", "entry"]),
+            models.Index(fields=["entry", "account"]),
             models.Index(fields=["object_app", "object_model", "object_id"]),
         ]
+
+    def __str__(self):
+        sign = "DR" if self.amount > 0 else "CR"
+        return f"{sign} {self.account.code}: ${abs(self.amount):.2f}"
+
+
+class CapitalTransaction(models.Model):
+    """
+    Kapital harakati
+
+    TYPES:
+    - injection: Owner investitsiya kiritadi
+    - withdrawal: Owner pul oladi
+    - transfer: Naqd ↔ Karta o'tkazma (YANGI!)
+
+    CHANNELS:
+    - cash: Naqd
+    - card: Karta
+    - both: Aralash (transfer uchun)
+    """
+
+    TYPE_INJECTION = "injection"
+    TYPE_WITHDRAWAL = "withdrawal"
+    TYPE_TRANSFER = "transfer"  # ← YANGI!
+
+    TYPE_CHOICES = (
+        (TYPE_INJECTION, "Investitsiya"),
+        (TYPE_WITHDRAWAL, "Yechish"),
+        (TYPE_TRANSFER, "O'tkazma"),  # ← YANGI!
+    )
+
+    CHANNEL_CASH = "cash"
+    CHANNEL_CARD = "card"
+    CHANNEL_BOTH = "both"  # ← Transfer uchun
+
+    CHANNEL_CHOICES = (
+        (CHANNEL_CASH, "Naqd"),
+        (CHANNEL_CARD, "Karta"),
+        (CHANNEL_BOTH, "Ikkala"),  # ← YANGI!
+    )
+
+    DIRECTION_CASH_TO_CARD = "cash_to_card"
+    DIRECTION_CARD_TO_CASH = "card_to_cash"
+
+    DIRECTION_CHOICES = (
+        (DIRECTION_CASH_TO_CARD, "Naqd → Karta"),
+        (DIRECTION_CARD_TO_CASH, "Karta → Naqd"),
+    )
+
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    channel = models.CharField(max_length=10, choices=CHANNEL_CHOICES)
+
+    # Transfer uchun
+    direction = models.CharField(
+        max_length=20,
+        choices=DIRECTION_CHOICES,
+        blank=True,
+        help_text="Faqat transfer uchun"
+    )
+
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    note = models.CharField(max_length=200, blank=True)
+
+    # Approval
+    is_approved = models.BooleanField(default=False)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        related_name="approved_capital_txns",
+        on_delete=models.SET_NULL
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="created_capital_txns",
+        on_delete=models.PROTECT
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["type", "is_approved", "created_at"]),
+            models.Index(fields=["store", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_type_display()} - ${self.amount} ({self.get_channel_display()})"
 
 
 class Investment(models.Model):
     """
-    Do'kon egasidan (yoki investor) kelgan kapital kiritmalarini qayd etamiz.
+    Investitsiya (owner capital injection)
     """
-    created_at = models.DateTimeField(default=timezone.now)
-    date = models.DateField(default=timezone.now)
-    amount = models.DecimalField(max_digits=14, decimal_places=2)
-    note = models.CharField(max_length=255, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    date = models.DateField(default=dj_tz.now)
+    note = models.TextField(blank=True)
 
-    # JE bilan bog'laymiz (auditing uchun)
-    journal_entry = models.OneToOneField(JournalEntry, null=True, blank=True, on_delete=models.SET_NULL)
+    journal_entry = models.OneToOneField(
+        JournalEntry,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+
+    def __str__(self):
+        return f"Investment ${self.amount} - {self.date}"

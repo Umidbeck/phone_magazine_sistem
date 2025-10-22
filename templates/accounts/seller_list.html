@@ -1,36 +1,324 @@
-# accounts/seller_list.html
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Sellers" %}{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Sotuvchilar" %}{% endblock %}
+
 {% block content %}
-<div class="p-4 space-y-3">
-  <a href="{% url 'seller_new' %}" class="px-3 py-2 rounded bg-black text-white">{% trans "Add seller" %}</a>
-  <div class="bg-white border rounded-xl">
-    <table class="w-full text-sm">
-      <thead><tr class="text-left border-b">
-        <th class="p-2">{% trans "Username" %}</th>
-        <th class="p-2">{% trans "Name" %}</th>
-        <th class="p-2">{% trans "Store" %}</th>
-        <th class="p-2">{% trans "Active" %}</th>
-        <th class="p-2"></th>
-      </tr></thead>
-      <tbody>
-        {% for u in items %}
-          <tr class="border-b">
-            <td class="p-2">{{ u.username }}</td>
-            <td class="p-2">{{ u.first_name }} {{ u.last_name }}</td>
-            <td class="p-2">{{ u.store.name }}</td>
-            <td class="p-2">{{ u.is_active }}</td>
-            <td class="p-2 space-x-2">
-              <a class="text-xs px-2 py-1 border rounded" href="{% url 'seller_edit' u.id %}">{% trans "Edit" %}</a>
-              <a class="text-xs px-2 py-1 border rounded" href="{% url 'seller_reset_password' u.id %}">{% trans "Reset password" %}</a>
-              <a class="text-xs px-2 py-1 border rounded" href="{% url 'seller_delete' u.id %}">{% trans "Delete" %}</a>
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td class="p-2 text-sm text-gray-500" colspan="5">{% trans "No items" %}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-indigo-50">
+
+  <!-- Header with gradient -->
+  <div class="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">
+            👥
+          </div>
+          <div>
+            <h1 class="text-3xl md:text-4xl font-bold">{% trans "Sotuvchilar" %}</h1>
+            <p class="text-purple-100 text-sm md:text-base">{% trans "Barcha sotuvchilarni boshqarish" %}</p>
+          </div>
+        </div>
+
+        <!-- Add Seller Button -->
+        <a href="{% url 'seller_new' %}" class="group px-6 py-3 rounded-2xl bg-white text-purple-600 font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2">
+          <svg class="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>{% trans "Yangi sotuvchi" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 -mt-6 pb-8 space-y-6">
+
+    <!-- Stats Card -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-purple-600">{{ items|length }}</div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Jami sotuvchilar" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-emerald-600">
+            {{ items|length|add:"0" }}
+            {% comment %}
+            Yoki viewsda hisoblash kerak:
+            active_count = users.filter(is_active=True).count()
+            {% endcomment %}
+          </div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Faol" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-blue-600">
+            {% regroup items by store as stores_list %}
+            {{ stores_list|length }}
+          </div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Do'konlar" %}</div>
+        </div>
+
+        <div class="text-center">
+          <div class="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
+          </div>
+          <div class="text-2xl font-bold text-amber-600">100%</div>
+          <div class="text-xs text-slate-500 font-medium">{% trans "Aktiv" %}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sellers by Store -->
+    {% regroup items by store as sellers_by_store %}
+
+    {% for store_group in sellers_by_store %}
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
+
+        <!-- Store Header -->
+        <div class="bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-white font-bold text-lg">
+                  {% if store_group.grouper %}
+                    {{ store_group.grouper.name }}
+                  {% else %}
+                    {% trans "Do'konsiz sotuvchilar" %}
+                  {% endif %}
+                </h2>
+                <p class="text-purple-100 text-sm">{{ store_group.list|length }} {% trans "ta sotuvchi" %}</p>
+              </div>
+            </div>
+            <div class="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-xs font-bold">
+              🏪 {% trans "Do'kon" %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Desktop Table View -->
+        <div class="hidden lg:block overflow-x-auto">
+          <table class="min-w-full">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  <div class="flex items-center gap-2">
+                    <span>👤</span>
+                    <span>{% trans "Sotuvchi" %}</span>
+                  </div>
+                </th>
+                <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  <div class="flex items-center gap-2">
+                    <span>📧</span>
+                    <span>{% trans "Email" %}</span>
+                  </div>
+                </th>
+                <th class="text-center px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  <div class="flex items-center justify-center gap-2">
+                    <span>✅</span>
+                    <span>{% trans "Holat" %}</span>
+                  </div>
+                </th>
+                <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  <div class="flex items-center justify-end gap-2">
+                    <span>⚙️</span>
+                    <span>{% trans "Amallar" %}</span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for seller in store_group.list %}
+                <tr class="hover:bg-purple-50 transition-all duration-300 hover:scale-[1.01]">
+                  <td class="px-6 py-4">
+                    <div class="flex items-center gap-3">
+                      <div class="w-12 h-12 bg-gradient-to-br from-purple-400 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                        <span class="text-white text-lg font-bold">
+                          {{ seller.username|slice:":1"|upper }}
+                        </span>
+                      </div>
+                      <div>
+                        <div class="font-bold text-slate-800">
+                          {{ seller.get_full_name|default:seller.username }}
+                        </div>
+                        <div class="text-xs text-slate-500">@{{ seller.username }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    {% if seller.email %}
+                      <div class="flex items-center gap-2 text-sm text-slate-700">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>{{ seller.email }}</span>
+                      </div>
+                    {% else %}
+                      <span class="text-slate-400 text-sm">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-6 py-4 text-center">
+                    {% if seller.is_active %}
+                      <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-emerald-100 to-green-200 text-emerald-700 border-2 border-emerald-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>{% trans "Faol" %}</span>
+                      </span>
+                    {% else %}
+                      <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-slate-100 to-gray-200 text-slate-700 border-2 border-slate-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>{% trans "Faol emas" %}</span>
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td class="px-6 py-4 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <a href="{% url 'seller_edit' seller.id %}" class="px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-300 hover:scale-105 flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        <span>{% trans "Tahrirlash" %}</span>
+                      </a>
+                      <a href="{% url 'seller_delete' seller.id %}" class="px-3 py-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 hover:scale-105 flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        <span>{% trans "O'chirish" %}</span>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="lg:hidden p-4 space-y-3">
+          {% for seller in store_group.list %}
+            <div class="bg-white border-2 border-slate-100 rounded-2xl p-4 hover:shadow-lg transition-all duration-300">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                  <span class="text-white text-xl font-bold">
+                    {{ seller.username|slice:":1"|upper }}
+                  </span>
+                </div>
+                <div class="flex-1">
+                  <div class="font-bold text-slate-800">
+                    {{ seller.get_full_name|default:seller.username }}
+                  </div>
+                  <div class="text-xs text-slate-500">@{{ seller.username }}</div>
+                </div>
+                {% if seller.is_active %}
+                  <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  </div>
+                {% else %}
+                  <div class="w-8 h-8 bg-slate-400 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </div>
+                {% endif %}
+              </div>
+
+              {% if seller.email %}
+                <div class="flex items-center gap-2 text-sm text-slate-600 mb-3 pb-3 border-b border-slate-100">
+                  <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                  </svg>
+                  <span class="text-xs">{{ seller.email }}</span>
+                </div>
+              {% endif %}
+
+              <div class="grid grid-cols-2 gap-2">
+                <a href="{% url 'seller_edit' seller.id %}" class="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-semibold hover:from-blue-600 hover:to-blue-700 transition-all">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                  </svg>
+                  <span>{% trans "Tahrirlash" %}</span>
+                </a>
+                <a href="{% url 'seller_delete' seller.id %}" class="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-semibold hover:from-red-600 hover:to-red-700 transition-all">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                  <span>{% trans "O'chirish" %}</span>
+                </a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+      </div>
+    {% empty %}
+      <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-12 text-center">
+        <div class="text-8xl mb-4">👥</div>
+        <h3 class="text-2xl font-bold text-slate-700 mb-2">{% trans "Sotuvchilar yo'q" %}</h3>
+        <p class="text-slate-500 mb-6">{% trans "Hali hech qanday sotuvchi qo'shilmagan" %}</p>
+        <a href="{% url 'seller_new' %}" class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>{% trans "Birinchi sotuvchini qo'shish" %}</span>
+        </a>
+      </div>
+    {% endfor %}
+
   </div>
 </div>
+
+<style>
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #9333ea, #4f46e5);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #7e22ce, #4338ca);
+  }
+
+  /* Smooth transitions */
+  * {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+</style>
 {% endblock %}

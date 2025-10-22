@@ -1,106 +1,360 @@
 {% extends "base.html" %}
 {% load i18n money %}
 
-{% block header_title %}{% trans "Consignment payouts" %}{% endblock %}
+{% block title %}{% trans "Konsignatsiya to'lovlari" %}{% endblock %}
 
 {% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+  <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-<!-- TOP CARDS -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-  <div class="bg-white border rounded-2xl p-4">
-    <div class="text-xs text-neutral-500">{% trans "Total count" %}</div>
-    <div class="mt-1 text-2xl font-semibold">{{ total_cnt }}</div>
-  </div>
-  <div class="bg-white border rounded-2xl p-4">
-    <div class="text-xs text-neutral-500">{% trans "Total amount" %}</div>
-    <div class="mt-1 text-2xl font-semibold">{{ total_sum|usd }}</div>
-  </div>
-  <div class="bg-white border rounded-2xl p-4">
-    <div class="text-xs text-neutral-500">{% trans "Approved (count/amount)" %}</div>
-    <div class="mt-1 text-sm"><span class="font-semibold">{{ appr_cnt }}</span> / {{ appr_sum|usd }}</div>
-  </div>
-  <div class="bg-white border rounded-2xl p-4">
-    <div class="text-xs text-neutral-500">{% trans "Pending (count/amount)" %}</div>
-    <div class="mt-1 text-sm"><span class="font-semibold">{{ pend_cnt }}</span> / {{ pend_sum|usd }}</div>
-  </div>
-</div>
+    <!-- Header -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl lg:text-3xl font-bold text-gray-900">{% trans "Konsignatsiya to'lovlari" %}</h1>
+          <p class="text-gray-600 text-sm mt-1">{% trans "Barcha payoutlar va tasdiqlashlar" %}</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <a href="{% url 'ap_consignment_batch_list' %}"
+             class="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition-all shadow-sm">
+            ⬇️ {% trans "Partiyalar" %}
+          </a>
+          <a href="{% url 'sales:consignment_new' %}"
+             class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-sm">
+            ➕ {% trans "Yangi payout" %}
+          </a>
+        </div>
+      </div>
+    </div>
 
-<!-- CHART (last 30 days) -->
-<div class="bg-white border rounded-2xl p-4 mb-6">
-  <div class="text-sm font-medium mb-2">{% trans "Approved payouts: last 30 days" %}</div>
-  <canvas id="cns30"></canvas>
-  <script type="application/json" id="cnsLabels">{{ chart_labels }}</script>
-  <script type="application/json" id="cnsSeries">{{ chart_series }}</script>
-</div>
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-600 mb-2">{% trans "Jami soni" %}</p>
+            <p class="text-3xl font-bold text-gray-900">{{ total_count }}</p>
+          </div>
+          <div class="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-3xl">
+            📊
+          </div>
+        </div>
+      </div>
 
-<!-- TABLE -->
-<div class="bg-white border rounded-2xl overflow-hidden">
-  <div class="px-4 py-3 border-b flex items-center justify-between">
-    <div class="font-semibold">{% trans "Payouts list" %}</div>
-    {% comment %} Yangi payout yaratish tugmasi (agar viewingizda bor bo‘lsa) {% endcomment %}
-    <a href="{% url 'consignment_new' %}" class="px-3 py-2 rounded-xl border hover:bg-neutral-50">
-      {% trans "New payout" %}
-    </a>
-  </div>
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-600 mb-2">{% trans "Jami summa" %}</p>
+            <p class="text-3xl font-bold text-blue-600">{{ total_sum|usd }}</p>
+          </div>
+          <div class="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-3xl">
+            💰
+          </div>
+        </div>
+      </div>
 
-  <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
-      <thead class="bg-neutral-50 text-neutral-600">
-        <tr>
-          <th class="text-left px-3 py-2">#</th>
-          <th class="text-left px-3 py-2">{% trans "Date" %}</th>
-          <th class="text-left px-3 py-2">{% trans "Store" %}</th>
-          <th class="text-left px-3 py-2">{% trans "Product" %}</th>
-          <th class="text-right px-3 py-2">{% trans "Amount" %}</th>
-          <th class="text-left px-3 py-2">{% trans "Note" %}</th>
-          <th class="text-left px-3 py-2">{% trans "Status / Action" %}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr class="border-b last:border-0">
-          <td class="px-3 py-2">{{ row.id }}</td>
-          <td class="px-3 py-2">{{ row.created_at|date:"Y-m-d H:i" }}</td>
-          <td class="px-3 py-2">{{ row.store_name }}</td>
-          <td class="px-3 py-2">{{ row.product_name|default:"—" }}</td>
-          <td class="px-3 py-2 text-right">{{ row.amount|usd }}</td>
-          <td class="px-3 py-2">{{ row.note }}</td>
-          <td class="px-3 py-2">
-            {% if row.id %}
-              {% if not row.approved %}
-                <a class="inline-block px-3 py-1 rounded-lg border hover:bg-neutral-50"
-                   href="{% url 'consignment_approve' row.id %}">{% trans "Approve" %}</a>
-                <a class="inline-block px-3 py-1 rounded-lg border hover:bg-neutral-50 ml-2"
-                   href="{% url 'consignment_reject' row.id %}">{% trans "Reject" %}</a>
-              {% else %}
-                <span class="inline-flex items-center px-2 py-1 rounded-md text-emerald-700 bg-emerald-50 border border-emerald-200">
-                  {% trans "Approved" %}
-                </span>
-              {% endif %}
-            {% else %}
-              <span class="text-neutral-400">—</span>
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-600 mb-2">{% trans "Tasdiqlangan" %}</p>
+            <p class="text-2xl font-bold text-green-600">{{ approved_count }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ approved_sum|usd }}</p>
+          </div>
+          <div class="w-14 h-14 rounded-2xl bg-green-100 flex items-center justify-center text-3xl">
+            ✅
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-600 mb-2">{% trans "Kutilmoqda" %}</p>
+            <p class="text-2xl font-bold text-orange-600">{{ pending_count }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ pending_sum|usd }}</p>
+          </div>
+          <div class="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-3xl">
+            ⏳
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl">
+          🔍
+        </div>
+        <h2 class="text-xl font-bold text-gray-900">{% trans "Filtrlar" %}</h2>
+      </div>
+
+      <form method="get" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {% if stores %}
+          <div class="lg:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">🏪 {% trans "Do'kon" %}</label>
+            <select name="store_id" class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">{% trans "Barchasi" %}</option>
+              {% for s in stores %}
+                <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">📊 {% trans "Holat" %}</label>
+            <select name="status" class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">{% trans "Barchasi" %}</option>
+              <option value="approved" {% if status == "approved" %}selected{% endif %}>{% trans "Tasdiqlangan" %}</option>
+              <option value="pending"  {% if status == "pending" %}selected{% endif %}>{% trans "Kutilmoqda" %}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">📅 {% trans "Sana (dan)" %}</label>
+            <input type="date" name="date_from" value="{{ date_from }}" class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">📅 {% trans "Sana (gacha)" %}</label>
+            <input type="date" name="date_to" value="{{ date_to }}" class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+
+          <div class="lg:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">🔎 {% trans "Qidiruv" %}</label>
+            <input type="text" name="q" value="{{ q }}" placeholder="{% trans 'Brend, model, IMEI yoki izoh' %}" class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">💰 {% trans "Min summa ($)" %}</label>
+            <input type="number" step="0.01" name="min_amount" value="{{ min_amount }}" placeholder="0.00" class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">💰 {% trans "Max summa ($)" %}</label>
+            <input type="number" step="0.01" name="max_amount" value="{{ max_amount }}" placeholder="0.00" class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+          <button type="submit" class="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md hover:shadow-lg transition-all">
+            🔍 {% trans "Qo'llash" %}
+          </button>
+          <a href="{% url 'sales:consignment_list' %}" class="px-8 py-3 rounded-xl border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-bold transition-all text-center">
+            🔄 {% trans "Tozalash" %}
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Chart -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-xl">
+          📈
+        </div>
+        <h3 class="text-xl font-bold text-gray-900">{% trans "Oxirgi 30 kun" %}</h3>
+      </div>
+      <canvas id="cns30" style="max-height: 280px;"></canvas>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-2xl">
+            📋
+          </div>
+          <div>
+            <h2 class="text-white font-bold text-xl">{% trans "Barcha payoutlar" %}</h2>
+            <p class="text-blue-100 text-sm">{% trans "To'liq ro'yxat va tasdiqlash" %}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-6 py-4 text-xs font-bold text-gray-700 uppercase">#</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-gray-700 uppercase">{% trans "Sana" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-gray-700 uppercase">{% trans "Do'kon" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-gray-700 uppercase">{% trans "Mahsulot" %}</th>
+              <th class="text-right px-6 py-4 text-xs font-bold text-gray-700 uppercase">{% trans "Summa ($)" %}</th>
+              <th class="text-left px-6 py-4 text-xs font-bold text-gray-700 uppercase">{% trans "Izoh" %}</th>
+              <th class="text-center px-6 py-4 text-xs font-bold text-gray-700 uppercase">{% trans "Holat/Amal" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for row in rows %}
+            <tr class="hover:bg-blue-50 transition-colors">
+              <td class="px-6 py-4 font-semibold text-gray-900">{{ row.id }}</td>
+              <td class="px-6 py-4 text-gray-700">{{ row.created_at|date:"Y-m-d H:i" }}</td>
+              <td class="px-6 py-4 text-gray-700">{{ row.store_name }}</td>
+              <td class="px-6 py-4 text-gray-700">{{ row.product_name|default:"—" }}</td>
+              <td class="px-6 py-4 text-right font-bold text-blue-600">{{ row.amount|usd }}</td>
+              <td class="px-6 py-4 text-gray-600 text-sm">{{ row.note|default:"—" }}</td>
+              <td class="px-6 py-4 text-center">
+                {% if row.approved %}
+                  <span class="inline-block px-4 py-2 rounded-xl bg-green-100 text-green-700 font-semibold">
+                    ✅ {% trans "Tasdiqlangan" %}
+                  </span>
+                {% else %}
+                  {% if request.user.is_owner %}
+                    <div class="flex items-center justify-center gap-2">
+                      <form method="post" action="{% url 'sales:consignment_approve' row.id %}" class="inline">
+                        {% csrf_token %}
+                        <button class="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition-all shadow-sm">
+                          ✅ {% trans "Tasdiqlash" %}
+                        </button>
+                      </form>
+                      <form method="post" action="{% url 'sales:consignment_reject' row.id %}" class="inline" onsubmit="return confirm('{% trans 'Bekor qilinsinmi?' %}')">
+                        {% csrf_token %}
+                        <button class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold transition-all shadow-sm">
+                          ❌ {% trans "Bekor" %}
+                        </button>
+                      </form>
+                    </div>
+                  {% else %}
+                    <span class="inline-block px-4 py-2 rounded-xl bg-orange-100 text-orange-700 font-semibold">
+                      ⏳ {% trans "Kutilmoqda" %}
+                    </span>
+                  {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td class="px-6 py-16 text-center" colspan="7">
+                <div class="text-6xl mb-4">📭</div>
+                <p class="text-gray-500 font-medium text-lg">{% trans "Hozircha ma'lumot yo'q" %}</p>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      {% if page_obj.paginator.num_pages > 1 %}
+      <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="text-sm text-gray-700">
+            <span class="font-semibold">{% trans "Sahifa" %} {{ page_obj.number }}</span> / {{ page_obj.paginator.num_pages }}
+            <span class="mx-2">•</span>
+            <span class="font-semibold">{% trans "Jami" %}: {{ page_obj.paginator.count }}</span>
+          </div>
+          <div class="flex gap-2">
+            {% if page_obj.has_previous %}
+              <a href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                 class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition-all">
+                « {% trans "Birinchi" %}
+              </a>
+              <a href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                 class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition-all">
+                ‹ {% trans "Oldingi" %}
+              </a>
             {% endif %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td class="px-3 py-6 text-neutral-500" colspan="7">{% trans "No payouts" %}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+            {% if page_obj.has_next %}
+              <a href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                 class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition-all">
+                {% trans "Keyingi" %} ›
+              </a>
+              <a href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                 class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition-all">
+                {% trans "Oxirgi" %} »
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
   </div>
 </div>
 
-<!-- Chart.js faqat shu sahifada -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function(){
-  const L = JSON.parse(document.getElementById('cnsLabels').textContent);
-  const S = JSON.parse(document.getElementById('cnsSeries').textContent);
-  new Chart(document.getElementById('cns30').getContext('2d'), {
-    type: 'line',
-    data: { labels: L, datasets: [{ label: 'Payouts', data: S, tension: .25 }] }
-  });
+  const labels = {{ chart_labels|safe }};
+  const series = {{ chart_series|safe }};
+
+  if (document.getElementById('cns30')) {
+    new Chart(document.getElementById('cns30').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '{% trans "Payoutlar ($)" %}',
+          data: series,
+          borderWidth: 3,
+          tension: 0.4,
+          fill: true,
+          backgroundColor: function(context) {
+            const chart = context.chart;
+            const {ctx, chartArea} = chart;
+            if (!chartArea) return null;
+            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+            gradient.addColorStop(0, 'rgba(37, 99, 235, 0.1)');
+            gradient.addColorStop(1, 'rgba(37, 99, 235, 0.3)');
+            return gradient;
+          },
+          borderColor: 'rgb(37, 99, 235)',
+          pointRadius: 5,
+          pointBackgroundColor: 'rgb(37, 99, 235)',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointHoverRadius: 7
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom',
+            labels: {
+              font: { size: 14, weight: 'bold' },
+              padding: 15,
+              color: '#374151'
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: 12,
+            cornerRadius: 8,
+            titleFont: { size: 14, weight: 'bold' },
+            bodyFont: { size: 13 }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+            ticks: {
+              font: { size: 12, weight: '600' },
+              color: '#6b7280',
+              callback: function(value) {
+                return '$' + value.toFixed(2);
+              }
+            }
+          },
+          x: {
+            grid: { display: false },
+            ticks: {
+              font: { size: 12, weight: '600' },
+              color: '#6b7280'
+            }
+          }
+        }
+      }
+    });
+  }
 })();
 </script>
-
 {% endblock %}

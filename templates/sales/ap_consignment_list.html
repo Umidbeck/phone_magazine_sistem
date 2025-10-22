@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% load i18n money %}
+
+{% block title %}{% trans "Do‘kon qarzlari — Konsignatsiya" %}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto p-4 space-y-6">
+
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold">🏦 {% trans "Do‘kon qarzlari (Konsignatsiya)" %}</h1>
+    <div class="flex items-center gap-2">
+      <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=csv"
+         class="px-3 py-2 rounded-xl border hover:bg-neutral-50 text-sm">{% trans "CSV eksport" %}</a>
+      <a href="{% url 'consignment_list' %}" class="px-3 py-2 rounded-xl border hover:bg-neutral-50 text-sm">
+        {% trans "Payout operatsiyalari" %}
+      </a>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="text-xs text-neutral-500">{% trans "Jami kelishilgan (base)" %}</div>
+      <div class="mt-1 text-2xl font-semibold">{{ kpi.total_base|usd }}</div>
+    </div>
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="text-xs text-neutral-500">{% trans "To‘langan (approved)" %}</div>
+      <div class="mt-1 text-2xl font-semibold text-emerald-700">{{ kpi.total_paid|usd }}</div>
+    </div>
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="text-xs text-neutral-500">{% trans "Qolgan (balans)" %}</div>
+      <div class="mt-1 text-2xl font-semibold text-amber-600">{{ kpi.total_balance|usd }}</div>
+    </div>
+    <div class="bg-white border rounded-2xl p-4">
+      <div class="text-xs text-neutral-500">{% trans "Status (open/closed)" %}</div>
+      <div class="mt-1 text-sm">
+        <span class="font-semibold">{{ kpi.open_cnt }}</span> / {{ kpi.closed_cnt }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="grid md:grid-cols-8 gap-3 bg-white border rounded-2xl p-4">
+    {% if stores %}
+      <div class="md:col-span-2">
+        <label class="text-xs text-neutral-500">{% trans "Do‘kon" %}</label>
+        <select name="store_id" class="w-full rounded-xl border p-2">
+          <option value="">{% trans "Hammasi" %}</option>
+          {% for s in stores %}
+            <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+
+    <div>
+      <label class="text-xs text-neutral-500">{% trans "Status" %}</label>
+      <select name="status" class="w-full rounded-xl border p-2">
+        <option value="">{% trans "Hammasi" %}</option>
+        <option value="open"   {% if status == "open" %}selected{% endif %}>{% trans "Ochiq (balans bor)" %}</option>
+        <option value="closed" {% if status == "closed" %}selected{% endif %}>{% trans "Yopilgan (balans 0)" %}</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="text-xs text-neutral-500">{% trans "Sana — dan" %}</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded-xl border p-2">
+    </div>
+    <div>
+      <label class="text-xs text-neutral-500">{% trans "Sana — gacha" %}</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded-xl border p-2">
+    </div>
+
+    <div class="md:col-span-2">
+      <label class="text-xs text-neutral-500">{% trans "Qidiruv (brend/model/IMEI)" %}</label>
+      <input type="text" name="q" value="{{ q }}" class="w-full rounded-xl border p-2" placeholder="{% trans 'Masalan: Samsung yoki 1234' %}">
+    </div>
+
+    <div>
+      <label class="text-xs text-neutral-500">{% trans "Min. base ($)" %}</label>
+      <input type="number" step="0.01" name="min_amount" value="{{ min_amount }}" class="w-full rounded-xl border p-2">
+    </div>
+    <div>
+      <label class="text-xs text-neutral-500">{% trans "Maks. base ($)" %}</label>
+      <input type="number" step="0.01" name="max_amount" value="{{ max_amount }}" class="w-full rounded-xl border p-2">
+    </div>
+
+    <div class="md:col-span-8 flex items-end justify-end gap-2">
+      <button class="px-4 py-2 rounded-xl bg-black text-white">{% trans "Filtrlash" %}</button>
+      <a href="{% url 'ap_consignment_list' %}" class="px-4 py-2 rounded-xl border">{% trans "Qayta tiklash" %}</a>
+    </div>
+  </form>
+
+  <!-- Trend (approved payouts, AP kamayishi) -->
+  <div class="bg-white border rounded-2xl p-4">
+    <div class="text-xs text-neutral-500 mb-2">{% trans "Oxirgi 30 kun: tasdiqlangan payoutlar" %}</div>
+    <canvas id="ap30"></canvas>
+    <script id="apLabels" type="application/json">{{ labels_json }}</script>
+    <script id="apSeries" type="application/json">{{ series_json }}</script>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white border rounded-2xl overflow-hidden">
+    <div class="px-4 py-3 border-b flex items-center justify-between">
+      <div class="font-semibold">{% trans "Konsignatsiya qarzlari (AP) ro‘yxati" %}</div>
+      <div class="text-sm text-neutral-600">{% trans "Sahifalangan natijalar (30 tadan)" %}</div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-neutral-100 text-neutral-700">
+          <tr>
+            <th class="text-left px-3 py-2">{% trans "Sana" %}</th>
+            <th class="text-left px-3 py-2">{% trans "Do‘kon" %}</th>
+            <th class="text-left px-3 py-2">{% trans "Mahsulot" %}</th>
+            <th class="text-right px-3 py-2">{% trans "Kelishilgan ($)" %}</th>
+            <th class="text-right px-3 py-2">{% trans "To‘langan ($)" %}</th>
+            <th class="text-right px-3 py-2">{% trans "Balans ($)" %}</th>
+            <th class="text-right px-3 py-2">{% trans "Amal" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="border-b last:border-0 hover:bg-neutral-50">
+            <td class="px-3 py-2">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="px-3 py-2">{{ r.store_name }}</td>
+            <td class="px-3 py-2">
+              {{ r.brand }} {{ r.model }}
+              {% if r.imei4 %}<span class="text-xs text-neutral-500">• {{ r.imei4 }}</span>{% endif %}
+            </td>
+            <td class="px-3 py-2 text-right">{{ r.base|usd }}</td>
+            <td class="px-3 py-2 text-right text-emerald-700">{{ r.paid|usd }}</td>
+            <td class="px-3 py-2 text-right font-semibold {% if r.balance > 0 %}text-amber-700{% else %}text-neutral-600{% endif %}">
+              {{ r.balance|usd }}
+            </td>
+            <td class="px-3 py-2 text-right">
+              {% if r.balance > 0 %}
+                <a class="px-3 py-1.5 rounded-lg bg-black text-white hover:opacity-90"
+                   href="{% url 'ap_consignment_pay' r.product_id %}">{% trans "To‘lov (tasdiqlash)" %}</a>
+              {% else %}
+                <span class="text-neutral-400">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td class="px-3 py-6 text-center text-neutral-500" colspan="7">{% trans "Ma’lumot yo‘q" %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center justify-between px-4 py-3 bg-neutral-50 border-t">
+      <div class="text-sm text-neutral-600">
+        {% blocktrans %}Sahifa {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}{% endblocktrans %}
+      </div>
+      <div class="flex items-center gap-2">
+        {% if page_obj.has_previous %}
+          <a class="px-3 py-1.5 rounded-lg border hover:bg-white" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode|default:'' }}">{% trans "Oldingi" %}</a>
+        {% else %}
+          <span class="px-3 py-1.5 rounded-lg border text-neutral-400">{% trans "Oldingi" %}</span>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="px-3 py-1.5 rounded-lg border hover:bg-white" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode|default:'' }}">{% trans "Keyingi" %}</a>
+        {% else %}
+          <span class="px-3 py-1.5 rounded-lg border text-neutral-400">{% trans "Keyingi" %}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function(){
+  const L = JSON.parse(document.getElementById('apLabels').textContent || "[]");
+  const S = JSON.parse(document.getElementById('apSeries').textContent || "[]");
+  const c = document.getElementById('ap30');
+  if (c) {
+    new Chart(c.getContext('2d'), {
+      type: 'line',
+      data: { labels: L, datasets: [{ label: '{{ _("Tasdiqlangan payoutlar") }}', data: S, tension: .25 }] }
+    });
+  }
+})();
+</script>
+{% endblock %}

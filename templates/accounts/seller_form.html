@@ -1,21 +1,359 @@
-# accounts/seller_form.html
-{% extends "base.html" %}{% load i18n %}
-{% block header_title %}{% trans "Seller" %}{% endblock %}
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}
+  {% if form.instance.pk %}
+    {% trans "Sotuvchini tahrirlash" %}
+  {% else %}
+    {% trans "Yangi sotuvchi" %}
+  {% endif %}
+{% endblock %}
+
 {% block content %}
-<div class="p-4">
-  <form method="post" class="bg-white border rounded-xl p-4 space-y-3">
-    {% csrf_token %}
-    <div><label class="text-sm">{% trans "Username" %}</label> {{ form.username }}</div>
-    <div class="grid grid-cols-2 gap-3">
-      <div><label class="text-sm">{% trans "First name" %}</label> {{ form.first_name }}</div>
-      <div><label class="text-sm">{% trans "Last name" %}</label> {{ form.last_name }}</div>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-indigo-50">
+  
+  <!-- Header -->
+  <div class="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="flex items-center gap-3">
+        <a href="{% url 'seller_list' %}" class="w-10 h-10 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center transition-all hover:scale-110">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+        </a>
+        <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">
+          👤
+        </div>
+        <div>
+          <h1 class="text-3xl md:text-4xl font-bold">
+            {% if form.instance.pk %}
+              {% trans "Sotuvchini tahrirlash" %}
+            {% else %}
+              {% trans "Yangi sotuvchi" %}
+            {% endif %}
+          </h1>
+          <p class="text-purple-100 text-sm md:text-base">{% trans "Sotuvchi ma'lumotlarini kiriting" %}</p>
+        </div>
+      </div>
     </div>
-    <div><label class="text-sm">{% trans "Store" %}</label> {{ form.store }}</div>
-    {% if form.password %}
-      <div><label class="text-sm">{% trans "Password (optional)" %}</label> {{ form.password }}</div>
-    {% endif %}
-    <div class="flex items-center gap-2">{{ form.is_active }} <span class="text-sm">{% trans "Active" %}</span></div>
-    <button class="w-full bg-black text-white rounded-lg py-2">{% trans "Save" %}</button>
-  </form>
+  </div>
+
+  <div class="max-w-3xl mx-auto px-4 -mt-6 pb-8">
+    
+    <!-- Form Card -->
+    <div class="bg-white/80 backdrop-blur-xl border border-white shadow-2xl rounded-3xl overflow-hidden">
+      
+      <!-- Form Header -->
+      <div class="bg-gradient-to-r from-slate-50 to-purple-50 px-6 py-4 border-b border-slate-200">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
+          </div>
+          <div>
+            <h2 class="font-bold text-slate-800">
+              {% if form.instance.pk %}
+                {% trans "Ma'lumotlarni yangilash" %}
+              {% else %}
+                {% trans "Sotuvchi ma'lumotlari" %}
+              {% endif %}
+            </h2>
+            <p class="text-xs text-slate-500">{% trans "Barcha maydonlarni to'ldiring" %}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Messages -->
+      {% if form.errors %}
+        <div class="mx-6 mt-6 bg-red-50 border-2 border-red-200 rounded-2xl p-4">
+          <div class="flex items-start gap-3">
+            <svg class="w-6 h-6 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <h4 class="font-bold text-red-900 text-sm mb-2">{% trans "Xatolar mavjud!" %}</h4>
+              <ul class="text-sm text-red-700 space-y-1">
+                {% for field, errors in form.errors.items %}
+                  {% for error in errors %}
+                    <li>• <strong>{{ field }}:</strong> {{ error }}</li>
+                  {% endfor %}
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Form -->
+      <form method="post" class="p-6 space-y-6">
+        {% csrf_token %}
+        
+        <!-- Username (only on create) -->
+        {% if not form.instance.pk %}
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
+            <span>{% trans "Foydalanuvchi nomi" %}</span>
+            <span class="text-red-500">*</span>
+          </label>
+          <div class="relative">
+            <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+            </div>
+            {{ form.username }}
+          </div>
+          {% if form.username.errors %}
+            <p class="text-sm text-red-600 flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              {{ form.username.errors.0 }}
+            </p>
+          {% endif %}
+          <p class="text-xs text-slate-500">{% trans "Masalan: john_doe, ali_valiyev" %}</p>
+        </div>
+        {% endif %}
+
+        <!-- First Name & Last Name -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+              <span>{% trans "Ism" %}</span>
+            </label>
+            <div class="relative">
+              <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+              </div>
+              {{ form.first_name }}
+            </div>
+            {% if form.first_name.errors %}
+              <p class="text-sm text-red-600">{{ form.first_name.errors.0 }}</p>
+            {% endif %}
+          </div>
+
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+              <span>{% trans "Familiya" %}</span>
+            </label>
+            <div class="relative">
+              <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+              </div>
+              {{ form.last_name }}
+            </div>
+            {% if form.last_name.errors %}
+              <p class="text-sm text-red-600">{{ form.last_name.errors.0 }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Store -->
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+            </svg>
+            <span>{% trans "Do'kon" %}</span>
+            <span class="text-red-500">*</span>
+          </label>
+          {{ form.store }}
+          {% if form.store.errors %}
+            <p class="text-sm text-red-600 flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              {{ form.store.errors.0 }}
+            </p>
+          {% endif %}
+        </div>
+
+        <!-- Password (only on create) -->
+        {% if form.password %}
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+            </svg>
+            <span>{% trans "Parol" %}</span>
+            <span class="text-xs text-slate-500 font-normal">({% trans "Ixtiyoriy" %})</span>
+          </label>
+          <div class="relative">
+            <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+              </svg>
+            </div>
+            {{ form.password }}
+          </div>
+          {% if form.password.errors %}
+            <p class="text-sm text-red-600">{{ form.password.errors.0 }}</p>
+          {% endif %}
+          <p class="text-xs text-slate-500">{% trans "Bo'sh qoldirilsa, avtomatik parol yaratiladi" %}</p>
+        </div>
+        {% endif %}
+
+        <!-- Active Status -->
+        <div class="space-y-3">
+          <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>{% trans "Holat" %}</span>
+          </label>
+          <div class="bg-gradient-to-r from-slate-50 to-purple-50 border-2 border-slate-200 rounded-2xl p-6">
+            <label class="flex items-center gap-4 cursor-pointer">
+              {{ form.is_active }}
+              <div class="flex-1">
+                <div class="font-semibold text-slate-800 flex items-center gap-2">
+                  <span>{% trans "Sotuvchi faol" %}</span>
+                  <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+                    {% trans "Tavsiya" %}
+                  </span>
+                </div>
+                <p class="text-sm text-slate-500 mt-1">
+                  {% trans "Faol sotuvchilar tizimga kirib sotuvlar amalga oshirishi mumkin" %}
+                </p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Info Card (only on create) -->
+        {% if not form.instance.pk %}
+        <div class="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <h4 class="font-bold text-blue-900 text-sm mb-1">{% trans "Ma'lumot" %}</h4>
+              <p class="text-sm text-blue-700">
+                {% trans "Sotuvchi yaratilgandan so'ng, parol ko'rsatiladi. Uni albatta yozib oling!" %}
+              </p>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Buttons -->
+        <div class="flex flex-col sm:flex-row gap-3 pt-4">
+          <button type="submit" class="flex-1 px-6 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all">
+            <span class="flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {% if form.instance.pk %}
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                {% else %}
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                {% endif %}
+              </svg>
+              {% if form.instance.pk %}
+                {% trans "Saqlash" %}
+              {% else %}
+                {% trans "Sotuvchi qo'shish" %}
+              {% endif %}
+            </span>
+          </button>
+          <a href="{% url 'seller_list' %}" class="flex-1 sm:flex-initial px-6 py-4 rounded-2xl border-2 border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 hover:scale-105 transition-all text-center">
+            <span class="flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+              {% trans "Bekor qilish" %}
+            </span>
+          </a>
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
 </div>
+
+<style>
+  /* Input styling */
+  input[type="text"],
+  input[type="password"],
+  select {
+    width: 100%;
+    padding: 1rem 1rem 1rem 3rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+    transition: all 0.3s;
+    background: white;
+  }
+
+  input:focus,
+  select:focus {
+    outline: none;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+    transform: scale(1.01);
+  }
+
+  /* Select dropdown */
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1.25rem;
+  }
+
+  /* Checkbox */
+  input[type="checkbox"] {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 2px solid #cbd5e1;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    appearance: none;
+    background: white;
+    transition: all 0.3s;
+  }
+
+  input[type="checkbox"]:checked {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #10b981;
+  }
+
+  input[type="checkbox"]:focus {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.querySelector('form');
+  const btn = form.querySelector('button[type="submit"]');
+  
+  form.addEventListener('submit', () => {
+    btn.disabled = true;
+    btn.innerHTML = `
+      <span class="flex items-center justify-center gap-2">
+        <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        {% if form.instance.pk %}{% trans "Saqlanmoqda..." %}{% else %}{% trans "Yaratilmoqda..." %}{% endif %}
+      </span>
+    `;
+  });
+});
+</script>
 {% endblock %}

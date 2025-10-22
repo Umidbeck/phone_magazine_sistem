@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}➕ Investitsiya kiritish{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 py-12">
+    <div class="container mx-auto px-4 max-w-2xl">
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full mb-4 shadow-lg">
+                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+            </div>
+            <h1 class="text-4xl font-bold text-slate-800 mb-2">Investitsiya Kiritish</h1>
+            <p class="text-slate-600">Biznesga qo'shimcha kapital qo'shing</p>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+            <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-8 py-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                    💰 Investitsiya Ma'lumotlari
+                </h2>
+            </div>
+
+            <form method="post" class="p-8 space-y-6">
+                {% csrf_token %}
+
+                <!-- Amount -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">
+                        Summa ($) <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg font-bold">$</span>
+                        <input type="number"
+                               name="amount"
+                               step="0.01"
+                               min="0.01"
+                               required
+                               class="w-full pl-10 pr-4 py-3.5 border-2 border-slate-300 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-200 transition-all text-lg font-semibold"
+                               placeholder="0.00">
+                    </div>
+                    <p class="mt-2 text-sm text-slate-500">Kiritmoqchi bo'lgan investitsiya summasini kiriting</p>
+                </div>
+
+                <!-- Channel -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-3">
+                        To'lov kanali <span class="text-red-500">*</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="channel" value="cash" checked class="peer sr-only">
+                            <div class="p-6 border-2 border-slate-300 rounded-xl peer-checked:border-green-600 peer-checked:bg-green-50 transition-all hover:border-green-400">
+                                <div class="flex flex-col items-center gap-2">
+                                    <div class="text-4xl">💵</div>
+                                    <span class="font-bold text-slate-700">Naqd</span>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="channel" value="card" class="peer sr-only">
+                            <div class="p-6 border-2 border-slate-300 rounded-xl peer-checked:border-green-600 peer-checked:bg-green-50 transition-all hover:border-green-400">
+                                <div class="flex flex-col items-center gap-2">
+                                    <div class="text-4xl">💳</div>
+                                    <span class="font-bold text-slate-700">Karta</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Store (if multiple stores) -->
+                {% if stores|length > 1 %}
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">
+                        Do'kon
+                    </label>
+                    <select name="store_id"
+                            class="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-200 transition-all">
+                        <option value="">Umumiy (Barcha do'konlar)</option>
+                        {% for store in stores %}
+                        <option value="{{ store.id }}">{{ store.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <!-- Memo -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">
+                        Izoh / Sabab
+                    </label>
+                    <textarea name="memo"
+                              rows="4"
+                              class="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-200 transition-all resize-none"
+                              placeholder="Masalan: Qo'shimcha inventar uchun, kengayish uchun, kassa to'ldirish..."></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-4 pt-4">
+                    <button type="submit"
+                            class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all">
+                        ✓ Investitsiya Kiritish
+                    </button>
+
+                    <a href="{% url 'finance:dashboard' %}"
+                       class="px-8 py-4 border-2 border-slate-300 hover:border-slate-400 text-slate-700 rounded-xl font-bold transition-all">
+                        Bekor qilish
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Info Box -->
+        <div class="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <div class="flex gap-4">
+                <svg class="w-6 h-6 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                    <h3 class="font-bold text-blue-900 mb-2">Ma'lumot</h3>
+                    <ul class="space-y-1 text-sm text-blue-800">
+                        <li>• Investitsiya darhol kassaga qo'shiladi</li>
+                        <li>• Owner's Equity balansida ko'rsatiladi</li>
+                        <li>• Barcha harakatlar tarixda saqlanadi</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
