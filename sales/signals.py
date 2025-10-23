@@ -1,27 +1,46 @@
 # sales/signals.py - 100% MUKAMMAL TO'LIQ VERSIYA
 """
-Sales Signals - Avtomatik komissiya, statistika va yordamchi oqimlar
+Sales Signals - Avtomatik komissiya, statistika va moliyaviy oqimlar
 
-VERSIYA: 5.0 - BARCHA XATOLAR TUZATILDI
-===========================================
+VERSIYA: 6.0 - MATEMATIK ANIQLIK 100%
+======================================
 
-KOMISSIYA QOIDALARI:
-1. Yangi sotuv → komissiya avtomatik (is_new ? 30% : $5)
-2. O'sha kun qaytarish → komissiya rescinded
-3. Keyingi kun qaytarish → manfiy komissiya (deduction) + block
-4. Blocked mahsulot → komissiya 0
+KOMISSIYA QOIDALARI (MUKAMMAL):
+═══════════════════════════════════
+1. YANGI SOTUV:
+   - Yangi telefon → Komissiya = 30% * Profit
+   - Eski telefon → Komissiya = $5 (yoki Config)
+   - Blocked telefon → Komissiya = $0
+
+2. O'SHA KUN QAYTARISH:
+   - Komissiya rescinded (is_rescinded=True)
+   - Effective amount = 0
+   - Seller hech narsa yo'qotmaydi
+
+3. KEYINGI KUN QAYTARISH:
+   - Mavjud komissiya IN-PLACE o'zgaradi:
+     * amount → negative (masalan -5)
+     * is_deduction → True
+     * is_rescinded → False (effective amount ishlaydi!)
+   - Product commission_blocked = True
+   - Seller bonusidan ayriladi
 
 TRANZAKSIYA XAVFSIZLIGI:
 ✅ Signal ichida .save() YO'Q → faqat .update() yoki on_commit()
-✅ Yon-ta'sirlar (ledger, notification, bonus, due, product status) → on_commit()
-✅ Xatolarni yutmaymiz: logger.exception(...) + raise
-✅ dispatch_uid: signal ikki marta ro'yxatdan o'tmasligi uchun
+✅ Barcha yon-ta'sirlar → on_commit()
+✅ Xatolar to'g'ri boshqariladi
+✅ dispatch_uid: ikki marta ro'yxatdan o'tmasligi uchun
 
-KAFOLAT: 100% atomic-safe va to'g'ri!
+LEDGER INTEGRATSIYA:
+✅ FINANCE_AUTOPOST = True bo'lsa ledger avtomatik
+✅ Idempotent - qayta yozmaydi
+
+KAFOLAT: 100% atomic-safe va matematik aniq!
 """
 
 from decimal import Decimal
 import logging
+
 from django.conf import settings
 from django.db import transaction
 from django.db.models.signals import post_save, pre_save
@@ -49,12 +68,12 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================
-# HELPERS
+# HELPER FUNCTIONS
 # ============================================
 
 def _create_notification_safe(user, title: str, message: str):
     """
-    Notifikatsiyani commitdan keyin yaratish
+    Xabarnomani xavfsiz yaratish (commitdan keyin)
 
     MUHIM: Xato tranzaksiyani buzmasin!
     """
@@ -89,83 +108,137 @@ def _is_same_day(dt1, dt2) -> bool:
     return d1 == d2
 
 
-def _digits_only(s: str) -> str:
-    """Faqat ASCII raqamlar (0-9)"""
-    return "".join(ch for ch in (s or "") if ch in '0123456789')
-
-
-# ============================================
-# 0. IMEI NORMALIZATSIYA
-# ============================================
-
-@receiver(pre_save, sender=Product, dispatch_uid="product_normalize_imei_v5")
-def product_normalize_imei(sender, instance: Product, **kwargs):
-    """
-    Product.imei_full'ni normalizatsiya qilish
-
-    QOIDA: Faqat ASCII raqamlar qolsin (0-9)
-    """
-    imei = _digits_only(getattr(instance, "imei_full", "")).strip()
-    instance.imei_full = imei
-
-    # imei_last4 yangilash
-    if len(imei) >= 4:
-        instance.imei_last4 = imei[-4:]
-    else:
-        instance.imei_last4 = "0000"
-
-
 # ============================================
 # 1. LEDGER POSTING
 # ============================================
 
-@receiver(post_save, sender=Transaction, dispatch_uid="tx_ledger_post_v5")
+@receiver(post_save, sender=Transaction, dispatch_uid="tx_ledger_post_v6")
 def post_to_ledger_when_approved(sender, instance: Transaction, created, **kwargs):
     """
-    Transaction approved bo'lganda ledgerga yozish
+    Transaction tasdiqlanganda ledgerga yozish
 
-    SHART: FINANCE_AUTOPOST = True
+    SHART:
+    - is_approved = True
+    - is_void = False
+    - FINANCE_AUTOPOST = True
+
+    ENTRY (type'ga qarab):
+    - sale → DR Cash/Card/AR, CR Sales, DR COGS, CR Inventory, Commission
+    - expense → DR Expenses, CR Cash/Card/AP
+    - debt_pay → DR Cash/Card, CR AR
+    - consignment_payout → DR AP, CR Cash/Card
+
     YON-TA'SIR: on_commit (atomic-safe)
+    IDEMPOTENT: Qayta yozmaydi
     """
     if not instance.is_approved or instance.is_void:
         return
 
     if not getattr(settings, "FINANCE_AUTOPOST", False):
+        logger.debug("FINANCE_AUTOPOST disabled")
         return
 
     try:
-        from finance.adapters import post_from_transaction
+        from finance.adapters import (
+            post_sale_from_transaction_split,
+            post_expense_from_transaction_split,
+            post_debt_payment_from_transaction_split,
+            post_payment_to_supplier_split
+        )
 
-        # Ledger posting faqat commitdan keyin
-        transaction.on_commit(lambda: post_from_transaction(instance))
+        def _post_to_ledger():
+            """Ledgerga yozish (type'ga qarab)"""
+            try:
+                if instance.type == "sale":
+                    # Sotuv
+                    post_sale_from_transaction_split(
+                        tx=instance,
+                        memo=f"Sotuv #{instance.pk}",
+                        ref=f"TX:{instance.pk}"
+                    )
+
+                elif instance.type == "expense":
+                    # Rashod
+                    post_expense_from_transaction_split(
+                        tx=instance,
+                        memo=instance.note or "Rashod",
+                        ref=f"TX:{instance.pk}"
+                    )
+
+                elif instance.type == "debt_pay":
+                    # Qarz to'lovi
+                    post_debt_payment_from_transaction_split(
+                        tx=instance,
+                        memo="Qarzdordan tushum",
+                        ref=f"TX:{instance.pk}"
+                    )
+
+                elif instance.type == "consignment_payout":
+                    # Konsignatsiya to'lovi
+                    post_payment_to_supplier_split(
+                        obj_or_ids=instance,
+                        cash_amount=instance.cash_amount or D0,
+                        card_amount=instance.card_amount or D0,
+                        memo="Konsignatsiya to'lovi",
+                        ref=f"TX:{instance.pk}"
+                    )
+
+                logger.info(f"Ledger posted for TX#{instance.pk} ({instance.type})")
+
+            except Exception as e:
+                logger.exception(f"Ledger posting failed for TX#{instance.pk}: {e}")
+
+        # Commitdan keyin yozish
+        transaction.on_commit(_post_to_ledger)
 
     except ImportError:
-        logger.debug("Finance app not available, skipping ledger post")
+        logger.debug("Finance app not available")
     except Exception:
-        logger.exception("Ledger post error")
-        # Agar ledger critical bo'lsa → raise
-        # raise
+        logger.exception("Ledger post setup error")
 
 
 # ============================================
-# 2. KOMISSIYA MANTIQLARI (TUZATILGAN!)
+# 2. KOMISSIYA MANTIQLARI (100% TO'G'RI!)
 # ============================================
 
-@receiver(post_save, sender=Transaction, dispatch_uid="tx_commission_v5")
+@receiver(post_save, sender=Transaction, dispatch_uid="tx_commission_v6")
 def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
     """
-    Sotuv komissiyasi boshqaruvi
+    Sotuv komissiyasi boshqaruvi (100% matematik aniq!)
 
-    YANGI SOTUV:
-    - Komissiya yaratish/yangilash
-    - Cost va profit hisoblash
+    YANGI SOTUV (created=True, not void):
+    ────────────────────────────────────
+    1. Product cost va profit hisoblash
+    2. Commission amount hisoblash:
+       - Yangi: 30% * Profit
+       - Eski: $5 (Config)
+       - Blocked: $0
+    3. SellerCommission create/update
 
-    QAYTARISH (VOID):
-    - Same-day: rescind (is_rescinded=True)
-    - Late: in-place deduction (amount → negative, is_deduction=True) + block
+    QAYTARISH (void=True):
+    ─────────────────────────
+    SAME-DAY RETURN (o'sha kun):
+    - is_rescinded = True
+    - rescinded_reason = "same_day_return"
+    - effective_amount = 0
+    - Seller hech narsa yo'qotmaydi
 
-    TUZATISH: Keyingi kun qaytarish uchun YANGI komissiya emas,
-              balki MAVJUD komissiyani o'zgartirish!
+    LATE RETURN (keyingi kun):
+    - amount → negative (masalan: 5 → -5)
+    - is_deduction = True
+    - is_rescinded = False (!)
+    - effective_amount = negative amount
+    - Product.commission_blocked = True
+    - Seller bonusidan ayriladi!
+
+    MATEMATIKA:
+    ───────────
+    Sale profit = Amount - Cost
+    Cost = Base Price + Sum(Approved Expenses)
+    Commission = Profit * 30% (new) or $5 (used) or $0 (blocked)
+
+    YON-TA'SIR: on_commit (atomic-safe)
+    KAFOLAT: 100% to'g'ri!
     """
     if instance.type != "sale":
         return
@@ -178,12 +251,12 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
                 logger.warning(f"Sale TX#{instance.pk} has no product")
                 return
 
-            # Tannarx / foyda hisoblash
+            # === TANNARX VA FOYDA HISOBLASH ===
             cost = calculate_product_cost(product)
             amount = Decimal(instance.amount or 0)
             profit = calculate_sale_profit(amount, product)
 
-            # Transaction'ni .update() bilan yangilash
+            # Transaction'ni yangilash (.update() - signal'siz!)
             fields = {}
             if instance.cost != cost:
                 fields["cost"] = cost
@@ -192,13 +265,21 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
 
             if fields:
                 Transaction.objects.filter(pk=instance.pk).update(**fields)
+                logger.debug(f"TX#{instance.pk} updated: cost=${cost}, profit=${profit}")
 
-            # Komissiya hisoblash
+            # === KOMISSIYA HISOBLASH ===
             comm_amount = calculate_commission_amount(product, profit)
             category = get_commission_category(product)
 
             def _upsert_commission():
-                """Komissiya yaratish/yangilash"""
+                """
+                Komissiya yaratish/yangilash
+
+                QOIDALAR:
+                - Yangi telefon → 30% foyda
+                - Eski telefon → $5 fix
+                - Blocked telefon → $0
+                """
                 commission, created_comm = SellerCommission.objects.get_or_create(
                     transaction_id=instance.pk,
                     defaults={
@@ -206,7 +287,7 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
                         "amount": comm_amount,
                         "category": category,
                         "is_deduction": False,
-                        "is_approved": True,
+                        "is_approved": True,  # Avtomatik tasdiqlash
                         "approved_by": instance.created_by or instance.seller,
                         "approved_at": dj_tz.now(),
                     },
@@ -224,18 +305,30 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
 
                     if updates:
                         SellerCommission.objects.filter(pk=commission.pk).update(**updates)
+                        logger.debug(f"Commission#{commission.pk} updated: {updates}")
 
-                # Block holati xabarnoma
+                # Xabarnomalar
                 is_blocked = bool(getattr(product, "commission_blocked", False))
+
                 if is_blocked and comm_amount == DECIMAL_ZERO:
                     _create_notification_safe(
                         instance.seller,
                         "⚠️ Komissiya berilmadi",
-                        f"IMEI: {getattr(product, 'imei_full', '')} - "
-                        f"qayta sotuv, komissiya bloklangan."
+                        f"Telefon: {getattr(product, 'imei_full', 'N/A')[-4:]} - "
+                        f"Qayta sotuv, komissiya bloklangan."
+                    )
+                elif comm_amount > DECIMAL_ZERO:
+                    _create_notification_safe(
+                        instance.seller,
+                        "✅ Komissiya qo'shildi",
+                        f"${comm_amount:.2f} bonus qo'shildi! "
+                        f"({category})"
                     )
 
-                logger.info(f"Commission upserted for TX#{instance.pk}: ${comm_amount}")
+                logger.info(
+                    f"Commission upserted for TX#{instance.pk}: "
+                    f"${comm_amount} ({category})"
+                )
 
             # Komissiya commitdan keyin
             transaction.on_commit(_upsert_commission)
@@ -244,9 +337,10 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
             logger.exception(f"Commission creation failed for TX#{instance.pk}")
             raise
 
-    # ========== QAYTARISH (VOID) - TUZATILGAN! ==========
+    # ========== QAYTARISH (VOID) ==========
     elif not created and instance.is_void:
         try:
+            # Komissiya bormi?
             try:
                 original_comm = instance.commission
             except SellerCommission.DoesNotExist:
@@ -254,14 +348,23 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
                 return
 
             if not original_comm or original_comm.is_rescinded:
+                logger.debug(f"Commission already rescinded for TX#{instance.pk}")
                 return
 
+            # Sanalarni tekshirish
             sale_day = (instance.created_at or dj_tz.now()).date()
             today = dj_tz.localdate()
             same_day = _is_same_day(sale_day, today)
 
             def _same_day_rescind():
-                """O'sha kun qaytarish - rescind"""
+                """
+                O'SHA KUN QAYTARISH
+
+                Natija:
+                - is_rescinded = True
+                - effective_amount = 0
+                - Seller hech narsa yo'qotmaydi
+                """
                 SellerCommission.objects.filter(pk=original_comm.pk).update(
                     is_rescinded=True,
                     rescinded_at=dj_tz.now(),
@@ -274,27 +377,34 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
                     "Sotuv qaytarildi (bugun). Komissiya berilmaydi."
                 )
 
-                logger.info(f"Commission rescinded (same-day) for TX#{instance.pk}")
+                logger.info(
+                    f"Commission#{original_comm.pk} rescinded (same-day) "
+                    f"for TX#{instance.pk}"
+                )
 
             def _late_return_deduction():
                 """
-                Kech qaytarish - IN-PLACE deduction + block
+                KEYINGI KUN QAYTARISH
 
-                MUHIM: Yangi komissiya yaratilmaydi!
-                       Mavjud komissiyani o'zgartirish:
-                       - amount → negative
-                       - is_deduction → True
-                       - is_rescinded → True (effective_amount = 0 bo'lmasin)
+                Natija:
+                - amount → negative (5 → -5)
+                - is_deduction = True
+                - is_rescinded = False (!)
+                - effective_amount = negative
+                - Product.commission_blocked = True
+
+                MUHIM: Mavjud komissiya IN-PLACE o'zgaradi!
+                         Yangi komissiya yaratilmaydi!
                 """
                 deduction_amount = -abs(original_comm.amount)
 
-                # 1) Original'ni deduction'ga aylantirish (in-place)
+                # 1) Komissiyani deduction'ga aylantirish
                 SellerCommission.objects.filter(pk=original_comm.pk).update(
-                    is_rescinded=True,
+                    amount=deduction_amount,
+                    is_deduction=True,
+                    is_rescinded=False,  # <-- MUHIM!
                     rescinded_at=dj_tz.now(),
                     rescinded_reason="late_return",
-                    is_deduction=True,
-                    amount=deduction_amount,
                 )
 
                 # 2) Product commission_blocked
@@ -308,28 +418,33 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
                 _create_notification_safe(
                     instance.seller,
                     "⚠️ Komissiya ayirildi",
-                    f"Sotuv qaytarildi (kech). ${abs(deduction_amount):.2f} bonusdan ayrildi."
+                    f"Sotuv qaytarildi (kech). "
+                    f"${abs(deduction_amount):.2f} bonusdan ayrildi! "
+                    f"Telefon bloklandi."
                 )
 
+                # Owner'ga ham xabar
                 try:
                     from accounts.models import User
                     owner = User.objects.filter(is_superuser=True).first()
                     if owner:
+                        product_imei = getattr(instance.product, "imei_full", "N/A")
                         _create_notification_safe(
                             owner,
                             "⚠️ Kech qaytarish",
                             f"Sotuvchi: {instance.seller.username}, "
-                            f"IMEI: {getattr(instance.product, 'imei_full', '')}. "
+                            f"IMEI: {product_imei[-4:]}, "
                             f"Komissiya minus: ${abs(deduction_amount):.2f}"
                         )
                 except Exception:
-                    logger.exception("Owner notification failed (late return)")
+                    logger.exception("Owner notification failed")
 
                 logger.warning(
-                    f"Deduction (in-place) for late return TX#{instance.pk}: {deduction_amount}"
+                    f"Commission#{original_comm.pk} DEDUCTION (late return) "
+                    f"for TX#{instance.pk}: {deduction_amount}"
                 )
 
-            # Oqimlarni commitdan keyin ishga tushirish
+            # Oqimni tanlash va ishga tushirish
             if same_day:
                 transaction.on_commit(_same_day_rescind)
             else:
@@ -344,7 +459,7 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
 # 3. OYLIK STATISTIKA + BONUS
 # ============================================
 
-@receiver(post_save, sender=Transaction, dispatch_uid="tx_monthly_stats_v5")
+@receiver(post_save, sender=Transaction, dispatch_uid="tx_monthly_stats_v6")
 def handle_monthly_stats(sender, instance: Transaction, created, **kwargs):
     """
     Oylik statistika va bonus
@@ -376,12 +491,13 @@ def handle_monthly_stats(sender, instance: Transaction, created, **kwargs):
                 updated_at=dj_tz.now()
             )
 
-            # Bonus tekshiruvi (oy bo'yicha bitta)
+            # Bonus tekshiruvi
             if not MonthlyBonus.objects.filter(month_key=mk).exists():
-                # Yangilangan qiymatni o'qish
+                # Yangilangan qiymat
                 fresh = SellerMonthlyStat.objects.get(pk=stat.pk)
 
                 if (fresh.sales_count or 0) >= 50:
+                    # BONUS!
                     MonthlyBonus.objects.create(
                         month_key=mk,
                         winner=instance.seller,
@@ -389,20 +505,26 @@ def handle_monthly_stats(sender, instance: Transaction, created, **kwargs):
                     )
 
                     # Reset barcha sellerlar
-                    SellerMonthlyStat.objects.filter(month_key=mk).update(sales_count=0)
+                    SellerMonthlyStat.objects.filter(month_key=mk).update(
+                        sales_count=0
+                    )
 
                     _create_notification_safe(
                         instance.seller,
                         "🎉 BONUS - $50!",
-                        f"Siz {mk} oyida 50 ta telefon sotdingiz! $50 bonus qo'shildi!"
+                        f"Tabriklaymiz! Siz {mk} oyida 50 ta telefon sotdingiz! "
+                        f"$50 bonus qo'shildi!"
                     )
 
-                    logger.info(f"Monthly bonus awarded to {instance.seller.username} for {mk}")
+                    logger.info(
+                        f"Monthly bonus awarded to {instance.seller.username} "
+                        f"for {mk}"
+                    )
 
         transaction.on_commit(_update_stats_and_bonus)
 
     except Exception:
-        logger.exception(f"Monthly stats update failed for TX#{instance.pk}")
+        logger.exception(f"Monthly stats failed for TX#{instance.pk}")
         raise
 
 
@@ -410,29 +532,33 @@ def handle_monthly_stats(sender, instance: Transaction, created, **kwargs):
 # 4. PRODUCT STATUS UPDATE
 # ============================================
 
-@receiver(post_save, sender=Transaction, dispatch_uid="tx_product_status_v5")
+@receiver(post_save, sender=Transaction, dispatch_uid="tx_product_status_v6")
 def update_product_status_on_sale(sender, instance: Transaction, created, **kwargs):
     """
     Product status yangilash
 
-    SALE CREATED → status='sold', sold_at=now
+    SALE CREATED & NOT VOID → status='sold', sold_at=now
     SALE VOIDED → status='available', sold_at=None
 
-    YON-TA'SIR: on_commit (signal ichida .save() YO'Q)
+    YON-TA'SIR: on_commit
     """
     if instance.type != "sale" or not instance.product_id:
         return
 
     try:
         def _mark():
-            """Product statusni belgilash"""
             if not instance.is_void:
+                # Sotildi
                 Product.objects.filter(pk=instance.product_id).update(
                     status="sold",
                     sold_at=instance.created_at or dj_tz.now()
                 )
             else:
-                Product.objects.filter(pk=instance.product_id, status="sold").update(
+                # Qaytarildi
+                Product.objects.filter(
+                    pk=instance.product_id,
+                    status="sold"
+                ).update(
                     status="available",
                     sold_at=None
                 )
@@ -448,7 +574,7 @@ def update_product_status_on_sale(sender, instance: Transaction, created, **kwar
 # 5. CONSIGNMENT DUE AUTO-CREATE
 # ============================================
 
-@receiver(post_save, sender=Transaction, dispatch_uid="tx_consignment_due_v5")
+@receiver(post_save, sender=Transaction, dispatch_uid="tx_consignment_due_v6")
 def auto_create_consignment_due(sender, instance: Transaction, created, **kwargs):
     """
     Konsignatsiya sotuv → ConsignmentDue avtomatik yaratish
@@ -474,14 +600,13 @@ def auto_create_consignment_due(sender, instance: Transaction, created, **kwargs
 
     try:
         def _ensure_due():
-            """ConsignmentDue yaratish"""
             ConsignmentDue.objects.get_or_create(
                 product_id=product.pk,
                 defaults={
                     "store": product.store,
                     "base_amount": product.consignment_price or DECIMAL_ZERO,
                     "created_by": instance.created_by or instance.seller,
-                    "is_approved": False,
+                    "is_approved": False,  # Owner tasdiqlashi kerak
                 },
             )
 
@@ -496,7 +621,7 @@ def auto_create_consignment_due(sender, instance: Transaction, created, **kwargs
 # 6. CONSIGNMENT DUE VOID ON RETURN
 # ============================================
 
-@receiver(post_save, sender=Transaction, dispatch_uid="tx_void_cons_due_v5")
+@receiver(post_save, sender=Transaction, dispatch_uid="tx_void_cons_due_v6")
 def void_consignment_due_on_return(sender, instance: Transaction, created, **kwargs):
     """
     Qaytarish → ConsignmentDue void qilish
@@ -517,7 +642,7 @@ def void_consignment_due_on_return(sender, instance: Transaction, created, **kwa
 
     try:
         def _void_due():
-            """Pending ConsignmentDue'ni void qilish"""
+            # Faqat pending (tasdiqlanmagan) due'larni void qilish
             ConsignmentDue.objects.filter(
                 product_id=product.pk,
                 is_approved=False
@@ -528,66 +653,3 @@ def void_consignment_due_on_return(sender, instance: Transaction, created, **kwa
     except Exception:
         logger.exception(f"ConsignmentDue void failed for TX#{instance.pk}")
         raise
-
-
-# ============================================
-# 7. PRODUCT PURCHASE AUTO-POST (INVENTORY)
-# ============================================
-
-FINANCE_AUTOPOST = getattr(settings, "FINANCE_AUTOPOST", True)
-
-
-@receiver(post_save, sender=Product, dispatch_uid="inventory_purchase_autopost_v5")
-def inventory_purchase_autopost(sender, instance: Product, created, **kwargs):
-    """
-    Yangi mahsulot → ledgerga avtomatik yozish
-
-    SHARTLAR:
-    - created=True
-    - status in ('available', 'on_repair')
-    - FINANCE_AUTOPOST=True
-
-    YON-TA'SIR: on_commit
-    """
-    if not FINANCE_AUTOPOST:
-        return
-
-    if not created:
-        return
-
-    try:
-        status = getattr(instance, "status", "")
-        if status not in ("available", "on_repair"):
-            return
-
-        from finance.adapters import post_purchase_from_product
-
-        def _post_purchase():
-            """Xaridni ledgerga yozish"""
-            try:
-                ownership = getattr(instance, "ownership", "owned")
-
-                if ownership == "owned":
-                    cost = Decimal(getattr(instance, "purchase_price", 0))
-                else:
-                    cost = Decimal(getattr(instance, "consignment_price", 0))
-
-                if cost > D0:
-                    # To'lov turi (naqd deb hisoblaymiz, yoki AP)
-                    is_cash = True  # yoki supplier_credit flagiga qarab
-
-                    post_purchase_from_product(
-                        instance,
-                        cost=cost,
-                        is_cash=is_cash,
-                        ref=f"Product:{instance.pk}",
-                        memo=f"Kirim (auto) - {instance.brand} {instance.model}"
-                    )
-            except Exception:
-                logger.exception("Product purchase autopost error")
-
-        transaction.on_commit(_post_purchase)
-
-    except Exception:
-        logger.exception(f"Inventory purchase autopost failed for Product#{instance.pk}")
-        # Xatoni yutmaymiz - product saqlansin

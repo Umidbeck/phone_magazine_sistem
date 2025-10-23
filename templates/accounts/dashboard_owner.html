@@ -1,0 +1,963 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% load i18n %}
+
+{% block title %}{% trans "Dashboard" %} - {% trans "Boshqaruv" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        min-height: 100vh;
+    }
+
+    .dashboard-wrapper {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 24px;
+    }
+
+    /* Hero Section */
+    .hero-banner {
+        background: white;
+        border-radius: 24px;
+        padding: 40px;
+        margin-bottom: 24px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9));
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero-banner::before {
+        content: '👑';
+        position: absolute;
+        top: -20px;
+        right: -20px;
+        font-size: 200px;
+        opacity: 0.05;
+    }
+
+    .hero-title {
+        font-size: 40px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 12px;
+    }
+
+    .hero-subtitle {
+        font-size: 16px;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+        background: white;
+        border-radius: 20px;
+        padding: 20px 28px;
+        margin-bottom: 24px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .filter-label {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1f2937;
+    }
+
+    .filter-select {
+        padding: 12px 20px;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        background: white;
+        min-width: 200px;
+        transition: all 0.2s;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: #f093fb;
+        box-shadow: 0 0 0 3px rgba(240,147,251,0.1);
+    }
+
+    .filter-btn {
+        padding: 12px 28px;
+        border: none;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+        color: white;
+        box-shadow: 0 4px 12px rgba(240,147,251,0.3);
+    }
+
+    .filter-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(240,147,251,0.4);
+    }
+
+    .filter-btn.secondary {
+        background: #6b7280;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .action-btn {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .action-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .action-btn:hover::before {
+        opacity: 1;
+    }
+
+    .action-btn:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 28px rgba(240,147,251,0.3);
+    }
+
+    .action-btn:hover .action-icon,
+    .action-btn:hover .action-label {
+        color: white;
+        position: relative;
+        z-index: 1;
+    }
+
+    .action-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+        transition: all 0.3s;
+    }
+
+    .action-label {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1f2937;
+        transition: all 0.3s;
+    }
+
+    .pending-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: #ef4444;
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(239,68,68,0.4);
+        z-index: 2;
+    }
+
+    /* Stats Grid */
+    .main-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 20px;
+        padding: 28px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, #f093fb, #f5576c);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+    }
+
+    .stat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 20px;
+    }
+
+    .stat-icon-box {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #f093fb15, #f5576c15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+    }
+
+    .stat-badge {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+        color: white;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        color: #6b7280;
+        font-weight: 600;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+        font-size: 36px;
+        font-weight: 800;
+        color: #1f2937;
+        line-height: 1;
+        margin-bottom: 8px;
+    }
+
+    .stat-meta {
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    /* Mini Stats */
+    .mini-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .mini-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        transition: all 0.2s;
+        text-align: center;
+    }
+
+    .mini-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+
+    .mini-icon {
+        font-size: 40px;
+        margin-bottom: 12px;
+    }
+
+    .mini-label {
+        font-size: 13px;
+        color: #6b7280;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .mini-value {
+        font-size: 28px;
+        font-weight: 800;
+        color: #1f2937;
+    }
+
+    .mini-value.danger {
+        color: #ef4444;
+    }
+
+    /* Chart Card */
+    .chart-section {
+        background: white;
+        border-radius: 20px;
+        padding: 32px;
+        margin-bottom: 24px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    .chart-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 24px;
+    }
+
+    /* Activity Section */
+    .activity-section {
+        background: white;
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    .section-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 24px;
+    }
+
+    .activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .activity-row {
+        display: flex;
+        align-items: center;
+        padding: 16px;
+        border-radius: 12px;
+        transition: all 0.2s;
+    }
+
+    .activity-row:hover {
+        background: #f9fafb;
+    }
+
+    .activity-icon-wrapper {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        margin-right: 16px;
+        flex-shrink: 0;
+    }
+
+    .activity-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .activity-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 4px;
+    }
+
+    .activity-subtitle {
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .activity-amount {
+        font-size: 20px;
+        font-weight: 700;
+        color: #00c853;
+        flex-shrink: 0;
+    }
+
+    .activity-amount.void {
+        color: #ef4444;
+    }
+
+    /* Leaderboard */
+    .leaderboard-section {
+        background: white;
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+    }
+
+    .leaderboard-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .leaderboard-item {
+        display: flex;
+        align-items: center;
+        padding: 16px;
+        border-radius: 12px;
+        transition: all 0.3s;
+        background: #f9fafb;
+    }
+
+    .leaderboard-item:hover {
+        transform: translateX(8px);
+    }
+
+    .rank-badge {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
+        margin-right: 16px;
+        flex-shrink: 0;
+    }
+
+    .rank-badge.gold {
+        background: linear-gradient(135deg, #ffd700, #ffed4e);
+        color: white;
+        box-shadow: 0 4px 12px rgba(255,215,0,0.4);
+    }
+
+    .rank-badge.silver {
+        background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+        color: white;
+        box-shadow: 0 4px 12px rgba(192,192,192,0.4);
+    }
+
+    .rank-badge.bronze {
+        background: linear-gradient(135deg, #cd7f32, #daa520);
+        color: white;
+        box-shadow: 0 4px 12px rgba(205,127,50,0.4);
+    }
+
+    .rank-badge.other {
+        background: #e5e7eb;
+        color: #6b7280;
+    }
+
+    .leaderboard-details {
+        flex: 1;
+    }
+
+    .leaderboard-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 4px;
+    }
+
+    .leaderboard-sales {
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    /* Brand Item */
+    .brand-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .brand-row {
+        display: flex;
+        align-items: center;
+        padding: 16px;
+        border-radius: 12px;
+        background: #f9fafb;
+        transition: all 0.2s;
+    }
+
+    .brand-row:hover {
+        transform: translateX(4px);
+    }
+
+    .brand-number {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        margin-right: 16px;
+        flex-shrink: 0;
+    }
+
+    .brand-details {
+        flex: 1;
+    }
+
+    .brand-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 4px;
+    }
+
+    .brand-count {
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .brand-total {
+        font-size: 18px;
+        font-weight: 700;
+        color: #00c853;
+        flex-shrink: 0;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-icon {
+        font-size: 80px;
+        opacity: 0.3;
+        margin-bottom: 16px;
+    }
+
+    .empty-text {
+        font-size: 16px;
+        color: #6b7280;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .dashboard-wrapper {
+            padding: 16px;
+        }
+
+        .hero-banner {
+            padding: 24px;
+        }
+
+        .hero-title {
+            font-size: 32px;
+        }
+
+        .main-stats,
+        .mini-stats,
+        .quick-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .filter-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .filter-select,
+        .filter-btn {
+            width: 100%;
+        }
+    }
+
+    /* Animations */
+    .fade-in {
+        animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .slide-up {
+        animation: slideUp 0.6s ease-out;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+
+    <!-- Hero Banner -->
+    <div class="hero-banner fade-in">
+        <div class="hero-title">👑 {% trans "Boshqaruv paneli" %}</div>
+        <div class="hero-subtitle">
+            <span>👤 {{ user.get_full_name|default:user.username }}</span>
+            <span>📅 {{ "now"|date:"d F Y" }}</span>
+            <span>⏰ {{ "now"|date:"H:i" }}</span>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <form method="get" class="filter-bar fade-in">
+        <span class="filter-label">🏪 {% trans "Do'kon" %}:</span>
+        <select name="store_id" class="filter-select">
+            <option value="">{% trans "Barcha do'konlar" %}</option>
+            {% for store in stores %}
+            <option value="{{ store.id }}" {% if store_id == store.id|stringformat:"s" %}selected{% endif %}>
+                {{ store.name }}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="filter-btn">🔍 {% trans "Filtr" %}</button>
+        {% if store_id %}
+        <a href="{% url 'home' %}" class="filter-btn secondary">❌ {% trans "Tozalash" %}</a>
+        {% endif %}
+    </form>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions fade-in">
+        <a href="{% url 'sales:sell' %}" class="action-btn">
+            <div class="action-icon">🛒</div>
+            <div class="action-label">{% trans "Yangi sotuv" %}</div>
+        </a>
+        <a href="{% url 'inventory_search' %}" class="action-btn">
+            <div class="action-icon">📱</div>
+            <div class="action-label">{% trans "Telefonlar" %}</div>
+        </a>
+        <a href="{% url 'profit_overview' %}" class="action-btn">
+            <div class="action-icon">💰</div>
+            <div class="action-label">{% trans "Moliya" %}</div>
+        </a>
+        <a href="{% url 'sales:commissions_list' %}" class="action-btn">
+            <div class="action-icon">🎁</div>
+            <div class="action-label">{% trans "Komissiyalar" %}</div>
+            {% if pending_count > 0 %}
+            <div class="pending-badge">{{ pending_count }}</div>
+            {% endif %}
+        </a>
+    </div>
+
+    <!-- Main Stats -->
+    <div class="main-stats slide-up">
+        <div class="stat-card" style="animation-delay: 0.1s;">
+            <div class="stat-header">
+                <div class="stat-icon-box">🎯</div>
+                <div class="stat-badge">{% trans "Bugun" %}</div>
+            </div>
+            <div class="stat-label">{% trans "Bugungi savdo" %}</div>
+            <div class="stat-value">$ {{ today_amount|floatformat:0|intcomma }}</div>
+            <div class="stat-meta">{{ today_count }} ta • Foyda: $ {{ today_profit|floatformat:0|intcomma }}</div>
+        </div>
+
+        <div class="stat-card" style="animation-delay: 0.2s;">
+            <div class="stat-header">
+                <div class="stat-icon-box">📊</div>
+                <div class="stat-badge">{% trans "Hafta" %}</div>
+            </div>
+            <div class="stat-label">{% trans "Haftalik savdo" %}</div>
+            <div class="stat-value">$ {{ week_amount|floatformat:0|intcomma }}</div>
+            <div class="stat-meta">{{ week_count }} ta • Foyda: $ {{ week_profit|floatformat:0|intcomma }}</div>
+        </div>
+
+        <div class="stat-card" style="animation-delay: 0.3s;">
+            <div class="stat-header">
+                <div class="stat-icon-box">📈</div>
+                <div class="stat-badge">{% trans "Oy" %}</div>
+            </div>
+            <div class="stat-label">{% trans "Oylik savdo" %}</div>
+            <div class="stat-value">$ {{ month_amount|floatformat:0|intcomma }}</div>
+            <div class="stat-meta">{{ month_count }} ta • Foyda: $ {{ month_profit|floatformat:0|intcomma }}</div>
+        </div>
+
+        <div class="stat-card" style="animation-delay: 0.4s;">
+            <div class="stat-header">
+                <div class="stat-icon-box">💵</div>
+                <div class="stat-badge">{% trans "Kassa" %}</div>
+            </div>
+            <div class="stat-label">{% trans "Umumiy kassa" %}</div>
+            <div class="stat-value">$ {{ total_cash|floatformat:0|intcomma }}</div>
+            <div class="stat-meta">Naqd: $ {{ cash_balance|floatformat:0|intcomma }} • Karta: $ {{ card_balance|floatformat:0|intcomma }}</div>
+        </div>
+    </div>
+
+    <!-- Mini Stats -->
+    <div class="mini-stats slide-up" style="animation-delay: 0.5s;">
+        <div class="mini-card">
+            <div class="mini-icon">📦</div>
+            <div class="mini-label">{% trans "Jami mahsulotlar" %}</div>
+            <div class="mini-value">{{ total_inventory }}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-icon">✅</div>
+            <div class="mini-label">{% trans "Mavjud" %}</div>
+            <div class="mini-value">{{ available_inventory }}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-icon">🔥</div>
+            <div class="mini-label">{% trans "Bugun sotildi" %}</div>
+            <div class="mini-value">{{ sold_today }}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-icon">💎</div>
+            <div class="mini-label">{% trans "Inventar qiymati" %}</div>
+            <div class="mini-value">$ {{ inventory_value|floatformat:0|intcomma|truncatechars:8 }}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-icon">📉</div>
+            <div class="mini-label">{% trans "Bugungi xarajat" %}</div>
+            <div class="mini-value danger">$ {{ today_expense|floatformat:0|intcomma }}</div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column -->
+        <div class="col-lg-8">
+            <!-- Chart -->
+            <div class="chart-section slide-up" style="animation-delay: 0.6s;">
+                <div class="chart-title">📈 {% trans "30 kunlik trend" %}</div>
+                <canvas id="salesChart" height="100"></canvas>
+            </div>
+
+            <!-- Recent Sales -->
+            <div class="activity-section slide-up" style="animation-delay: 0.7s;">
+                <div class="section-title">🕐 {% trans "So'nggi sotuvlar" %}</div>
+                <div class="activity-list">
+                    {% for sale in recent_sales %}
+                    <div class="activity-row">
+                        <div class="activity-icon-wrapper">
+                            {% if not sale.is_void %}📱{% else %}↩️{% endif %}
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">
+                                {{ sale.product.brand.name }} {{ sale.product.model.name }}
+                            </div>
+                            <div class="activity-subtitle">
+                                👤 {{ sale.seller.username }} •
+                                🏪 {{ sale.store.name }} •
+                                {{ sale.created_at|date:"d.m.Y H:i" }}
+                                {% if sale.is_void %}
+                                <span style="color: #ef4444;">• {% trans "Qaytarilgan" %}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="activity-amount {% if sale.is_void %}void{% endif %}">
+                            {% if not sale.is_void %}
+                                $ {{ sale.amount|floatformat:2 }}
+                            {% else %}
+                                -$ {{ sale.amount|floatformat:2 }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <div class="empty-text">{% trans "So'nggi sotuvlar yo'q" %}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-lg-4">
+            <!-- Seller Performance -->
+            <div class="leaderboard-section slide-up" style="animation-delay: 0.8s;">
+                <div class="section-title">👥 {% trans "Sotuvchilar" %}</div>
+                <div class="leaderboard-list">
+                    {% for stat in seller_stats %}
+                    <div class="leaderboard-item">
+                        <div class="rank-badge {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% else %}other{% endif %}">
+                            {% if forloop.counter == 1 %}🥇
+                            {% elif forloop.counter == 2 %}🥈
+                            {% elif forloop.counter == 3 %}🥉
+                            {% else %}{{ forloop.counter }}{% endif %}
+                        </div>
+                        <div class="leaderboard-details">
+                            <div class="leaderboard-name">
+                                {{ stat.seller.get_full_name|default:stat.seller.username }}
+                            </div>
+                            <div class="leaderboard-sales">{{ stat.sales_count }} {% trans "ta sotuv" %}</div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div class="empty-text">{% trans "Ma'lumot yo'q" %}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Top Brands -->
+            <div class="activity-section slide-up" style="animation-delay: 0.9s;">
+                <div class="section-title">🏅 {% trans "Top brendlar" %}</div>
+                <div class="brand-list">
+                    {% for brand in top_brands %}
+                    <div class="brand-row">
+                        <div class="brand-number">{{ forloop.counter }}</div>
+                        <div class="brand-details">
+                            <div class="brand-name">{{ brand.product__brand__name|default:"Noma'lum" }}</div>
+                            <div class="brand-count">{{ brand.count }} {% trans "ta" %}</div>
+                        </div>
+                        <div class="brand-total">$ {{ brand.total|floatformat:0|intcomma }}</div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div class="empty-text">{% trans "Ma'lumot yo'q" %}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+    const chartData = {{ chart_data|safe }};
+    const ctx = document.getElementById('salesChart').getContext('2d');
+
+    const gradient1 = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient1.addColorStop(0, 'rgba(240, 147, 251, 0.3)');
+    gradient1.addColorStop(1, 'rgba(240, 147, 251, 0.0)');
+
+    const gradient2 = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient2.addColorStop(0, 'rgba(0, 200, 83, 0.3)');
+    gradient2.addColorStop(1, 'rgba(0, 200, 83, 0.0)');
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.map(d => d.date),
+            datasets: [
+                {
+                    label: '{% trans "Savdo" %} ($)',
+                    data: chartData.map(d => d.sales),
+                    borderColor: '#f093fb',
+                    backgroundColor: gradient1,
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#f093fb',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 3,
+                },
+                {
+                    label: '{% trans "Foyda" %} ($)',
+                    data: chartData.map(d => d.profit),
+                    borderColor: '#00c853',
+                    backgroundColor: gradient2,
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#00c853',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 3,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20,
+                        font: { size: 14, weight: '600' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    padding: 16,
+                    cornerRadius: 12,
+                    titleFont: { size: 15, weight: '700' },
+                    bodyFont: { size: 14 },
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f3f4f6' },
+                    ticks: {
+                        font: { size: 13 },
+                        callback: value => '$ ' + value
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 13 } }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

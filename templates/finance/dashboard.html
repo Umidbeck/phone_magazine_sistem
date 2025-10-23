@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load currency_filters %}
 
 {% block title %}💰 Moliyaviy Dashboard{% endblock %}
 
@@ -83,24 +84,24 @@
                     </div>
                 </div>
 
-                <div class="text-4xl font-bold mb-4">${{ bs.total_assets|floatformat:2 }}</div>
+                <div class="text-4xl font-bold mb-4">{{ bs.total_assets|usd }}</div>
 
                 <div class="space-y-2 text-sm bg-white/10 backdrop-blur-sm rounded-xl p-4">
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">💵 Naqd</span>
-                        <span class="font-bold">${{ bs.cash_balance|floatformat:2 }}</span>
+                        <span class="font-bold">{{ bs.cash_balance|usd }}</span>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">💳 Karta</span>
-                        <span class="font-bold">${{ bs.card_balance|floatformat:2 }}</span>
+                        <span class="font-bold">{{ bs.card_balance|usd }}</span>
                     </div>
                     <div class="flex justify-between items-center border-t border-white/20 pt-2">
                         <span class="opacity-90">📦 Tovar</span>
-                        <span class="font-bold">${{ bs.inventory_value|floatformat:2 }}</span>
+                        <span class="font-bold">{{ bs.inventory_value|usd }}</span>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">👥 Qarzlar (AR)</span>
-                        <span class="font-bold">${{ bs.accounts_receivable|floatformat:2 }}</span>
+                        <span class="font-bold">{{ bs.accounts_receivable|usd }}</span>
                     </div>
                 </div>
             </div>
@@ -116,24 +117,24 @@
                     </div>
                 </div>
 
-                <div class="text-4xl font-bold mb-4">${{ kpi_30d.net_profit|floatformat:2 }}</div>
+                <div class="text-4xl font-bold mb-4">{{ kpi_30d.net_profit|usd}}</div>
 
                 <div class="space-y-2 text-sm bg-white/10 backdrop-blur-sm rounded-xl p-4">
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">📊 Gross Profit</span>
-                        <span class="font-bold">${{ kpi_30d.gross_profit|floatformat:2 }}</span>
+                        <span class="font-bold">{{ kpi_30d.gross_profit|usd }}</span>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">💰 Sotuv</span>
-                        <span class="font-bold">${{ kpi_30d.total_sales|floatformat:2 }}</span>
+                        <span class="font-bold">{{ kpi_30d.total_sales|usd}}</span>
                     </div>
                     <div class="flex justify-between items-center border-t border-white/20 pt-2">
                         <span class="opacity-90">📉 Xarajat</span>
-                        <span class="font-bold">${{ kpi_30d.total_expense|floatformat:2 }}</span>
+                        <span class="font-bold">{{ kpi_30d.total_expense|usd }}</span>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">👤 Komissiya</span>
-                        <span class="font-bold">${{ kpi_30d.total_commission|floatformat:2 }}</span>
+                        <span class="font-bold">{{ kpi_30d.total_commission|usd}}</span>
                     </div>
                 </div>
             </div>
@@ -150,20 +151,20 @@
                     </div>
                 </div>
 
-                <div class="text-4xl font-bold mb-4">${{ bs.total_equity|floatformat:2 }}</div>
+                <div class="text-4xl font-bold mb-4">{{ bs.total_equity|usd }}</div>
 
                 <div class="space-y-2 text-sm bg-white/10 backdrop-blur-sm rounded-xl p-4">
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">💼 Owner Equity</span>
-                        <span class="font-bold">${{ bs.owner_equity|floatformat:2 }}</span>
+                        <span class="font-bold">{{ bs.owner_equity|usd }}</span>
                     </div>
                     <div class="flex justify-between items-center border-t border-white/20 pt-2">
                         <span class="opacity-90">📈 Yig'ilgan foyda</span>
-                        <span class="font-bold">${{ bs.retained_earnings|floatformat:2 }}</span>
+                        <span class="font-bold">{{ bs.retained_earnings|usd }}</span>
                     </div>
                     <div class="flex justify-between items-center border-t border-white/20 pt-2">
                         <span class="opacity-90">🏦 Majburiyatlar</span>
-                        <span class="font-bold text-red-300">${{ bs.total_liabilities|floatformat:2 }}</span>
+                        <span class="font-bold text-red-300">{{ bs.total_liabilities|usd }}</span>
                     </div>
                 </div>
             </div>
@@ -180,29 +181,29 @@
                 </div>
 
                 {% with total_cash=cash.cash_closing|add:cash.card_closing %}
-                <div class="text-4xl font-bold mb-4">${{ total_cash|floatformat:2 }}</div>
+                <div class="text-4xl font-bold mb-4">{{ total_cash|usd }}</div>
                 {% endwith %}
 
                 <div class="space-y-2 text-sm bg-white/10 backdrop-blur-sm rounded-xl p-4">
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">💵 Naqd</span>
-                        <span class="font-bold">${{ cash.cash_closing|floatformat:2 }}</span>
+                        <span class="font-bold">{{ cash.cash_closing|usd }}</span>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="opacity-90">💳 Karta</span>
-                        <span class="font-bold">${{ cash.card_closing|floatformat:2 }}</span>
+                        <span class="font-bold">{{ cash.card_closing|usd }}</span>
                     </div>
                     <div class="border-t border-white/20 pt-2 mt-2 space-y-1">
                         {% with total_in=cash.cash_in|add:cash.card_in %}
                         <div class="flex justify-between items-center">
                             <span class="opacity-90">⬆️ Kirim</span>
-                            <span class="font-bold text-green-300">${{ total_in|floatformat:2 }}</span>
+                            <span class="font-bold text-green-300">{{ total_in|usd }}</span>
                         </div>
                         {% endwith %}
                         {% with total_out=cash.cash_out|add:cash.card_out %}
                         <div class="flex justify-between items-center">
                             <span class="opacity-90">⬇️ Chiqim</span>
-                            <span class="font-bold text-red-300">${{ total_out|floatformat:2 }}</span>
+                            <span class="font-bold text-red-300">{{ total_out|usd }}</span>
                         </div>
                         {% endwith %}
                     </div>
@@ -267,9 +268,9 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">
                                 {% if movement.type == 'injection' %}
-                                <span class="text-green-600">+${{ movement.amount|floatformat:2 }}</span>
+                                <span class="text-green-600">+{{ movement.amount|usd }}</span>
                                 {% else %}
-                                <span class="text-red-600">-${{ movement.amount|floatformat:2 }}</span>
+                                <span class="text-red-600">-{{ movement.amount|usd }}</span>
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">

@@ -1261,7 +1261,7 @@ def debt_pay(request, group):
                 )
 
             messages.success(request, "To'lov qabul qilindi")
-            return redirect("debt_list")
+            return redirect("sales:debt_list")
         else:
             messages.error(request, "Xatolarni tuzating")
     else:

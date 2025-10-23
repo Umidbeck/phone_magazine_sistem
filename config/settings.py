@@ -59,6 +59,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.i18n_flags",
+                "core.context_processors.currency_context",
             ],
         },
     },
@@ -134,3 +135,21 @@ MESSAGE_TAGS = {
     messages.WARNING: 'warning',
     messages.ERROR: 'error',
 }
+
+# ============================================
+# CURRENCY SETTINGS
+# ============================================
+
+# Asosiy valyuta
+CURRENCY = 'USD'
+CURRENCY_SYMBOL = '$'
+CURRENCY_NAME = 'Dollar'
+
+# Format sozlamalari
+USE_THOUSAND_SEPARATOR = True
+THOUSAND_SEPARATOR = ','
+DECIMAL_SEPARATOR = '.'
+
+
+# Number formatting
+NUMBER_GROUPING = 3  # 1,000,000

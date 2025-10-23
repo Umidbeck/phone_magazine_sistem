@@ -2,13 +2,13 @@
 from django.urls import path
 
 from inventory.views import my_acquisitions, my_stats
-from .views import login_view, logout_view, home, store_list, store_form, store_delete, seller_list, seller_new, \
-    seller_edit, seller_delete, seller_reset_password, my_sales
+from .views import login_view, logout_view, store_list, store_form, store_delete, seller_list, seller_new, \
+    seller_edit, seller_delete, seller_reset_password, my_sales, home_dashboard
 from .views_commission import commission_settings
 
 urlpatterns = [
     # path("", account_dashboard, name="account_dashboard"),
-    path("", home, name="home"),
+    path('', home_dashboard, name='home'),
 
     path("my-sales/", my_sales, name="my_sales"),
     path("login/", login_view, name="login"),

@@ -400,3 +400,80 @@ def log_warning(message: str):
 
 # Backward compatibility
 get_store_for_user = lambda user: get_user_store_id(user)
+
+from decimal import Decimal, ROUND_HALF_UP
+
+
+def format_currency(value, show_decimals=False):
+    """
+    Format value as currency
+
+    Args:
+        value: Decimal or float value
+        show_decimals: Show decimal part (default: False)
+
+    Returns:
+        str: Formatted currency string
+
+    Examples:
+        format_currency(1234.56) → "$ 1,235"
+        format_currency(1234.56, True) → "$ 1,234.56"
+    """
+    if value is None:
+        value = Decimal('0')
+
+    if not isinstance(value, Decimal):
+        value = Decimal(str(value))
+
+    if show_decimals:
+        # Round to 2 decimals
+        value = value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        formatted = f'{value:,.2f}'
+    else:
+        # Round to integer
+        value = value.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+        formatted = f'{int(value):,}'
+
+    return f'$ {formatted}'
+
+
+def parse_currency(value):
+    """
+    Parse currency string to Decimal
+
+    Args:
+        value: String like "$ 1,234.56" or "1234.56"
+
+    Returns:
+        Decimal: Parsed value
+
+    Examples:
+        parse_currency("$ 1,234.56") → Decimal("1234.56")
+        parse_currency("1,234") → Decimal("1234")
+    """
+    if value is None:
+        return Decimal('0')
+
+    if isinstance(value, (Decimal, int, float)):
+        return Decimal(str(value))
+
+    # Remove currency symbols and separators
+    value_str = str(value)
+    value_str = value_str.replace('$', '').replace(',', '').strip()
+
+    try:
+        return Decimal(value_str)
+    except:
+        return Decimal('0')
+
+
+def safe_sum(queryset, field):
+    """
+    Safely sum a field from queryset
+
+    Returns Decimal (never None)
+    """
+    from django.db.models import Sum
+
+    result = queryset.aggregate(total=Sum(field))['total']
+    return Decimal(str(result)) if result else Decimal('0')
