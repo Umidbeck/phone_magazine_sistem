@@ -1,3 +1,27 @@
-.env
+# Media files
+media/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+
+# Static files
+staticfiles/
+
+# Database
+*.sqlite3
 db.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+"""
 A27 03.09.2025.xlsx
+.env

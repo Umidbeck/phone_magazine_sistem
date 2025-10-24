@@ -3,10 +3,11 @@ from decimal import Decimal
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django.forms import inlineformset_factory
+from django.forms import inlineformset_factory, BaseInlineFormSet
 from django.forms.widgets import ClearableFileInput
 
 from accounts.models import Store
+from core.utils import parse_decimal, DECIMAL_ZERO
 from .models import Product, ProductImage, BatchIntake
 from reference.models import Brand, ModelName, Color
 from django.utils.translation import gettext_lazy as _
@@ -333,85 +334,298 @@ class ProductForm(forms.ModelForm):
             self.add_error("document_image", _("Hujjatli telefon uchun hujjat rasmi talab qilinadi."))
 
         # Multiple rasmlar limiti (0..7) — mavjudlar + yangi ≤ 7
-        new_files = []
-        # self.files getlist ishlashi uchun MultiFileInput bor; bo'lmasa ham guard:
-        if hasattr(self, "files") and "images" in getattr(self.files, "keys", lambda: [])():
-            try:
-                new_files = self.files.getlist("images")
-            except Exception:
-                new_files = []
+        class ProductForm(forms.ModelForm):
+            """
+            Telefon yaratish/tahrirlash formasi
 
-        existing_count = 0
-        if self.instance and self.instance.pk:
-            existing_count = ProductImage.objects.filter(product=self.instance).count()
+            VALIDATION:
+            ✅ IMEI unikalligi
+            ✅ Narxlar musbat
+            ✅ Min price < Ask price
+            ✅ Ownership'ga mos narx
+            """
 
-        if len(new_files) + existing_count > 7:
-            self.add_error("images", _("Umumiy rasm soni 7 tadan oshmasligi kerak."))
+            class Meta:
+                model = Product
+                fields = [
+                    'store', 'batch', 'brand', 'model', 'color', 'year',
+                    'imei_full', 'has_documents', 'is_new', 'defect',
+                    'battery_pct', 'ownership', 'purchase_price',
+                    'consignment_price', 'ask_price', 'min_price',
+                    'owner_name', 'owner_phone', 'commission_blocked'
+                ]
+                widgets = {
+                    'imei_full': forms.TextInput(attrs={
+                        'class': 'form-control',
+                        'placeholder': '123456789012345',
+                        'maxlength': '32'
+                    }),
+                    'defect': forms.TextInput(attrs={
+                        'class': 'form-control',
+                        'placeholder': 'Kamchiliklar (agar bor bo\'lsa)'
+                    }),
+                    'owner_name': forms.TextInput(attrs={
+                        'class': 'form-control',
+                        'placeholder': 'Konsignatsiya egasi'
+                    }),
+                    'owner_phone': forms.TextInput(attrs={
+                        'class': 'form-control',
+                        'placeholder': '+998 XX XXX XX XX'
+                    }),
+                }
 
-        return cleaned
+            def __init__(self, *args, **kwargs):
+                self.user = kwargs.pop('user', None)
+                super().__init__(*args, **kwargs)
 
-    # ---------- Save override ----------
-    def save(self, commit=True):
-        """
-        - document_image kelmasa: eski faylni saqlab qolamiz
-        - seller bo'lsa: store ni user’dan olamiz (view’da ham tekshirilyapti, ammo bu yerda ham safe)
-        """
-        instance: Product = super().save(commit=False)
+                # Seller uchun faqat o'z do'koni
+                if self.user and not self.user.is_owner():
+                    self.fields['store'].queryset = Store.objects.filter(id=self.user.store_id)
+                    self.fields['store'].initial = self.user.store_id
 
-        # document_image: bo'sh kelgan bo'lsa, mavjudini saqlash
-        if not self.cleaned_data.get("document_image") and self.instance and self.instance.pk:
-            instance.document_image = self.instance.document_image
+            def clean_imei_full(self):
+                """IMEI validatsiya va normalizatsiya"""
+                imei = self.cleaned_data.get('imei_full', '')
 
-        # sellerlar uchun store ni majburan user’dan
-        if self._user and not getattr(self._user, "is_owner", False) and getattr(self._user, "store_id", None):
-            instance.store_id = self._user.store_id
+                # Faqat raqamlar
+                imei = ''.join(ch for ch in imei if ch.isdigit())
 
-        if commit:
-            instance.save()
-            self.save_m2m()
+                if not imei:
+                    raise ValidationError("IMEI kiritilishi shart")
 
-        return instance
+                if len(imei) < 11:
+                    raise ValidationError("IMEI kamida 11 raqamdan iborat bo'lishi kerak")
 
-    # ---------- Public helper ----------
-    def get_images(self):
-        """0..7, bo‘sh bo‘lsa ham [] qaytaradi."""
-        try:
-            return self.files.getlist("images")
-        except Exception:
-            return []
+                # Unikallık tekshiruvi
+                qs = Product.objects.filter(imei_full=imei)
+                if self.instance and self.instance.pk:
+                    qs = qs.exclude(pk=self.instance.pk)
 
+                if qs.exists():
+                    raise ValidationError(f"Bu IMEI ({imei[-4:]}) bazada mavjud!")
+
+                return imei
+
+            def clean_purchase_price(self):
+                """Xarid narxi validatsiya"""
+                price = parse_decimal(self.cleaned_data.get('purchase_price', 0))
+                if price < DECIMAL_ZERO:
+                    raise ValidationError("Narx manfiy bo'lishi mumkin emas")
+                return price
+
+            def clean_consignment_price(self):
+                """Konsignatsiya narxi validatsiya"""
+                price = parse_decimal(self.cleaned_data.get('consignment_price', 0))
+                if price < DECIMAL_ZERO:
+                    raise ValidationError("Narx manfiy bo'lishi mumkin emas")
+                return price
+
+            def clean_ask_price(self):
+                """Sotuv narxi validatsiya"""
+                price = parse_decimal(self.cleaned_data.get('ask_price', 0))
+                if price < DECIMAL_ZERO:
+                    raise ValidationError("Narx manfiy bo'lishi mumkin emas")
+                return price
+
+            def clean_min_price(self):
+                """Minimal narx validatsiya"""
+                price = parse_decimal(self.cleaned_data.get('min_price', 0))
+                if price < DECIMAL_ZERO:
+                    raise ValidationError("Narx manfiy bo'lishi mumkin emas")
+                return price
+
+            def clean(self):
+                """Umumiy validatsiya"""
+                cleaned = super().clean()
+
+                ownership = cleaned.get('ownership')
+                purchase_price = cleaned.get('purchase_price', DECIMAL_ZERO)
+                consignment_price = cleaned.get('consignment_price', DECIMAL_ZERO)
+                ask_price = cleaned.get('ask_price', DECIMAL_ZERO)
+                min_price = cleaned.get('min_price', DECIMAL_ZERO)
+
+                # Ownership'ga mos narx tekshiruvi
+                if ownership == 'owned' and purchase_price <= DECIMAL_ZERO:
+                    self.add_error('purchase_price', "O'zimizniki uchun xarid narxi kiritish shart")
+
+                if ownership == 'consignment' and consignment_price <= DECIMAL_ZERO:
+                    self.add_error('consignment_price', "Konsignatsiya uchun narx kiritish shart")
+
+                # Min < Ask tekshiruvi
+                if min_price > DECIMAL_ZERO and ask_price > DECIMAL_ZERO:
+                    if min_price > ask_price:
+                        self.add_error('min_price', "Minimal narx sotuv narxidan katta bo'lmasligi kerak")
+
+                return cleaned
 
 
 class ProductImageForm(forms.ModelForm):
-    images = forms.ImageField(
-        required=False,
-        label=_("Rasmlar"),
-        widget=MultipleFileInput(attrs={
-            "multiple": True,
-            "accept": "image/*",
-            "id": "id_images",
-            "class": "hidden",  # templateda tugma orqali ochamiz
-        })
-    )
+    """
+    Bitta rasm formasi
+
+    FEATURES:
+    ✅ Image upload
+    ✅ Order (tartib)
+    ✅ Kind (tur)
+    ✅ Preview
+    """
+
     class Meta:
         model = ProductImage
-        # MUHIM: modeldagi nom 'kind', 'type' emas
-        fields = ["image", "kind"]
+        fields = ['image', 'order', 'kind']
         widgets = {
-            "image": forms.ClearableFileInput(attrs={"class": "w-full rounded-xl border p-2", "accept": "image/*"}),
-            "kind": forms.Select(attrs={"class": "w-full rounded-xl border p-2"}),
-        }
-        labels = {
-            "image": _("Rasm"),
-            "kind":  _("Turi (doc/cond/other)"),
+            'image': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*'
+            }),
+            'order': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'max': '10'
+            }),
+            'kind': forms.Select(attrs={
+                'class': 'form-control'
+            }),
         }
 
+    def clean_image(self):
+        """Rasm validatsiya"""
+        image = self.cleaned_data.get('image')
 
+        if image:
+            # Fayl hajmi (max 5MB)
+            if image.size > 5 * 1024 * 1024:
+                raise ValidationError("Rasm hajmi 5 MB dan oshmasligi kerak")
+
+            # Fayl turi
+            if not image.content_type.startswith('image/'):
+                raise ValidationError("Faqat rasm fayllari yuklash mumkin")
+
+        return image
+
+
+
+
+class BaseProductImageFormSet(BaseInlineFormSet):
+    """
+    Custom formset - qo'shimcha validatsiya
+
+    RULES:
+    - Maksimal 7 ta rasm
+    - Kamida 1 ta rasm tavsiya etiladi
+    """
+
+    def clean(self):
+        """Formset validatsiya"""
+        if any(self.errors):
+            return
+
+        # Rasmlar soni
+        images_count = sum(
+            1 for form in self.forms
+            if form.cleaned_data and not form.cleaned_data.get('DELETE', False)
+        )
+
+        if images_count > 7:
+            raise ValidationError("Maksimal 7 ta rasm yuklash mumkin")
+
+
+# ProductImage inline formset (1-7 ta)
 ProductImageFormSet = inlineformset_factory(
-    parent_model=Product,
-    model=ProductImage,
+    Product,
+    ProductImage,
     form=ProductImageForm,
-    extra=7,
-    max_num=7,
-    can_delete=True,
+    formset=BaseProductImageFormSet,
+    extra=3,  # Bo'sh formalar soni
+    max_num=7,  # Maksimal
+    can_delete=True,  # O'chirish mumkin
 )
+
+
+class BatchIntakeForm(forms.ModelForm):
+    """Partiya formasi"""
+
+    class Meta:
+        model = BatchIntake
+        fields = ['title', 'supplier_name', 'supplier_phone', 'note']
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Partiya nomi (ixtiyoriy)'
+            }),
+            'supplier_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ta\'minotchi ismi'
+            }),
+            'supplier_phone': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '+998 XX XXX XX XX'
+            }),
+            'note': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Qo\'shimcha ma\'lumot'
+            }),
+        }
+
+
+class ProductSearchForm(forms.Form):
+    """Qidiruv formasi"""
+
+    q = forms.CharField(
+        required=False,
+        label='Qidiruv',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'IMEI, Brand, Model...',
+            'autofocus': True
+        })
+    )
+
+    status = forms.ChoiceField(
+        required=False,
+        label='Holat',
+        choices=[('', 'Barchasi')] + list(Product.STATUS),
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+    ownership = forms.ChoiceField(
+        required=False,
+        label='Egalik',
+        choices=[('', 'Barchasi')] + list(Product.OWNERSHIP),
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+    brand = forms.ModelChoiceField(
+        required=False,
+        label='Brand',
+        queryset=Brand.objects.filter(is_active=True),
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+    store = forms.ModelChoiceField(
+        required=False,
+        label='Do\'kon',
+        queryset=Store.objects.filter(is_active=True),
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+
+class ProductQuickEditForm(forms.ModelForm):
+    """Tez tahrirlash (narxlar va holat)"""
+
+    class Meta:
+        model = Product
+        fields = ['ask_price', 'min_price', 'status', 'defect']
+        widgets = {
+            'ask_price': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01'
+            }),
+            'min_price': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01'
+            }),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+            'defect': forms.TextInput(attrs={'class': 'form-control'}),
+        }

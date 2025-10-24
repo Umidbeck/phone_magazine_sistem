@@ -15,7 +15,7 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q, Model, Sum, When, Case, F, OuterRef, Exists, Count, Subquery, Value
 from django.db.models.functions import Right, Coalesce, TruncDate, Concat
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils.dateparse import parse_date
@@ -89,108 +89,60 @@ def _parse_date(s: str):
 
 
 @login_required
-@db_txn.atomic
-def product_create(request, pk=None):
+def product_create(request):
     """
-    Mahsulot yaratish yoki tahrirlash
+    Yangi telefon qo'shish (rasmlar bilan)
 
-    GET ?pk=123 - tahrirlash
-    POST - saqlash
-
-    FEATURES:
-    ✅ Form validation
-    ✅ Image upload (0-7 ta)
-    ✅ Document image (1 ta)
-    ✅ Permission check
-
-    KAFOLAT: 100% xavfsiz!
+    XUSUSIYATLAR:
+    ✅ Product formasi
+    ✅ Inline rasmlar (1-7 ta)
+    ✅ IMEI validatsiya
+    ✅ Narxlar validatsiya
+    ✅ Batch (partiya) qo'shish
     """
-    instance = get_object_or_404(
-        Product.objects.select_related("store", "brand", "model"),
-        pk=pk
-    ) if pk else None
-
-    # Permission check
-    if not _can_edit(request.user, instance):
-        messages.error(request, _("Ushbu mahsulotni tahrirlashga ruxsatingiz yo'q."))
-        return redirect("inventory_search")
-
-    if request.method == "POST":
-        pform = ProductForm(
+    if request.method == 'POST':
+        form = ProductForm(request.POST, user=request.user)
+        formset = ProductImageFormSet(
             request.POST,
             request.FILES,
-            instance=instance,
-            user=request.user
+            instance=form.instance if form.instance.pk else None
         )
 
-        # Mavjud rasm soni
-        existing_count = ProductImage.objects.filter(product=instance).count() if instance else 0
-
-        # Yangi rasmlar
-        files = pform.get_images()  # 0..7
-        total_after = existing_count + len(files)
-
-        if total_after > 7:
-            pform.add_error(
-                "images",
-                _("Umumiy rasm soni 7 tadan oshmasin. Hozir %(n)s ta bo'lyapti.") % {"n": total_after}
-            )
-
-        if pform.is_valid():
-            product = pform.save(commit=False)
-
-            # Seller bo'lsa do'konni userdan olish
-            if not is_owner(request.user):
-                product.store = request.user.store
-
-            if not product.pk:
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                # Product saqlash
+                product = form.save(commit=False)
                 product.created_by = request.user
 
-            product.save()
-            pform.save_m2m()
+                # Seller uchun store
+                if not is_owner(request.user):
+                    product.store_id = request.user.store_id
 
-            # Gallery rasmlarini yozish
-            can_add = max(0, 7 - existing_count)
-            for idx, f in enumerate(files[:can_add], start=existing_count + 1):
-                ProductImage.objects.create(
-                    product=product,
-                    image=f,
-                    order=idx,
-                    kind="other"
+                product.save()
+
+                # Rasmlarni saqlash
+                formset.instance = product
+                formset.save()
+
+                messages.success(
+                    request,
+                    f"Telefon qo'shildi: {product.brand} {product.model} [{product.imei_last4}]"
                 )
 
-            messages.success(request, _("Ma'lumot saqlandi."))
-            return redirect("product_detail", pk=product.pk)
-        else:
-            messages.error(request, _("Xatolarni to'g'rilang."))
+                return redirect('product_detail', pk=product.pk)
     else:
-        initial = {}
-        if not is_owner(request.user) and get_user_store_id(request.user):
-            initial["store"] = request.user.store_id
-
-        pform = ProductForm(instance=instance, user=request.user, initial=initial)
+        form = ProductForm(user=request.user)
+        formset = ProductImageFormSet()
+        existing_images = []
 
     ctx = {
-        "p": instance,
-        "is_edit": bool(instance),
-        "form": pform,
-        "existing_images": ProductImage.objects.filter(product=instance) if instance else [],
-        "max_images": 7,
-        "has_existing_doc": bool(getattr(instance, "document_image", None)) if instance else False,
-
-        # Qo'shildi:
-        "exclude_fields": ["images", "document_image"],
-
-        # oldin aytganimdek, fieldlarga classy:
-        "attrs": {
-            "class": "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        },
-
-        # Slot hisobini ham templatega tayyorlab berish qulay:
-        "slots_left": 7 - (ProductImage.objects.filter(product=instance).count() if instance else 0),
+        'form': form,
+        'formset': formset,
+        'title': 'Yangi telefon qo\'shish',
+        'existing_images': existing_images,
     }
 
-    return render(request, "inventory/product_form.html", ctx)
+    return render(request, 'inventory/product_form.html', ctx)
 
 
 @login_required
@@ -625,111 +577,311 @@ def inventory_search(request):
 @login_required
 def product_detail(request, pk):
     """
-    Mahsulot tafsilotlari
+    Telefon batafsil ma'lumoti
 
-    FEATURES:
-    ✅ Product info
-    ✅ Images gallery
-    ✅ Edit/Delete buttons
-    ✅ Sell button
-    ✅ Status change (to_repair, to_available)
-
-    KAFOLAT: 100% to'g'ri!
+    KO'RSATILADI:
+    ✅ Asosiy ma'lumotlar
+    ✅ Narxlar va tannarx
+    ✅ Holat va kamchiliklar
+    ✅ Rasmlar (galereya)
+    ✅ Xarajatlar tarixi
+    ✅ Sotuv ma'lumoti (agar sotilgan bo'lsa)
+    ✅ Komissiya ma'lumoti
     """
-    p = get_object_or_404(
-        Product.objects.select_related("brand", "model", "store").prefetch_related("images"),
+    product = get_object_or_404(
+        Product.objects.select_related('brand', 'model', 'color', 'store', 'created_by'),
         pk=pk
     )
 
-    images = list(p.images.all())
+    # Ruxsat tekshiruvi
+    if not is_owner(request.user):
+        if product.store_id != request.user.store_id:
+            return HttpResponseForbidden("Bu telefonga kirishingiz mumkin emas")
 
-    # Tahrirlash huquqi
-    can_edit = bool(is_owner(request.user) or p.created_by_id == request.user.id)
+    # Tannarx hisoblash
+    from sales.services import calc_product_cost
+    cost = calc_product_cost(product)
 
-    if request.method == "POST":
-        action = request.POST.get("action")
+    # Rasmlar
+    images = product.images.order_by('order', 'id')
 
-        # Status o'zgartirish
-        if action == "to_repair" and p.status == "available":
-            if not can_edit:
-                messages.error(request, _("Ushbu mahsulot holatini o'zgartira olmaysiz."))
-            else:
-                p.status = "on_repair"
-                p.save(update_fields=["status"])
-                messages.success(request, _("Mahsulot ta'mir holatiga o'tkazildi."))
-            return redirect("product_detail", pk=p.id)
+    # Xarajatlar
+    expenses = Transaction.objects.filter(
+        type='expense',
+        product=product,
+        is_void=False
+    ).select_related('created_by').order_by('-created_at')
 
-        if action == "to_available" and p.status == "on_repair":
-            if not can_edit:
-                messages.error(request, _("Ushbu mahsulot holatini o'zgartira olmaysiz."))
-            else:
-                p.status = "available"
-                p.save(update_fields=["status"])
-                messages.success(request, _("Mahsulot sotuvga qaytarildi."))
-            return redirect("product_detail", pk=p.id)
+    # Sotuv ma'lumoti (agar sotilgan)
+    sale = None
+    commission = None
+    if product.status == 'sold':
+        sale = Transaction.objects.filter(
+            type='sale',
+            product=product,
+            is_void=False
+        ).select_related('seller').first()
 
-        # Sotish
-        if action == "sell" and p.status == "available":
-            return redirect(f"/sales/sell/?product_id={p.id}")
+        if sale:
+            from sales.models import SellerCommission
+            try:
+                commission = SellerCommission.objects.get(transaction=sale)
+            except SellerCommission.DoesNotExist:
+                pass
+
+    # Foyda (agar sotilgan)
+    profit = None
+    if sale:
+        profit = sale.profit
 
     ctx = {
-        "p": p,
-        "images": images,
-        "can_edit": can_edit,
+        'p': product,
+        'cost': cost,
+        'profit': profit,
+        'images': images,
+        'expenses': expenses,
+        'sale': sale,
+        'commission': commission,
+
+        # Ruxsatlar
+        'can_edit': can_edit_product(request.user, product),
+        'can_delete': is_owner(request.user) and product.status == 'available',
     }
 
-    return render(request, "inventory/product_detail.html", ctx)
+    return render(request, 'inventory/product_detail.html', ctx)
+
 
 @login_required
 def product_edit(request, pk):
     """
-    Mavjud mahsulotni tahrirlash.
+    Telefon tahrirlash (rasmlar bilan)
+
+    XUSUSIYATLAR:
+    ✅ Product ma'lumotlari
+    ✅ Rasmlarni qo'shish/o'chirish/tartiblash
+    ✅ Narxlarni o'zgartirish
+    ✅ Validation
     """
-    p = get_object_or_404(
-        Product.objects.select_related("store", "brand", "model"),
-        pk=pk
-    )
-    if not _can_edit(request.user, p):
-        messages.error(request, _("Ushbu mahsulotni tahrirlashga ruxsatingiz yo'q."))
-        return redirect("product_detail", pk=pk)
+    product = get_object_or_404(Product, pk=pk)
 
-    if request.method == "POST":
-        form = ProductForm(request.POST, request.FILES, instance=p, user=request.user)
-        if form.is_valid():
+    # Ruxsat tekshiruvi
+    if not can_edit_product(request.user, product):
+        messages.error(request, "Bu telefonni tahrirlash huquqingiz yo'q")
+        return redirect('product_detail', pk=pk)
+
+    if request.method == 'POST':
+        form = ProductForm(request.POST, instance=product, user=request.user)
+        formset = ProductImageFormSet(
+            request.POST,
+            request.FILES,
+            instance=product
+        )
+
+        if form.is_valid() and formset.is_valid():
             with transaction.atomic():
-                product: Product = form.save(commit=True)  # form.save() document_image ni ham to‘g‘ri saqlaydi
-                # Yangi rasmlar (mavjud + yangi ≤ 7) — form.clean’da nazorat bor, bu yerda faqat yozamiz
-                files = form.get_images()
-                existing_count = product.images.count()
-                can_add = max(0, 7 - existing_count)
-                start_order = existing_count + 1
-                for i, f in enumerate(files[:can_add]):
-                    ProductImage.objects.create(
-                        product=product, image=f, order=start_order + i, kind="other"
-                    )
-            messages.success(request, _("Telefon ma’lumotlari yangilandi."))
-            return redirect("product_detail", pk=product.pk)
-        else:
-            messages.error(request, _("Xatolarni to'g'rilang."))
-    else:
-        form = ProductForm(instance=p, user=request.user)
+                # Product saqlash
+                product = form.save()
 
-    existing_images_qs = ProductImage.objects.filter(product=p).order_by("order")
+                # Rasmlarni saqlash
+                formset.save()
+
+                messages.success(request, "Telefon ma'lumotlari yangilandi")
+                return redirect('product_detail', pk=product.pk)
+    else:
+        form = ProductForm(instance=product, user=request.user)
+        formset = ProductImageFormSet(instance=product)
+
     ctx = {
-        "p": p,
-        "is_edit": True,
-        "form": form,
-        "existing_images": list(existing_images_qs),
-        "max_images": 7,
-        "has_existing_doc": bool(getattr(p, "document_image", None)),
-        "slots_left": max(0, 7 - existing_images_qs.count()),
-        "attrs": {
-            "class": "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm "
-                     "text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        },
-        "exclude_fields": ["images", "document_image"],
+        'form': form,
+        'formset': formset,
+        'product': product,
+        'title': f'Tahrirlash: {product.brand} {product.model}',
     }
-    return render(request, "inventory/product_form.html", ctx)
+
+    return render(request, 'inventory/product_form.html', ctx)
+
+
+@login_required
+def product_delete(request, pk):
+    """
+    Telefon o'chirish
+
+    SHARTLAR:
+    ✅ Faqat owner o'chirishi mumkin
+    ✅ Faqat 'available' holatdagi telefonlar
+    ✅ Hech qanday tranzaksiya bo'lmasligi kerak
+
+    CONFIRMATION:
+    - GET: Tasdiqlash sahifasi
+    - POST: O'chirish
+    """
+    product = get_object_or_404(Product, pk=pk)
+
+    # Faqat owner
+    if not is_owner(request.user):
+        messages.error(request, "Faqat owner telefon o'chirishi mumkin")
+        return redirect('product_detail', pk=pk)
+
+    # Holat tekshiruvi
+    if product.status != 'available':
+        messages.error(request, f"'{product.get_status_display()}' holatdagi telefonni o'chirish mumkin emas")
+        return redirect('product_detail', pk=pk)
+
+    # Tranzaksiyalar tekshiruvi
+    has_transactions = Transaction.objects.filter(product=product).exists()
+    if has_transactions:
+        messages.error(request, "Bu telefonning tranzaksiyalari bor. O'chirish mumkin emas.")
+        return redirect('product_detail', pk=pk)
+
+    if request.method == 'POST':
+        # O'chirish tasdiqlandi
+        brand_name = product.brand.name
+        model_name = product.model.name
+        imei = product.imei_last4
+
+        # Rasmlarni o'chirish (fayllar ham)
+        for img in product.images.all():
+            if img.image:
+                img.image.delete()
+            img.delete()
+
+        # Telefon o'chirish
+        product.delete()
+
+        messages.success(
+            request,
+            f"Telefon o'chirildi: {brand_name} {model_name} [{imei}]"
+        )
+
+        return redirect('inventory_search')
+
+    # Tasdiqlash sahifasi
+    ctx = {
+        'product': product,
+        'has_transactions': has_transactions,
+    }
+
+    return render(request, 'inventory/product_delete_confirm.html', ctx)
+
+
+@login_required
+def product_images_manage(request, pk):
+    """
+    Rasmlarni alohida boshqarish
+
+    AJAX orqali:
+    - Rasm qo'shish
+    - Rasm o'chirish
+    - Rasmlarni tartiblash (drag & drop)
+    """
+    product = get_object_or_404(Product, pk=pk)
+
+    # Ruxsat tekshiruvi
+    if not can_edit_product(request.user, product):
+        return JsonResponse({'error': 'Ruxsat yo\'q'}, status=403)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'upload':
+            # Yangi rasm yuklash
+            image_file = request.FILES.get('image')
+            kind = request.POST.get('kind', 'other')
+            order = int(request.POST.get('order', 0))
+
+            if not image_file:
+                return JsonResponse({'error': 'Rasm yuklanmadi'}, status=400)
+
+            # Maksimal 7 ta tekshiruvi
+            current_count = product.images.count()
+            if current_count >= 7:
+                return JsonResponse({'error': 'Maksimal 7 ta rasm'}, status=400)
+
+            # Saqlash
+            img = ProductImage.objects.create(
+                product=product,
+                image=image_file,
+                kind=kind,
+                order=order
+            )
+
+            return JsonResponse({
+                'success': True,
+                'image': {
+                    'id': img.id,
+                    'url': img.image.url,
+                    'kind': img.kind,
+                    'order': img.order,
+                }
+            })
+
+        elif action == 'delete':
+            # Rasm o'chirish
+            image_id = request.POST.get('image_id')
+
+            try:
+                img = ProductImage.objects.get(id=image_id, product=product)
+                if img.image:
+                    img.image.delete()
+                img.delete()
+
+                return JsonResponse({'success': True})
+            except ProductImage.DoesNotExist:
+                return JsonResponse({'error': 'Rasm topilmadi'}, status=404)
+
+        elif action == 'reorder':
+            # Rasmlarni tartiblash
+            orders = request.POST.get('orders', '{}')
+            import json
+            orders_dict = json.loads(orders)
+
+            for image_id, new_order in orders_dict.items():
+                ProductImage.objects.filter(
+                    id=image_id,
+                    product=product
+                ).update(order=new_order)
+
+            return JsonResponse({'success': True})
+
+    # GET - rasmlar ro'yxati
+    images = product.images.order_by('order', 'id')
+
+    return render(request, 'inventory/product_images_manage.html', {
+        'product': product,
+        'images': images,
+    })
+
+
+@login_required
+def product_archive(request, pk):
+    """Telefon arxivlash (soft delete)"""
+    product = get_object_or_404(Product, pk=pk)
+
+    if not is_owner(request.user):
+        messages.error(request, "Faqat owner arxivlashi mumkin")
+        return redirect('product_detail', pk=pk)
+
+    product.is_archived = True
+    product.save()
+
+    messages.success(request, "Telefon arxivlandi")
+    return redirect('inventory_search')
+
+
+@login_required
+def product_unarchive(request, pk):
+    """Telefon arxivdan chiqarish"""
+    product = get_object_or_404(Product, pk=pk)
+
+    if not is_owner(request.user):
+        messages.error(request, "Faqat owner arxivdan chiqarishi mumkin")
+        return redirect('product_detail', pk=pk)
+
+    product.is_archived = False
+    product.save()
+
+    messages.success(request, "Telefon arxivdan chiqarildi")
+    return redirect('product_detail', pk=pk)
 
 
 @login_required

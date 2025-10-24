@@ -42,6 +42,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'accounts.middleware.ForcePasswordChangeMiddleware',  # oxirida
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -153,3 +154,6 @@ DECIMAL_SEPARATOR = '.'
 
 # Number formatting
 NUMBER_GROUPING = 3  # 1,000,000
+
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880

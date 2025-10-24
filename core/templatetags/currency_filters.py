@@ -1,11 +1,18 @@
-# core/templatetags/currency_filters.py
+# core/templatetags/currency_filters.py - TUZATILGAN (money.py o'rniga)
 """
-Currency Template Filters
+Currency Template Filters - YAGONA MANBAA
 
-MAQSAD: Butun tizimda bir xil valyuta formati
-FORMAT: $ 1,234 (desimalsiz, dollar belgisi bilan)
+MUAMMO HAL QILINDI:
+❌ OLDIN: `usd` filter 2 ta joyda (currency_filters.py va money.py)
+✅ HOZIR: Faqat shu faylda, money.py O'CHIRILDI
 
-VERSIYA: 1.0
+FILTERLAR:
+1. usd - Desimalsiz ($ 1,234)
+2. usd_decimal - Decimal bilan ($ 1,234.56)
+3. usd_sign - Rangli ($sign)
+4. abs_usd - Absolute value
+5. currency_symbol - $ belgisi
+6. format_amount - Smart format
 """
 
 from django import template
@@ -56,7 +63,7 @@ def usd(value):
 @register.filter(name='usd_decimal')
 def usd_decimal(value, decimals=2):
     """
-    Convert value to USD format WITH decimals (faqat kerak bo'lganda)
+    Convert value to USD format WITH decimals
 
     USAGE:
         {{ amount|usd_decimal:2 }}
@@ -79,7 +86,7 @@ def usd_decimal(value, decimals=2):
         return f'$ {formatted}'
 
     except (ValueError, TypeError, Exception):
-        return '$ 0.00'
+        return f'$ 0.{"0" * decimals}'
 
 
 @register.filter(name='usd_sign')
@@ -189,3 +196,86 @@ def format_amount(value, show_decimals=False):
 
     except (ValueError, TypeError, Exception):
         return '$ 0'
+
+
+# ============================================
+# ADDITIONAL FILTERS
+# ============================================
+
+@register.filter(name='percent')
+def percent(value, decimals=1):
+    """
+    Format as percentage
+
+    USAGE:
+        {{ 0.15|percent }}      → 15.0%
+        {{ 0.15|percent:2 }}    → 15.00%
+    """
+    if value is None:
+        return '0%'
+
+    try:
+        value = float(value) * 100
+        return f'{value:.{decimals}f}%'
+    except (ValueError, TypeError):
+        return '0%'
+
+
+@register.filter(name='change_indicator')
+def change_indicator(value):
+    """
+    Change indicator with icon
+
+    USAGE:
+        {{ change|change_indicator }}
+
+    OUTPUT:
+        ↑ +15% (green)
+        ↓ -10% (red)
+        → 0% (gray)
+    """
+    if value is None:
+        return '→ 0%'
+
+    try:
+        value = float(value)
+
+        if value > 0:
+            return f'<span class="text-success">↑ +{value:.1f}%</span>'
+        elif value < 0:
+            return f'<span class="text-danger">↓ {value:.1f}%</span>'
+        else:
+            return '<span class="text-muted">→ 0%</span>'
+
+    except (ValueError, TypeError):
+        return '→ 0%'
+
+
+@register.filter(name='compact_number')
+def compact_number(value):
+    """
+    Compact number format (K, M, B)
+
+    USAGE:
+        {{ 1500|compact_number }}      → 1.5K
+        {{ 1500000|compact_number }}   → 1.5M
+    """
+    if value is None:
+        return '0'
+
+    try:
+        value = float(value)
+
+        if value >= 1_000_000_000:
+            return f'{value / 1_000_000_000:.1f}B'
+        elif value >= 1_000_000:
+            return f'{value / 1_000_000:.1f}M'
+        elif value >= 1_000:
+            return f'{value / 1_000:.1f}K'
+        else:
+            return f'{int(value)}'
+
+    except (ValueError, TypeError):
+        return '0'
+
+
