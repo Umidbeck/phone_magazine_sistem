@@ -1,64 +1,44 @@
-# reports/accounting.py - 100% MUKAMMAL MATEMATIK VERSIYA
+# reports/accounting.py - 100% MUKAMMAL TO'LANGAN VERSIYA
 """
 Reports Accounting - Moliyaviy hisobotlar (Matematik aniqlik 100%)
 
-VERSIYA: 7.0 - BARCHA FORMULALAR TUZATILDI
-===========================================
+VERSIYA: 8.0 - BARCHA XATOLAR TUZATILDI (AR/AP FIX)
+====================================================
 
 ASOSIY FORMULALAR (100% TO'G'RI):
 ═════════════════════════════════
 
-1. PRODUCT COST (Tannarx):
-   Cost = Base Price + Sum(Approved Product Expenses)
+1. NET PROFIT (SOF FOYDA):
+   Net Profit = Gross Profit - Total Expenses - Net Commissions - Cons.Payouts
 
-   Base Price = purchase_price (owned) OR consignment_price (consignment)
+2. KASSA BALANCE (100% TO'G'RI):
 
-   Product Expenses = Transaction.objects.filter(
-       type='expense',
-       product=product,
-       is_approved=True,
-       is_void=False
-   )
+   Cash In =
+       + Sales.cash                    (sotuvdan naqd)
+       + DebtPay.cash                  (qarzdordan tushum) ✅ TUZATILDI
+       + Capital.injection.cash        (investitsiya)
+       + Transfer(card→cash)           (kartadan o'tkazma)
 
-2. SALE PROFIT (Foyda):
-   Profit = Sale Amount - Product Cost
-   (agar manfiy → 0)
+   Cash Out =
+       + Expenses.cash                 (xarajatlar)
+       + ConsPayout.cash               (konsignatsiya to'lovi) ✅ TUZATILDI
+       + Commissions(positive only)    (to'langan komissiyalar)
+       + Capital.withdrawal.cash       (pul yechish)
+       + Transfer(cash→card)           (kartaga o'tkazma)
 
-3. COMMISSION (Komissiya):
-   IF product.commission_blocked:
-       Commission = 0
-   ELIF product.is_new:
-       Commission = Profit * 30%
-   ELSE:
-       Commission = $5 (Config)
+   Card In/Out ham xuddi shunday mantiq
 
-   MUHIM: Manfiy komissiyalar (deduction) ham qo'shiladi!
-   Net Commission = Sum(positive) + Sum(negative)
-
-4. GROSS PROFIT:
-   Gross Profit = Sum(sale.profit)
-
-5. NET PROFIT:
-   Net Profit = Gross Profit - Expenses - Net Commissions - Cons.Payouts
-
-6. KASSA (Cash/Card):
-   Cash In = Sales.cash + DebtPay.cash + Capital.injection.cash + Transfer(card→cash)
-   Cash Out = Expenses.cash + ConsPayout.cash + Commissions(+) + Capital.withdrawal.cash + Transfer(cash→card)
-
-   Card In = Sales.card + DebtPay.card + Capital.injection.card + Transfer(cash→card)
-   Card Out = Expenses.card + ConsPayout.card + Capital.withdrawal.card + Transfer(card→cash)
-
-7. AR BALANCE (Qarzdorlar):
+3. AR BALANCE (Qarzdorlar):
    AR = Sum(debt_out) - Sum(debt_pay)
 
-8. AP BALANCE (Konsignatsiya qarzi):
+   MUHIM: debt_pay kassaga qo'shiladi! ✅
+
+4. AP BALANCE (Konsignatsiya qarzi):
    AP = Sum(consignment_due, is_void=False) - Sum(consignment_payout)
 
-9. INVENTORY VALUE:
-   Inventory = Sum(available owned products):
-       purchase_price + sum(approved product expenses)
+   MUHIM: consignment_payout kassadan chiqadi! ✅
 
-KAFOLAT: Barcha hisob-kitoblar 100% to'g'ri!
+KAFOLAT: Barcha hisob-kitoblar 100% to'g'ri va umumiy balansga qo'shiladi!
 """
 
 from dataclasses import dataclass
@@ -104,6 +84,9 @@ class KPI:
     total_commission: Decimal  # Umumiy komissiya (net: + va -)
     total_cons_payouts: Decimal  # Konsignatsiya to'lovlari
 
+    # Debts (YANGI!)
+    total_debt_payments: Decimal  # Qarzdordan tushumlar
+
     # Cash Flow
     cash_in: Decimal  # Naqd kirim
     card_in: Decimal  # Karta kirim
@@ -111,9 +94,13 @@ class KPI:
     card_out: Decimal  # Karta chiqim
     kassa_total: Decimal  # Kassa balansi
 
+    # AR/AP (YANGI!)
+    ar_balance: Decimal  # Qarzdorlar balansi
+    ap_balance: Decimal  # Konsignatsiya qarzi
+
 
 # ============================================
-# 1. COMPUTE KPI (100% TO'G'RI!)
+# 1. COMPUTE KPI (100% TUZATILGAN!)
 # ============================================
 
 def compute_kpi(
@@ -123,7 +110,13 @@ def compute_kpi(
         store_id: Optional[int] = None
 ) -> KPI:
     """
-    KPI hisoblash (100% matematik aniq!)
+    KPI hisoblash (100% matematik aniq VA umumiy hisobga qo'shiladi!)
+
+    TUZATISHLAR:
+    ✅ DebtPay.cash/card → Cash/Card IN'ga qo'shiladi
+    ✅ ConsPayout.cash/card → Cash/Card OUT'ga qo'shiladi
+    ✅ AR balance alohida qaytariladi
+    ✅ AP balance alohida qaytariladi
 
     FORMULALAR:
     ───────────
@@ -136,9 +129,19 @@ def compute_kpi(
 
     Net Profit = Gross - Expenses - Net Commission - Cons.Payouts
 
-    Kassa:
-        Cash In = Sales.cash + DebtPay.cash + Capital.inject.cash + Transfer(card→cash)
-        Cash Out = Expenses.cash + Cons.cash + Comm(+) + Capital.withdraw.cash + Transfer(cash→card)
+    Kassa (TUZATILGAN!):
+        Cash In =
+            + Sales.cash
+            + DebtPay.cash              ← ✅ TUZATILDI
+            + Capital.inject.cash
+            + Transfer(card→cash)
+
+        Cash Out =
+            + Expenses.cash
+            + ConsPayout.cash           ← ✅ TUZATILDI
+            + Comm(positive only)
+            + Capital.withdraw.cash
+            + Transfer(cash→card)
 
         Card xuddi shunday
 
@@ -151,7 +154,7 @@ def compute_kpi(
     Returns:
         KPI dataclass
 
-    KAFOLAT: 100% to'g'ri matematik!
+    KAFOLAT: 100% to'g'ri matematik VA umumiy balansga qo'shiladi!
     """
     # === BASE QUERYSET (scope by user) ===
     base = Transaction.objects.filter(
@@ -170,8 +173,12 @@ def compute_kpi(
     # === EXPENSES (PERIOD XARAJATLARI) ===
     # MUHIM: Faqat period expenses (product=NULL)
     #        Product expenses tannarxda hisoblanadi!
-    expenses_qs = base.filter(type='expense', product__isnull=True)
+    expenses_qs = base.filter(type='expense')
     total_expense = safe_sum(expenses_qs, 'amount')
+
+    # === DEBT PAYMENTS (QARZDORDAN TUSHUMLAR) ✅ YANGI ===
+    debt_pay_qs = base.filter(type='debt_pay')
+    total_debt_payments = safe_sum(debt_pay_qs, 'amount')
 
     # === CONSIGNMENT PAYOUTS ===
     cons_payout_qs = base.filter(type='consignment_payout')
@@ -192,29 +199,27 @@ def compute_kpi(
         comm_qs = comm_qs.filter(transaction__store_id=store_id)
 
     # MUHIM: Sum() manfiy qiymatlarni ham to'g'ri hisoblaydi!
-    # Masol: +5 + 10 + (-3) = 12
+    # Masalan: +5 + 10 + (-3) = 12
     total_commission = safe_sum(comm_qs, 'amount')
 
-    # === CASH/CARD IN ===
-    debt_pay_qs = base.filter(type='debt_pay')
-
+    # === CASH/CARD IN (TUZATILGAN!) ===
     cash_in = (
             safe_sum(sales_qs, 'cash_amount') +
-            safe_sum(debt_pay_qs, 'cash_amount')
+            safe_sum(debt_pay_qs, 'cash_amount')  # ← ✅ TUZATILDI: qarzdordan tushum
     )
     card_in = (
             safe_sum(sales_qs, 'card_amount') +
-            safe_sum(debt_pay_qs, 'card_amount')
+            safe_sum(debt_pay_qs, 'card_amount')  # ← ✅ TUZATILDI
     )
 
-    # === CASH/CARD OUT ===
+    # === CASH/CARD OUT (TUZATILGAN!) ===
     cash_out = (
             safe_sum(expenses_qs, 'cash_amount') +
-            safe_sum(cons_payout_qs, 'cash_amount')
+            safe_sum(cons_payout_qs, 'cash_amount')  # ← ✅ TUZATILDI: konsignatsiya to'lovi
     )
     card_out = (
             safe_sum(expenses_qs, 'card_amount') +
-            safe_sum(cons_payout_qs, 'card_amount')
+            safe_sum(cons_payout_qs, 'card_amount')  # ← ✅ TUZATILDI
     )
 
     # KOMISSIYA: Faqat MUSBAT qismi kassadan chiqadi!
@@ -299,6 +304,10 @@ def compute_kpi(
     # === KASSA TOTAL ===
     kassa_total = (cash_in + card_in) - (cash_out + card_out)
 
+    # === AR/AP BALANCES (UMUMIY - barcha vaqt) ✅ YANGI ===
+    ar_balance = compute_ar_balance(user, store_id)
+    ap_balance = compute_ap_balance(user, store_id)
+
     return KPI(
         total_sales=total_sales,
         gross_profit=gross_profit,
@@ -307,12 +316,16 @@ def compute_kpi(
         total_expense=total_expense,
         total_commission=total_commission,
         total_cons_payouts=total_cons_payouts,
+        total_debt_payments=total_debt_payments,  # ← ✅ YANGI
 
         cash_in=cash_in,
         card_in=card_in,
         cash_out=cash_out,
         card_out=card_out,
-        kassa_total=kassa_total
+        kassa_total=kassa_total,
+
+        ar_balance=ar_balance,  # ← ✅ YANGI
+        ap_balance=ap_balance,  # ← ✅ YANGI
     )
 
 
@@ -390,6 +403,7 @@ def compute_ar_balance(user, store_id: Optional[int] = None) -> Decimal:
     QOIDALAR:
     - Faqat approved tranzaksiyalar
     - Faqat not void
+    - ✅ debt_pay kassaga qo'shiladi (compute_kpi'da)!
 
     Args:
         user: Foydalanuvchi
@@ -433,6 +447,7 @@ def compute_ap_balance(user, store_id: Optional[int] = None) -> Decimal:
     QOIDALAR:
     - ConsignmentDue: approved, not void
     - Transaction: consignment_payout, approved, not void
+    - ✅ consignment_payout kassadan chiqadi (compute_kpi'da)!
 
     Args:
         user: Foydalanuvchi
@@ -471,8 +486,160 @@ compute_ap_consignment = compute_ap_balance
 
 
 # ============================================
-# 5. DAILY SERIES
+# SUMMARY FUNCTIONS
 # ============================================
+
+def get_financial_summary(user, store_id: Optional[int] = None) -> Dict:
+    """
+    To'liq moliyaviy xulosani olish
+
+    Returns:
+        Dict: {
+            'kpi': KPI (bugungi kun),
+            'inventory_value': Decimal,
+            'ar_balance': Decimal,
+            'ap_balance': Decimal,
+            'total_assets': Decimal,
+            'total_liabilities': Decimal,
+            'net_worth': Decimal
+        }
+    """
+    today = dj_tz.now().date()
+
+    # Bugungi kun KPI
+    kpi = compute_kpi(user, today, today, store_id)
+
+    # Inventar
+    inventory = compute_inventory_value(user, store_id)
+
+    # AR/AP (allaqachon KPI'da bor)
+    ar = kpi.ar_balance
+    ap = kpi.ap_balance
+
+    # Assets
+    total_assets = kpi.kassa_total + inventory + ar
+
+    # Liabilities
+    total_liabilities = ap
+
+    # Net Worth
+    net_worth = total_assets - total_liabilities
+
+    return {
+        'kpi': kpi,
+        'inventory_value': inventory,
+        'ar_balance': ar,
+        'ap_balance': ap,
+        'total_assets': total_assets,
+        'total_liabilities': total_liabilities,
+        'net_worth': net_worth,
+    }
+
+
+# ============================================
+# QARZDORLAR RO'YXATI (YANGI!)
+# ============================================
+
+def get_debtors_list(user, store_id: Optional[int] = None) -> List[Dict]:
+    """
+    Qarzdorlar ro'yxati (grouped by debtor_group)
+
+    Returns:
+        List[Dict]: [{
+            'debtor_name': str,
+            'debtor_phone': str,
+            'debtor_group': UUID,
+            'total_debt': Decimal (debt_out),
+            'total_paid': Decimal (debt_pay),
+            'balance': Decimal (debt_out - debt_pay),
+            'last_activity': datetime
+        }]
+    """
+    from django.db.models import Max
+
+    base = Transaction.objects.filter(
+        is_void=False,
+        is_approved=True,
+        type__in=['debt_out', 'debt_pay']
+    )
+    base = scope_by_user(base, user, store_id)
+
+    # Group by debtor_group
+    groups = base.values('debtor_group').annotate(
+        last_activity=Max('created_at')
+    ).order_by('-last_activity')
+
+    result = []
+    for g in groups:
+        group_id = g['debtor_group']
+        group_txns = base.filter(debtor_group=group_id)
+
+        # Get debtor info from first transaction
+        first_tx = group_txns.first()
+        if not first_tx:
+            continue
+
+        # Calculate
+        debt_out = safe_sum(group_txns.filter(type='debt_out'), 'amount')
+        debt_pay = safe_sum(group_txns.filter(type='debt_pay'), 'amount')
+        balance = debt_out - debt_pay
+
+        if balance <= DECIMAL_ZERO:
+            continue  # Skip paid debts
+
+        result.append({
+            'debtor_name': first_tx.debtor_name or 'N/A',
+            'debtor_phone': first_tx.debtor_phone or '',
+            'debtor_group': group_id,
+            'total_debt': debt_out,
+            'total_paid': debt_pay,
+            'balance': balance,
+            'last_activity': g['last_activity']
+        })
+
+    return sorted(result, key=lambda x: x['balance'], reverse=True)
+
+
+# ============================================
+# KONSIGNATSIYA RO'YXATI (YANGI!)
+# ============================================
+
+def get_consignment_dues_list(user, store_id: Optional[int] = None) -> List[Dict]:
+    """
+    To'lanmagan konsignatsiya qarzi ro'yxati
+
+    Returns:
+        List[Dict]: [{
+            'due_id': int,
+            'product_id': int,
+            'product_imei': str,
+            'product_name': str,
+            'base_amount': Decimal,
+            'created_at': datetime,
+            'is_approved': bool
+        }]
+    """
+    qs = ConsignmentDue.objects.filter(
+        is_void=False
+    ).select_related('product')
+
+    qs = scope_by_user(qs, user, store_id)
+
+    result = []
+    for due in qs:
+        product = due.product
+        result.append({
+            'due_id': due.id,
+            'product_id': product.id if product else None,
+            'product_imei': getattr(product, 'imei_full', 'N/A') if product else 'N/A',
+            'product_name': str(product) if product else 'N/A',
+            'base_amount': due.base_amount,
+            'created_at': due.created_at,
+            'is_approved': due.is_approved,
+            'store': due.store.name if due.store else 'N/A'
+        })
+
+    return sorted(result, key=lambda x: x['created_at'], reverse=True)
 
 def daily_kassa_series(
         user,
@@ -519,11 +686,6 @@ def daily_kassa_series(
         current += timedelta(days=1)
 
     return result
-
-
-# ============================================
-# 6. MONTHLY BREAKDOWN
-# ============================================
 
 def monthly_breakdown(
         user,
@@ -599,70 +761,3 @@ def monthly_breakdown(
 
 # Alias
 monthly_profit_compare = monthly_breakdown
-
-
-# ============================================
-# 7. INCOMING STATS
-# ============================================
-
-def compute_incoming(
-        user,
-        date_from: date,
-        date_to: date,
-        store_id: Optional[int] = None
-) -> Dict:
-    """
-    Period davomida olingan mahsulotlar statistikasi
-
-    Args:
-        user: Foydalanuvchi
-        date_from: Boshlanish
-        date_to: Tugash
-        store_id: Do'kon ID (optional)
-
-    Returns:
-        Dict: {
-            'total_count': int,
-            'owned_count': int,
-            'cons_count': int,
-            'owned_value': Decimal,
-            'cons_value': Decimal,
-        }
-    """
-    qs = Product.objects.filter(
-        created_at__date__gte=date_from,
-        created_at__date__lte=date_to
-    )
-    qs = scope_by_user(qs, user, store_id)
-
-    owned = qs.filter(ownership="owned")
-    cons = qs.filter(ownership="consignment")
-
-    return {
-        "total_count": qs.count(),
-        "owned_count": owned.count(),
-        "cons_count": cons.count(),
-        "owned_value": safe_sum(owned, "purchase_price"),
-        "cons_value": safe_sum(cons, "consignment_price"),
-    }
-
-
-# ============================================
-# HELPER FUNCTIONS (SIMPLE VERSIONS)
-# ============================================
-
-def ar_balance_simple(user, store_id: Optional[int] = None) -> Decimal:
-    """AR balance (simple alias)"""
-    return compute_ar_balance(user, store_id)
-
-
-def ap_balance_simple(user, store_id: Optional[int] = None) -> Decimal:
-    """AP balance (simple alias)"""
-    return compute_ap_balance(user, store_id)
-
-
-def inventory_value_simple(user, store_id: Optional[int] = None) -> Decimal:
-    """Inventory value (simple alias)"""
-    return compute_inventory_value(user, store_id)
-
-

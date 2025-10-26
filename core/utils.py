@@ -41,6 +41,14 @@ def parse_decimal(value: Any, default: Optional[Decimal] = None) -> Decimal:
     Xavfsiz Decimal'ga aylantirish
 
     KAFOLAT: Hech qachon None qaytarmaydi!
+
+    FORMATLAR:
+    - 5000      → 5000.00
+    - 5,000     → 5000.00 (minglarni ajratuvchi)
+    - 5.000     → 5000.00 (Evropa formati)
+    - 5,000.50  → 5000.50 (Amerika formati)
+    - 5.000,50  → 5000.50 (Evropa formati)
+    - 5 000     → 5000.00 (bo'shliq bilan)
     """
     if default is None:
         default = DECIMAL_ZERO
@@ -54,9 +62,46 @@ def parse_decimal(value: Any, default: Optional[Decimal] = None) -> Decimal:
     try:
         # String tozalash
         if isinstance(value, str):
-            s = value.strip().replace(" ", "").replace(",", ".").replace("$", "")
+            s = value.strip().replace("$", "").replace(" ", "")
             if not s:
                 return default
+
+            # ✅ YANGI LOGIKA: Format aniqlash
+            # Agar oxirgi vergul/nuqtadan keyin 2 ta raqam bo'lsa -> o'nli vergul
+            # Aks holda -> minglarni ajratuvchi
+
+            # Bo'shliqlarni olib tashlash
+            s = s.replace(" ", "")
+
+            # Oxirgi vergul/nuqta pozitsiyasini topish
+            last_comma = s.rfind(',')
+            last_dot = s.rfind('.')
+
+            if last_comma > last_dot:
+                # Oxirgi vergul - o'nli vergul yoki minglarni ajratuvchi?
+                after_comma = s[last_comma + 1:]
+                if len(after_comma) == 2 and after_comma.isdigit():
+                    # Evropa formati: 5.000,50 → 5000.50
+                    s = s[:last_comma].replace('.', '').replace(',', '.') + '.' + after_comma
+                else:
+                    # Minglarni ajratuvchi: 5,000 → 5000
+                    s = s.replace(',', '')
+            elif last_dot > last_comma:
+                # Oxirgi nuqta - o'nli nuqta yoki minglarni ajratuvchi?
+                after_dot = s[last_dot + 1:]
+                if len(after_dot) == 2 and after_dot.isdigit():
+                    # Amerika formati: 5,000.50 → 5000.50
+                    s = s[:last_dot].replace(',', '') + '.' + after_dot
+                else:
+                    # Minglarni ajratuvchi: 5.000 → 5000
+                    s = s.replace('.', '')
+            else:
+                # Vergul/nuqta yo'q - oddiy raqam
+                s = s.replace(',', '').replace('.', '')
+
+            if not s or s == '.':
+                return default
+
             result = Decimal(s)
         else:
             result = Decimal(str(value))

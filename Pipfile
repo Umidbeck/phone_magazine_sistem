@@ -16,6 +16,7 @@ pytest = "*"
 pytest-django = "*"
 freezegun = "*"
 djangorestframework = "*"
+django-redis = "*"
 
 [dev-packages]
 

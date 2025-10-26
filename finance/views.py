@@ -139,7 +139,7 @@ def capital_inject(request):
         try:
             amount = Decimal(request.POST.get("amount") or "0")
             channel = request.POST.get("channel", CapitalTransaction.CHANNEL_CASH)
-            memo = (request.POST.get("memo") or "").strip()
+            note = (request.POST.get("note") or "").strip()
             store_id = request.POST.get("store_id")
 
             if amount <= 0:
@@ -156,7 +156,7 @@ def capital_inject(request):
                     store=store,
                     amount=amount,
                     channel=channel,
-                    memo=memo or "Qo'shimcha investitsiya",
+                    note=note or "Qo'shimcha investitsiya",
                     created_by=request.user,
                     is_approved=True,
                     approved_by=request.user,
@@ -185,8 +185,8 @@ def capital_withdraw(request):
         try:
             amount = Decimal(request.POST.get("amount") or "0")
             channel = request.POST.get("channel", CapitalTransaction.CHANNEL_CASH)
-            source = request.POST.get("source", CapitalTransaction.WITHDRAWAL_FROM_PROFIT)
-            memo = (request.POST.get("memo") or "").strip()
+            source = request.POST.get("source", CapitalTransaction.SOURCE_PROFIT)  # ✅ To'g'rilandi
+            note = (request.POST.get("note") or "").strip()
             store_id = request.POST.get("store_id")
 
             if amount <= 0:
@@ -200,11 +200,12 @@ def capital_withdraw(request):
             # Balansni tekshirish
             bs = compute_balance_sheet(request.user, dj_tz.now().date(), store.id if store else None)
 
-            if source == CapitalTransaction.WITHDRAWAL_FROM_PROFIT:
+            # ✅ Source bo'yicha tekshirish
+            if source == CapitalTransaction.SOURCE_PROFIT:
                 if amount > bs.retained_earnings:
                     messages.error(request, f"Yetarli foyda yo'q. Mavjud: ${bs.retained_earnings}")
                     return redirect("finance:dashboard")
-            elif source == CapitalTransaction.WITHDRAWAL_FROM_CAPITAL:
+            elif source == CapitalTransaction.SOURCE_CAPITAL:
                 if amount > bs.owner_equity:
                     messages.error(request, f"Yetarli kapital yo'q. Mavjud: ${bs.owner_equity}")
                     return redirect("finance:dashboard")
@@ -227,15 +228,17 @@ def capital_withdraw(request):
                     amount=amount,
                     channel=channel,
                     withdrawal_source=source,
-                    memo=memo or f"Pul yechish ({source})",
+                    note=note or f"Pul yechish ({source})",
                     created_by=request.user,
                     is_approved=True,
                     approved_by=request.user,
                     approved_at=dj_tz.now(),
                 )
 
+            # ✅ Display text to'g'rilandi
+            source_text = "foydadan" if source == CapitalTransaction.SOURCE_PROFIT else "kapitaldan"
             messages.success(request,
-                             f"${amount} yechildi ({cap_txn.get_channel_display()}, {cap_txn.get_withdrawal_source_display()})")
+                             f"${amount} yechildi ({cap_txn.get_channel_display()}, {source_text})")
             return redirect("finance:dashboard")
 
         except Exception as e:

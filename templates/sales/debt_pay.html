@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
-{% load money %}
+{% load currency_filters %}
 
 {% block title %}{% trans "To'lov qabul qilish" %}{% endblock %}
 
@@ -59,7 +59,7 @@
     <form method="post" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6" oninput="syncTotals()">
       {% csrf_token %}
 
-      <!-- Total Amount -->
+      <!-- Total Amount - ✅ CHANGED: type="text" with pattern -->
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2">
           💰 {% trans "To'lov summasi" %}
@@ -70,15 +70,14 @@
           <input
             id="id_amount"
             name="amount"
-            type="number"
-            step="0.01"
-            min="0.01"
-            max="{{ balance }}"
-            placeholder="0.00"
+            type="text"
+            inputmode="decimal"
+            placeholder="5000 yoki 5,000 yoki 5.000"
             class="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl bg-white text-gray-900 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
             required>
         </div>
         <p class="text-xs text-gray-500 mt-2">
+          ✅ {% trans "Vergul yoki nuqta bilan yozishingiz mumkin:" %} <span class="font-mono">5000, 5,000, 5.000</span><br>
           {% trans "Maksimum:" %} <span class="font-semibold text-orange-600">{{ balance|usd }}</span>
         </p>
       </div>
@@ -127,7 +126,7 @@
         </div>
       </div>
 
-      <!-- Cash and Card Amounts -->
+      <!-- Cash and Card Amounts - ✅ CHANGED: type="text" -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -138,9 +137,8 @@
             <input
               id="id_cash_amount"
               name="cash_amount"
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputmode="decimal"
               value="0"
               placeholder="0.00"
               class="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl bg-white text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
@@ -155,9 +153,8 @@
             <input
               id="id_card_amount"
               name="card_amount"
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputmode="decimal"
               value="0"
               placeholder="0.00"
               class="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl bg-white text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
@@ -193,6 +190,7 @@
           <div>
             <h3 class="font-semibold text-blue-900 text-sm mb-1">{% trans "Maslahat" %}</h3>
             <ul class="text-blue-700 text-sm space-y-1">
+              <li>• {% trans "Vergul yoki nuqta bilan yozing: 5,000 yoki 5.000" %}</li>
               <li>• {% trans "To'lov turi avtomatik hisoblanadi" %}</li>
               <li>• {% trans "Aralash to'lovda naqd va karta summalarini kiriting" %}</li>
               <li>• {% trans "To'lov qarzdan oshmasligi kerak" %}</li>
@@ -221,6 +219,52 @@
 </div>
 
 <script>
+// ✅ YANGI: Parse function - vergul va nuqtani to'g'ri handle qiladi
+function parseAmount(value) {
+  if (!value) return 0;
+
+  // String'ga aylantirish
+  let s = String(value).trim();
+
+  // Dollar belgisini olib tashlash
+  s = s.replace('$', '').replace(/\s/g, '');
+
+  if (!s) return 0;
+
+  // Oxirgi vergul/nuqta pozitsiyasini topish
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+
+  // Format aniqlash
+  if (lastComma > lastDot) {
+    // Oxirgi vergul
+    const afterComma = s.substring(lastComma + 1);
+    if (afterComma.length === 2 && /^\d+$/.test(afterComma)) {
+      // Evropa formati: 5.000,50 → 5000.50
+      s = s.substring(0, lastComma).replace(/\./g, '').replace(/,/g, '') + '.' + afterComma;
+    } else {
+      // Minglarni ajratuvchi: 5,000 → 5000
+      s = s.replace(/,/g, '');
+    }
+  } else if (lastDot > lastComma) {
+    // Oxirgi nuqta
+    const afterDot = s.substring(lastDot + 1);
+    if (afterDot.length === 2 && /^\d+$/.test(afterDot)) {
+      // Amerika formati: 5,000.50 → 5000.50
+      s = s.substring(0, lastDot).replace(/,/g, '') + '.' + afterDot;
+    } else {
+      // Minglarni ajratuvchi: 5.000 → 5000
+      s = s.replace(/\./g, '');
+    }
+  } else {
+    // Vergul/nuqta yo'q
+    s = s.replace(/,/g, '').replace(/\./g, '');
+  }
+
+  const num = parseFloat(s);
+  return isNaN(num) ? 0 : num;
+}
+
 function syncTotals(){
   const ptypeInputs = document.querySelectorAll('input[name="payment_type"]');
   let ptype = 'cash';
@@ -228,13 +272,13 @@ function syncTotals(){
     if (input.checked) ptype = input.value;
   });
 
-  const amount = parseFloat(document.getElementById('id_amount').value || 0);
+  const amount = parseAmount(document.getElementById('id_amount').value);
   const cashEl = document.getElementById('id_cash_amount');
   const cardEl = document.getElementById('id_card_amount');
   const sumDisplay = document.getElementById('sum-display');
   const sumValue = document.getElementById('sum-value');
-  let cash = parseFloat(cashEl.value || 0);
-  let card = parseFloat(cardEl.value || 0);
+  let cash = parseAmount(cashEl.value);
+  let card = parseAmount(cardEl.value);
 
   if (ptype === 'cash'){
     cash = amount;
@@ -264,21 +308,15 @@ function syncTotals(){
     cardEl.classList.remove('bg-gray-100', 'cursor-not-allowed');
     sumDisplay.classList.remove('hidden');
 
-    const sum = (parseFloat(cashEl.value || 0) + parseFloat(cardEl.value || 0));
+    const sum = (parseAmount(cashEl.value) + parseAmount(cardEl.value));
     sumValue.textContent = '$' + sum.toFixed(2);
 
     if (Math.abs(sum - amount) > 0.009){
       // muvofiqlashtirish: naqdni avtomatik moslaymiz
-      const newCash = Math.max(amount - (parseFloat(cardEl.value || 0)), 0);
+      const newCash = Math.max(amount - parseAmount(cardEl.value), 0);
       cashEl.value = newCash.toFixed(2);
       sumValue.textContent = '$' + amount.toFixed(2);
     }
-  }
-
-  // amount maxdan oshmasin
-  const max = parseFloat(document.getElementById('id_amount').max || 0);
-  if (amount > max){
-    document.getElementById('id_amount').value = (isFinite(max) ? max.toFixed(2) : document.getElementById('id_amount').value);
   }
 }
 
@@ -291,6 +329,11 @@ document.addEventListener('DOMContentLoaded', function() {
   ptypeInputs.forEach(input => {
     input.addEventListener('change', syncTotals);
   });
+
+  // Add input listeners
+  document.getElementById('id_amount').addEventListener('input', syncTotals);
+  document.getElementById('id_cash_amount').addEventListener('input', syncTotals);
+  document.getElementById('id_card_amount').addEventListener('input', syncTotals);
 });
 </script>
 {% endblock %}

@@ -1,18 +1,3 @@
-# Media files
-media/
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.webp
-
-# Static files
-staticfiles/
-
-# Database
-*.sqlite3
-db.sqlite3
-
 # Python
 __pycache__/
 *.py[cod]
@@ -22,6 +7,63 @@ __pycache__/
 env/
 venv/
 ENV/
-"""
-A27 03.09.2025.xlsx
+.venv
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+/logs/
+
+# Environment variables
 .env
+.env.local
+.env.production
+.env.development
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+
+# Distribution
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Database backups
+backups/
+*.dump
+*.sql
+
+# Docker
+.docker/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Node modules
+node_modules/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Temporary files
+*.tmp
+*.bak
+tmp/
+temp/

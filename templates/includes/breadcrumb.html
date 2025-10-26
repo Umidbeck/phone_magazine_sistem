@@ -1,0 +1,14 @@
+{% load i18n %}
+<nav class="text-sm text-gray-500" aria-label="Breadcrumb">
+  <ol class="list-reset flex flex-wrap items-center gap-2">
+    <li><a href="{% url 'home' %}" class="hover:text-gray-700">{% trans "Bosh sahifa" %}</a></li>
+    {% for name, url in trail %}
+      <li class="mx-1">/</li>
+      {% if url %}
+        <li><a href="{{ url }}" class="hover:text-gray-700">{{ name }}</a></li>
+      {% else %}
+        <li class="text-gray-700 font-medium">{{ name }}</li>
+      {% endif %}
+    {% endfor %}
+  </ol>
+</nav>

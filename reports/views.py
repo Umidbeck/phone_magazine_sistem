@@ -29,7 +29,7 @@ import json
 
 from accounts.models import User, Store
 from finance.models import CapitalTransaction
-from finance.services import post_cash_card_transfer, record_cash_card_transfer, logger
+from finance.services import  record_cash_card_transfer, logger
 from reports.accounting import (
     compute_kpi,
     daily_kassa_series,
@@ -186,12 +186,11 @@ def profit_overview(request):
     card_in = card_in_sales + card_in_debt
 
     # === CHIQIMLAR (OUT) ===
-    # Expenses (period, no product)
+    # Expenses (BARCHA - period va product expenses)
     expenses_qs = _scope(Transaction.objects.filter(
         type="expense",
         is_approved=True,
         is_void=False,
-        product__isnull=True,
         created_at__date__gte=df,
         created_at__date__lte=dt
     ))

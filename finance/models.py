@@ -133,32 +133,36 @@ class CapitalTransaction(models.Model):
     TYPES:
     - injection: Owner investitsiya kiritadi
     - withdrawal: Owner pul oladi
-    - transfer: Naqd ↔ Karta o'tkazma (YANGI!)
+    - transfer: Naqd ↔ Karta o'tkazma
 
     CHANNELS:
     - cash: Naqd
     - card: Karta
     - both: Aralash (transfer uchun)
+
+    WITHDRAWAL SOURCES:
+    - profit: Foydadan yechish
+    - capital: Kapitaldan yechish
     """
 
     TYPE_INJECTION = "injection"
     TYPE_WITHDRAWAL = "withdrawal"
-    TYPE_TRANSFER = "transfer"  # ← YANGI!
+    TYPE_TRANSFER = "transfer"
 
     TYPE_CHOICES = (
         (TYPE_INJECTION, "Investitsiya"),
         (TYPE_WITHDRAWAL, "Yechish"),
-        (TYPE_TRANSFER, "O'tkazma"),  # ← YANGI!
+        (TYPE_TRANSFER, "O'tkazma"),
     )
 
     CHANNEL_CASH = "cash"
     CHANNEL_CARD = "card"
-    CHANNEL_BOTH = "both"  # ← Transfer uchun
+    CHANNEL_BOTH = "both"
 
     CHANNEL_CHOICES = (
         (CHANNEL_CASH, "Naqd"),
         (CHANNEL_CARD, "Karta"),
-        (CHANNEL_BOTH, "Ikkala"),  # ← YANGI!
+        (CHANNEL_BOTH, "Ikkala"),
     )
 
     DIRECTION_CASH_TO_CARD = "cash_to_card"
@@ -167,6 +171,15 @@ class CapitalTransaction(models.Model):
     DIRECTION_CHOICES = (
         (DIRECTION_CASH_TO_CARD, "Naqd → Karta"),
         (DIRECTION_CARD_TO_CASH, "Karta → Naqd"),
+    )
+
+    # ✅ WITHDRAWAL SOURCE - Qayerdan yechiladi
+    SOURCE_PROFIT = "profit"
+    SOURCE_CAPITAL = "capital"
+
+    SOURCE_CHOICES = (
+        (SOURCE_PROFIT, "Foydadan"),
+        (SOURCE_CAPITAL, "Kapitaldan"),
     )
 
     store = models.ForeignKey(
@@ -185,6 +198,14 @@ class CapitalTransaction(models.Model):
         choices=DIRECTION_CHOICES,
         blank=True,
         help_text="Faqat transfer uchun"
+    )
+
+    # ✅ Withdrawal uchun - Qayerdan yechiladi
+    withdrawal_source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        blank=True,
+        help_text="Faqat withdrawal uchun - foydadan yoki kapitaldan"
     )
 
     amount = models.DecimalField(max_digits=12, decimal_places=2)

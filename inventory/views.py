@@ -35,10 +35,9 @@ from sales.models import Transaction, SellerCommission
 from sales.services import calc_product_cost
 # from sales.views import _seller_only
 from .forms import (
-    ProductCreateForm,
     BatchIntakeForm,
     BatchItemForm,
-    ExcelImportForm, ImportExcelForm, ProductImageFormSet, ProductForm, ProductImageForm,
+    ExcelImportForm, ProductImageFormSet, ProductForm, ProductImageForm,
 )
 from .mixins import can_edit_product
 from .models import Product, ProductImage, BatchIntake
@@ -58,11 +57,8 @@ from sales.models import Transaction, SellerCommission
 from inventory.models import Product
 
 
-
 def digits_only(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
-
-
 
 
 # ============================================
@@ -93,56 +89,216 @@ def product_create(request):
     """
     Yangi telefon qo'shish (rasmlar bilan)
 
+    ✅ TO'LIQOMA TUZATILGAN VERSIYA - 2024-10-24
+    ============================================
+
     XUSUSIYATLAR:
-    ✅ Product formasi
-    ✅ Inline rasmlar (1-7 ta)
+    ✅ Product formasi (user bilan)
+    ✅ Gallery rasmlar (0-7 ta) - images
+    ✅ Hujjat rasmi (1 ta) - document_image
     ✅ IMEI validatsiya
     ✅ Narxlar validatsiya
-    ✅ Batch (partiya) qo'shish
+    ✅ Store avtomatik assignment (seller uchun)
+    ✅ Atomic transaction
+    ✅ Debug logging
+
+    MUAMMO YECHILDI:
+    ✅ enctype="multipart/form-data" template'da qo'shildi
+    ✅ Form'da images field required=False
+    ✅ request.FILES to'g'ri handle qilinadi
+    ✅ Gallery rasmlar to'g'ri saqlanadi
     """
+
     if request.method == 'POST':
-        form = ProductForm(request.POST, user=request.user)
-        formset = ProductImageFormSet(
-            request.POST,
-            request.FILES,
-            instance=form.instance if form.instance.pk else None
-        )
+        # ============================================
+        # 1. DEBUG: REQUEST MA'LUMOTLARINI KO'RISH
+        # ============================================
+        print("=" * 80)
+        print("🔵 POST REQUEST KELDI")
+        print("=" * 80)
+        print(f"📝 POST keys: {list(request.POST.keys())}")
+        print(f"📁 FILES keys: {list(request.FILES.keys())}")
+        print(f"📊 Content-Type: {request.content_type}")
 
-        if form.is_valid() and formset.is_valid():
-            with transaction.atomic():
-                # Product saqlash
-                product = form.save(commit=False)
-                product.created_by = request.user
+        # Check enctype
+        if 'multipart/form-data' not in request.content_type:
+            print("⚠️  WARNING: Content-Type multipart/form-data emas!")
 
-                # Seller uchun store
-                if not is_owner(request.user):
-                    product.store_id = request.user.store_id
+        # Files detail
+        if request.FILES:
+            print("\n📸 YUKLANGAN FAYLLAR:")
+            for key in request.FILES.keys():
+                if key == 'images':
+                    files = request.FILES.getlist('images')
+                    print(f"  ✅ images: {len(files)} ta fayl")
+                    for idx, f in enumerate(files, 1):
+                        print(f"      #{idx}: {f.name} ({f.size:,} bytes)")
+                else:
+                    file = request.FILES.get(key)
+                    print(f"  ✅ {key}: {file.name} ({file.size:,} bytes)")
+        else:
+            print("❌ FILES BO'SH - rasmlar yuborilmagan!")
+            print("   Sabablari:")
+            print("   1. Template'da enctype='multipart/form-data' yo'q")
+            print("   2. Input'da name='images' to'g'ri emas")
+            print("   3. Form submit bo'layotganda JavaScript xato")
 
-                product.save()
+        print("=" * 80)
 
-                # Rasmlarni saqlash
-                formset.instance = product
-                formset.save()
+        # ============================================
+        # 2. FORM YARATISH VA VALIDATSIYA
+        # ============================================
+        # ⚠️ MUHIM: request.FILES'ni MAJBURIY o'tkazish!
+        form = ProductForm(request.POST, request.FILES, user=request.user)
 
-                messages.success(
-                    request,
-                    f"Telefon qo'shildi: {product.brand} {product.model} [{product.imei_last4}]"
-                )
+        # Form validation
+        if form.is_valid():
+            print("✅ FORM VALID - saqlashga tayyor")
 
-                return redirect('product_detail', pk=product.pk)
+            try:
+                with transaction.atomic():
+                    # ============================================
+                    # 3. PRODUCT YARATISH
+                    # ============================================
+                    product = form.save(commit=False)
+
+                    # User assignment
+                    product.created_by = request.user
+
+                    # Seller uchun store avtomatik
+                    if not is_owner(request.user):
+                        if hasattr(request.user, 'store') and request.user.store:
+                            product.store = request.user.store
+                            print(f"   📍 Store: {product.store.name}")
+
+                    # Product save
+                    product.save()
+                    print(f"✅ Product saqlandi: ID={product.id}, IMEI=...{product.imei_last4}")
+
+                    # ============================================
+                    # 3.1. DOCUMENT IMAGE (agar yuborilgan bo'lsa)
+                    # ============================================
+                    if 'document_image' in request.FILES:
+                        product.document_image = request.FILES['document_image']
+                        product.save(update_fields=['document_image'])
+                        print(f"✅ Hujjat rasmi saqlandi")
+
+                    # ============================================
+                    # 4. GALLERY RASMLARNI SAQLASH (0-7 ta)
+                    # ============================================
+                    gallery_images = request.FILES.getlist('images')
+                    print(f"\n📸 Gallery rasmlarni saqlash: {len(gallery_images)} ta")
+
+                    if not gallery_images:
+                        print("   ℹ️  Gallery rasmlari yuborilmagan (optional)")
+
+                    saved_count = 0
+                    for idx, image_file in enumerate(gallery_images[:7]):  # Max 7 ta
+                        try:
+                            img = ProductImage.objects.create(
+                                product=product,
+                                image=image_file,
+                                order=idx,
+                                kind='other'
+                            )
+                            print(f"   ✅ Rasm #{idx + 1} saqlandi: {image_file.name}")
+                            saved_count += 1
+                        except Exception as img_error:
+                            print(f"   ❌ Rasm #{idx + 1} saqlanmadi: {img_error}")
+
+                    print(f"✅ Jami {saved_count} ta rasm saqlandi")
+
+                    # ============================================
+                    # 5. SUCCESS MESSAGE va REDIRECT
+                    # ============================================
+                    msg = _(f"✅ Telefon muvaffaqiyatli qo'shildi!")
+                    msg += f"\n📱 Model: {product.brand} {product.model}"
+                    msg += f"\n🔢 IMEI: ...{product.imei_last4}"
+                    if saved_count > 0:
+                        msg += f"\n📸 Rasmlar: {saved_count} ta"
+
+                    messages.success(request, msg)
+                    print("=" * 80)
+                    print("✅ MUVAFFAQIYATLI YAKUNLANDI")
+                    print("=" * 80)
+
+                    return redirect('product_detail', pk=product.pk)
+
+            except Exception as e:
+                # ============================================
+                # ERROR HANDLING
+                # ============================================
+                print("=" * 80)
+                print("❌ XATOLIK YUZ BERDI!")
+                print("=" * 80)
+                print(f"Error: {e}")
+
+                import traceback
+                traceback.print_exc()
+
+                messages.error(request, _(f"❌ Xatolik: {str(e)}"))
+
+        else:
+            # ============================================
+            # FORM INVALID - XATOLARNI KO'RSATISH
+            # ============================================
+            print("=" * 80)
+            print("❌ FORM INVALID - xatolar bor!")
+            print("=" * 80)
+            print("Xatolar:")
+            for field, errors in form.errors.items():
+                print(f"  • {field}: {', '.join(str(e) for e in errors)}")
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+
+            # Special check for images field
+            if 'images' in form.errors:
+                print("\n⚠️  IMAGES FIELD XATOSI:")
+                print(f"  Error: {form.errors['images']}")
+                print("  Bu xato form validation'da yuzaga keladi")
+                print("  Sabab: MultipleFileInput widget bilan muammo")
+
     else:
+        # ============================================
+        # GET REQUEST - FORMA KO'RSATISH
+        # ============================================
+        print("=" * 80)
+        print("🔵 GET REQUEST - forma ko'rsatilmoqda")
+        print("=" * 80)
         form = ProductForm(user=request.user)
-        formset = ProductImageFormSet()
-        existing_images = []
 
+    # ============================================
+    # CONTEXT VA RENDER
+    # ============================================
     ctx = {
         'form': form,
-        'formset': formset,
-        'title': 'Yangi telefon qo\'shish',
-        'existing_images': existing_images,
+        'title': _('Yangi telefon qo\'shish'),
+        'is_edit': False,
+        'max_images': 7,
+        'existing_images': [],  # Yangi yaratishda bo'sh
     }
 
     return render(request, 'inventory/product_form.html', ctx)
+
+
+@login_required
+def product_image_delete(request, pk):
+    """Rasmni o'chirish"""
+
+    image = get_object_or_404(ProductImage, pk=pk)
+    product = image.product
+
+    # Permission check
+    if not is_owner(request.user):
+        if not (hasattr(request.user, 'store') and request.user.store == product.store):
+            messages.error(request, _("Sizda ruxsat yo'q"))
+            return redirect('product_detail', pk=product.pk)
+
+    if request.method == 'POST':
+        image.delete()
+        messages.success(request, _("Rasm o'chirildi"))
+
+    return redirect('product_detail', pk=product.pk)
 
 
 @login_required
@@ -310,6 +466,7 @@ def export_products_csv(request):
 
     return resp
 
+
 @login_required
 def export_sales_csv(request):
     qs = (
@@ -442,12 +599,14 @@ def import_excel(request):
         form = ExcelImportForm(initial={"store": initial_store})
     return render(request, "inventory/import_excel.html", {"form": form})
 
+
 def _parse_decimal(val):
     if not val: return None
     try:
         return Decimal(str(val))
     except (InvalidOperation, TypeError, ValueError):
         return None
+
 
 def _parse_date(val):
     if not val: return None
@@ -654,23 +813,29 @@ def product_detail(request, pk):
 @login_required
 def product_edit(request, pk):
     """
-    Telefon tahrirlash (rasmlar bilan)
+    Telefon tahrirlash
 
     XUSUSIYATLAR:
-    ✅ Product ma'lumotlari
-    ✅ Rasmlarni qo'shish/o'chirish/tartiblash
-    ✅ Narxlarni o'zgartirish
-    ✅ Validation
+    ✅ Mavjud product
+    ✅ Mavjud rasmlar
+    ✅ Yangi rasmlar qo'shish
+    ✅ Rasmlarni o'chirish
     """
+
+    # Product olish
     product = get_object_or_404(Product, pk=pk)
 
-    # Ruxsat tekshiruvi
-    if not can_edit_product(request.user, product):
-        messages.error(request, "Bu telefonni tahrirlash huquqingiz yo'q")
-        return redirect('product_detail', pk=pk)
+    # Permission check
+    if not is_owner(request.user):
+        if not (hasattr(request.user, 'store') and request.user.store == product.store):
+            messages.error(request, _("Sizda bu telefon ustidan ishlash huquqi yo'q"))
+            return redirect('product_list')
+
+    # Mavjud rasmlar
+    existing_images = product.images.all()
 
     if request.method == 'POST':
-        form = ProductForm(request.POST, instance=product, user=request.user)
+        form = ProductForm(request.POST, request.FILES, instance=product, user=request.user)
         formset = ProductImageFormSet(
             request.POST,
             request.FILES,
@@ -678,15 +843,45 @@ def product_edit(request, pk):
         )
 
         if form.is_valid() and formset.is_valid():
-            with transaction.atomic():
-                # Product saqlash
-                product = form.save()
+            try:
+                with transaction.atomic():
+                    # Product yangilash
+                    product = form.save()
 
-                # Rasmlarni saqlash
-                formset.save()
+                    # Document image (agar yangi yuklangan bo'lsa)
+                    if 'document_image' in request.FILES:
+                        product.document_image = request.FILES['document_image']
+                        product.save(update_fields=['document_image'])
 
-                messages.success(request, "Telefon ma'lumotlari yangilandi")
-                return redirect('product_detail', pk=product.pk)
+                    # Gallery rasmlarni qo'shish
+                    images_files = request.FILES.getlist('images')
+                    existing_count = product.images.count()
+
+                    for idx, image_file in enumerate(images_files):
+                        if existing_count + idx >= 7:
+                            break
+
+                        ProductImage.objects.create(
+                            product=product,
+                            image=image_file,
+                            order=existing_count + idx,
+                            kind='other'
+                        )
+
+                    # Formset saqlash (delete va update)
+                    formset.save()
+
+                    messages.success(request, _("Telefon muvaffaqiyatli yangilandi"))
+                    return redirect('product_detail', pk=product.pk)
+
+            except Exception as e:
+                messages.error(request, _(f"Xatolik: {str(e)}"))
+        else:
+            if form.errors:
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        messages.error(request, f"{field}: {error}")
+
     else:
         form = ProductForm(instance=product, user=request.user)
         formset = ProductImageFormSet(instance=product)
@@ -694,8 +889,11 @@ def product_edit(request, pk):
     ctx = {
         'form': form,
         'formset': formset,
+        'title': _('Telefon tahrirlash'),
+        'is_edit': True,
         'product': product,
-        'title': f'Tahrirlash: {product.brand} {product.model}',
+        'existing_images': existing_images,
+        'max_images': 7,
     }
 
     return render(request, 'inventory/product_form.html', ctx)
@@ -886,9 +1084,35 @@ def product_unarchive(request, pk):
 
 @login_required
 def my_acquisitions(request):
-    qs = Product.objects.select_related("brand","model","store")\
-            .filter(created_by_id=request.user.id).order_by("-created_at")
-    return render(request, "accounts/my_acquisitions.html", {"rows": qs[:500]})
+    # 1. Asosiy queryset
+    qs = (
+        Product.objects
+        .select_related("brand", "model", "store")
+        .filter(created_by=request.user)
+        .order_by("-created_at")
+    )
+
+    # 2. Statistikalar (hisoblab olish)
+    total_count       = qs.count()
+    owned_count       = qs.filter(ownership="owned").count()
+    consignment_count = qs.filter(ownership="consignment").count()
+    last_obj          = qs.first()
+    last_date         = last_obj.created_at if last_obj else None
+
+    # 3. Pagination (sahifada 25 ta)
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get("page")
+    page_obj    = paginator.get_page(page_number)
+
+    context = {
+        "rows":            page_obj,               # paginated queryset
+        "total_count":     total_count,
+        "owned_count":     owned_count,
+        "consignment_count": consignment_count,
+        "last_date":       last_date,
+    }
+    return render(request, "accounts/my_acquisitions.html", context)
+
 
 def _month_bounds(d: date):
     first = date(d.year, d.month, 1)
@@ -962,7 +1186,7 @@ def my_stats(request):
     )
     commission_total = commission_totals["total"] or 0
     commission_paid = (
-        commissions_qs.filter(is_paid=True).aggregate(s=Sum("amount"))["s"] or 0
+            commissions_qs.filter(is_paid=True).aggregate(s=Sum("amount"))["s"] or 0
     )
 
     acquired_count = (
@@ -987,95 +1211,6 @@ def my_stats(request):
     )
     return render(request, "accounts/my_stats.html", ctx)
 
-@login_required
-def import_products_excel(request):
-    """
-    Excel headerlar: brand, model, color, year, imei_full, ownership, purchase_price,
-                     consignment_price, has_documents, is_new, defect, battery_pct, owner_name, owner_phone
-    """
-    from reference.models import Brand, ModelName, Color
-
-    if request.method == "POST":
-        form = ImportExcelForm(request.POST, request.FILES)
-        if form.is_valid():
-            store = form.cleaned_data["store"]
-            data = form.cleaned_data["file"].read()
-            wb = load_workbook(io.BytesIO(data))
-            ws = wb.active
-
-            header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
-            expected = ["brand","model","color","year","imei_full","ownership",
-                        "purchase_price","consignment_price","has_documents","is_new",
-                        "defect","battery_pct","owner_name","owner_phone"]
-            missing = [h for h in expected if h not in header]
-            if missing:
-                messages.error(request, _("Missing headers: ") + ", ".join(missing))
-                return render(request, "inventory/import_products_excel.html", {"form": form})
-
-            idx = {name: header.index(name) for name in expected}
-            results, created_count = [], 0
-
-            for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
-                def cell(n):
-                    val = row[idx[n]].value
-                    return val if val is not None else ""
-
-                rr = {"row": i, "status": "ok", "message": ""}
-                try:
-                    brand_name = str(cell("brand")).strip()
-                    model_name = str(cell("model")).strip()
-                    color_name = str(cell("color")).strip()
-                    year = cell("year")
-                    imei_full = str(cell("imei_full")).strip()
-                    ownership = str(cell("ownership")).strip() or "owned"
-                    purchase_price = cell("purchase_price") or 0
-                    consignment_price = cell("consignment_price") or 0
-                    has_documents = bool(int(cell("has_documents") or 0))
-                    is_new = bool(int(cell("is_new") or 0))
-                    defect = str(cell("defect")).strip() or ""
-                    battery_pct = cell("battery_pct") or None
-                    owner_name = str(cell("owner_name")).strip() or ""
-                    owner_phone = str(cell("owner_phone")).strip() or ""
-
-                    if not brand_name or not model_name or not imei_full:
-                        raise ValueError(_("brand/model/imei_full required"))
-
-                    brand = Brand.objects.get(name__iexact=brand_name)
-                    model = ModelName.objects.get(brand=brand, name__iexact=model_name)
-                    color = None
-                    if color_name:
-                        color = Color.objects.get(name__iexact=color_name)
-
-                    if ownership not in ("owned","consignment"):
-                        raise ValueError(_("Ownership must be 'owned' or 'consignment'"))
-
-                    p = Product(
-                        store=store, brand=brand, model=model, color=color, year=year or None,
-                        imei_full=imei_full, ownership=ownership,
-                        purchase_price=Decimal(purchase_price or 0),
-                        consignment_price=Decimal(consignment_price or 0),
-                        has_documents=has_documents, is_new=is_new,
-                        defect=defect or "", battery_pct=battery_pct if battery_pct not in ("", None) else None,
-                        owner_name=owner_name, owner_phone=owner_phone, created_by=request.user,
-                    )
-                    p.save()
-                    created_count += 1
-                except Exception as e:
-                    rr["status"] = "error"
-                    rr["message"] = str(e)
-                results.append(rr)
-
-            messages.success(request, _(f"Imported: {created_count}"))
-            return render(request, "inventory/import_products_result.html", {"results": results})
-        else:
-            messages.error(request, _("Fix form errors."))
-    else:
-        init = {}
-        if not request.user.is_owner and getattr(request.user, "store_id", None):
-            init["store"] = request.user.store_id
-        form = ImportExcelForm(initial=init)
-
-    return render(request, "inventory/import_products_excel.html", {"form": form})
 
 # ==== OLINGAN TELEFONLAR (available/on_repair) ====
 @login_required
@@ -1397,12 +1532,10 @@ def product_sold_list(request):
     return render(request, "inventory/product_sold_list.html", ctx)
 
 
-
-
 def _sold_list_ctx_base(request, rows, store_id, brand_id, model_id, seller_id, payment_type, date_from, date_to):
     stores = Store.objects.filter(is_active=True).order_by("name")
     brands = Brand.objects.filter(is_active=True).order_by("name")
-    models = ModelName.objects.filter(is_active=True).order_by("brand__name","name")
+    models = ModelName.objects.filter(is_active=True).order_by("brand__name", "name")
     sellers = User.objects.filter(is_active=True).order_by("username")
     return {
         "rows": rows,

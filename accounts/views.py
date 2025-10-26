@@ -61,29 +61,26 @@ def home_dashboard(request):
 # SELLER DASHBOARD
 # ============================================
 
+@login_required
 def seller_dashboard(request):
     """
-    Sotuvchi dashboard
-
-    STATS:
-    - Bugungi sotuvlar
-    - Haftalik sotuvlar
-    - Oylik statistika
-    - Komissiyalar
-    - Recent activities
+    Sotuvchi dashboard (faqat o'z DO'KONI bo'yicha)
     """
     user = request.user
+    store_id = getattr(user, 'store_id', None)  # muhimi shu
+
     today = dj_tz.now().date()
     week_ago = today - timedelta(days=7)
     month_start = today.replace(day=1)
 
-    # === TODAY STATS ===
+    # === TODAY STATS (faqat o'z do'koni) ===
     today_sales = Transaction.objects.filter(
         type='sale',
         seller=user,
         is_approved=True,
         is_void=False,
-        created_at__date=today
+        created_at__date=today,
+        store_id=store_id,               # <-- do'kon cheklovi
     )
 
     today_count = today_sales.count()
@@ -96,9 +93,9 @@ def seller_dashboard(request):
         seller=user,
         is_approved=True,
         is_void=False,
-        created_at__date__gte=week_ago
+        created_at__date__gte=week_ago,
+        store_id=store_id,               # <-- do'kon cheklovi
     )
-
     week_count = week_sales.count()
     week_amount = parse_decimal(week_sales.aggregate(s=Sum('amount'))['s'] or D0)
 
@@ -108,39 +105,40 @@ def seller_dashboard(request):
         seller=user,
         is_approved=True,
         is_void=False,
-        created_at__date__gte=month_start
+        created_at__date__gte=month_start,
+        store_id=store_id,               # <-- do'kon cheklovi
     )
-
     month_count = month_sales.count()
     month_amount = parse_decimal(month_sales.aggregate(s=Sum('amount'))['s'] or D0)
 
-    # === COMMISSIONS ===
+    # === COMMISSIONS (faqat sotuvchining o'zi) ===
     commissions = SellerCommission.objects.filter(
         seller=user,
         is_approved=True,
-        is_rescinded=False
+        is_rescinded=False,
+        # Agar komissiya ham do'kon bo'yicha saqlansa, qo'shing:
+        # store_id=store_id,
     )
-
     total_commission = parse_decimal(commissions.aggregate(s=Sum('amount'))['s'] or D0)
-
     unpaid_commission = parse_decimal(
         commissions.filter(is_paid=False, amount__gt=0).aggregate(s=Sum('amount'))['s'] or D0
     )
-
     pending_commission = parse_decimal(
         SellerCommission.objects.filter(
             seller=user,
             is_approved=False,
-            is_rescinded=False
+            is_rescinded=False,
+            # agar kerak bo'lsa: store_id=store_id,
         ).aggregate(s=Sum('amount'))['s'] or D0
     )
 
-    # === RECENT SALES ===
+    # === RECENT SALES (faqat o'z do'koni) ===
     recent_sales = list(
         Transaction.objects.filter(
             type='sale',
             seller=user,
-            is_approved=True
+            is_approved=True,
+            store_id=store_id,            # <-- do'kon cheklovi
         ).select_related(
             'product__brand',
             'product__model',
@@ -148,19 +146,21 @@ def seller_dashboard(request):
         ).order_by('-created_at')[:10]
     )
 
-    # === MONTHLY RANKING ===
+    # === MONTHLY RANKING (faqat shu do'kon ichida) ===
     month_key = today.strftime("%Y-%m")
+
+    # Variant A: SellerMonthlyStat da store bor (tavsiya etiladi)
     my_stat = SellerMonthlyStat.objects.filter(
         seller=user,
-        month_key=month_key
+        month_key=month_key,
+        store_id=store_id,               # <-- do'kon cheklovi
     ).first()
-
     my_sales_count = my_stat.sales_count if my_stat else 0
 
-    # Leaderboard
     leaderboard = list(
         SellerMonthlyStat.objects.filter(
-            month_key=month_key
+            month_key=month_key,
+            store_id=store_id,           # <-- do'kon cheklovi
         ).select_related('seller').order_by('-sales_count')[:5]
     )
 
@@ -170,7 +170,7 @@ def seller_dashboard(request):
             my_rank = idx
             break
 
-    # === 7 KUNLIK CHART ===
+    # === 7 KUNLIK CHART (faqat o'z do'koni) ===
     chart_data = []
     for i in range(6, -1, -1):
         day = today - timedelta(days=i)
@@ -179,7 +179,8 @@ def seller_dashboard(request):
             seller=user,
             is_approved=True,
             is_void=False,
-            created_at__date=day
+            created_at__date=day,
+            store_id=store_id,            # <-- do'kon cheklovi
         )
         count = day_sales.count()
         amount = parse_decimal(day_sales.aggregate(s=Sum('amount'))['s'] or D0)
@@ -187,13 +188,13 @@ def seller_dashboard(request):
         chart_data.append({
             'date': day.strftime("%d.%m"),
             'count': count,
-            'amount': float(amount)
+            'amount': float(amount),
         })
 
-    # === AVAILABLE PHONES ===
+    # === AVAILABLE PHONES (o'z do'koni) ===
     available_phones = Product.objects.filter(
         status='available',
-        store_id=getattr(user, 'store_id', None)
+        store_id=store_id                # allaqachon shunday edi, yaxshi
     ).count()
 
     context = {

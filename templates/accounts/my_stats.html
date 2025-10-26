@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n currency_filters%}
 
 {% block title %}{% trans "Mening statistikam" %}{% endblock %}
 
 {% block content %}
 <div class="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50 to-orange-50">
-  
+
   <!-- Header with gradient -->
   <div class="bg-gradient-to-r from-rose-600 via-pink-600 to-orange-600 text-white">
     <div class="max-w-7xl mx-auto px-4 py-8">
@@ -21,7 +21,7 @@
             </p>
           </div>
         </div>
-        
+
         <!-- Period Selector -->
         <div class="flex items-center gap-2">
           <a href="?period=day" class="px-4 py-2 rounded-xl {% if period == 'day' %}bg-white text-rose-600{% else %}bg-white/20 hover:bg-white/30 text-white{% endif %} font-semibold transition-all duration-300 hover:scale-105">
@@ -42,10 +42,10 @@
   </div>
 
   <div class="max-w-7xl mx-auto px-4 -mt-6 pb-8 space-y-6">
-    
+
     <!-- Main KPI Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      
+
       <!-- Sales Count -->
       <div class="group animate-slide-up bg-white/80 backdrop-blur-xl border border-white shadow-lg hover:shadow-2xl rounded-3xl p-6 transition-all duration-300 hover:-translate-y-2" style="animation-delay: 0.1s">
         <div class="flex items-center justify-between mb-4">
@@ -83,7 +83,7 @@
           </div>
         </div>
         <h3 class="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent mb-1">
-          ${{ sales_sum|floatformat:2 }}
+          {{ sales_sum|usd }}
         </h3>
         <p class="text-sm text-slate-600 font-medium mb-3">{% trans "Jami sotuv summasi" %}</p>
         <div class="flex items-center gap-2 text-xs text-slate-500">
@@ -107,7 +107,7 @@
           </div>
         </div>
         <h3 class="text-4xl font-bold bg-gradient-to-r from-violet-600 to-violet-800 bg-clip-text text-transparent mb-1">
-          ${{ profit_sum|floatformat:2 }}
+          {{ profit_sum|usd }}
         </h3>
         <p class="text-sm text-slate-600 font-medium mb-3">{% trans "Sof foyda" %}</p>
         <div class="flex items-center gap-2 text-xs text-slate-500">
@@ -131,7 +131,7 @@
           </div>
         </div>
         <h3 class="text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mb-1">
-          ${{ commission_total|floatformat:2 }}
+          {{ commission_total|usd }}
         </h3>
         <p class="text-sm text-slate-600 font-medium mb-3">{% trans "Komissiya" %}</p>
         <div class="flex items-center gap-2 text-xs text-slate-500">
@@ -146,7 +146,7 @@
 
     <!-- Secondary Stats -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      
+
       <!-- Cost -->
       <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6 hover:shadow-xl transition-all duration-300">
         <div class="flex items-center justify-between mb-3">
@@ -157,7 +157,7 @@
           </div>
         </div>
         <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Tan narx" %}</div>
-        <div class="text-2xl font-bold text-slate-700">${{ cost_sum|floatformat:2 }}</div>
+        <div class="text-2xl font-bold text-slate-700">{{ cost_sum|usd }}</div>
       </div>
 
       <!-- Expenses -->
@@ -170,7 +170,7 @@
           </div>
         </div>
         <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Xarajatlar" %}</div>
-        <div class="text-2xl font-bold text-red-600">${{ my_expenses|floatformat:2 }}</div>
+        <div class="text-2xl font-bold text-red-600">{{ my_expenses|usd }}</div>
       </div>
 
       <!-- Acquired -->
@@ -201,10 +201,10 @@
           </div>
         </div>
       </div>
-      
+
       <div class="p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
+
           <!-- Total Commission -->
           <div class="p-6 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-3xl">
             <div class="flex items-center justify-between mb-4">
@@ -216,7 +216,7 @@
               <span class="text-xs font-bold text-amber-700 bg-amber-200 px-3 py-1 rounded-full">💰</span>
             </div>
             <div class="text-sm text-amber-700 font-semibold mb-1">{% trans "Jami komissiya" %}</div>
-            <div class="text-3xl font-bold text-amber-600">${{ commission_total|floatformat:2 }}</div>
+            <div class="text-3xl font-bold text-amber-600">{{ commission_total|usd }}</div>
           </div>
 
           <!-- Paid Commission -->
@@ -230,7 +230,7 @@
               <span class="text-xs font-bold text-emerald-700 bg-emerald-200 px-3 py-1 rounded-full">✅</span>
             </div>
             <div class="text-sm text-emerald-700 font-semibold mb-1">{% trans "To'langan" %}</div>
-            <div class="text-3xl font-bold text-emerald-600">${{ commission_paid|floatformat:2 }}</div>
+            <div class="text-3xl font-bold text-emerald-600">{{ commission_paid|usd }}</div>
           </div>
 
         </div>
@@ -248,7 +248,7 @@
             </span>
           </div>
           <div class="w-full bg-slate-200 rounded-full h-3">
-            <div class="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full transition-all duration-500" 
+            <div class="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full transition-all duration-500"
                  style="width: {% if commission_total > 0 %}{% widthratio commission_paid commission_total 100 %}%{% else %}0%{% endif %}">
             </div>
           </div>
@@ -280,7 +280,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="grid grid-cols-2 gap-6 text-center">
           <div>
             <div class="text-rose-100 text-xs mb-1">{% trans "O'rtacha sotuv" %}</div>

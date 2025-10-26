@@ -49,6 +49,8 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_GET
 
+from django.db import transaction as db_transaction
+
 # Local apps
 from accounts.models import User, Store
 from inventory.models import Product
@@ -537,12 +539,15 @@ def expense_create(request):
     """
     Yangi rashod yaratish
 
-    GET ?product_id=123 (optional) - product'ga bog'lash
-    GET ?q=search_term (optional) - product qidirish
+    GET ?product_id=123 → product'ga bog'lash (COGS)
     POST: amount, note
+
+    COGS vs Period Expense:
+    - product_id mavjud → COGS (product tannarxiga qo'shiladi)
+    - product_id yo'q → Period expense (P&L'ga kiradi)
     """
-    # Product qidirish/tanlash
-    q = request.GET.get("q", "").strip()
+    # Product qidirish (optional)
+    q = (request.GET.get("q") or "").strip()
     products = []
     picked_product = None
 
@@ -553,9 +558,9 @@ def expense_create(request):
                 "brand", "model", "store"
             ).get(pk=product_id)
         except Product.DoesNotExist:
-            messages.warning(request, "Mahsulot topilmadi")
+            messages.warning(request, _("Mahsulot topilmadi"))
 
-    # Qidiruv
+    # Qidiruv (agar picked_product yo'q bo'lsa)
     if q and not picked_product:
         from core.utils import digits_only
         q_digits = digits_only(q)
@@ -579,13 +584,12 @@ def expense_create(request):
             if picked_product:
                 expense_store = picked_product.store
             else:
-                expense_store = _get_user_store(request.user)
+                # User'ning do'koni yoki default
+                expense_store = getattr(request.user, "store", None)
+                if not expense_store:
+                    expense_store = Store.objects.first()
 
-            if not expense_store:
-                messages.error(request, "Do'kon topilmadi")
-                return redirect("expenses_list")
-
-            with db_txn.atomic():
+            with db_transaction.atomic():
                 Transaction.objects.create(
                     type="expense",
                     product=picked_product,
@@ -594,24 +598,26 @@ def expense_create(request):
                     created_by=request.user,
                     amount=amount,
                     note=note,
-                    is_approved=False  # Owner tasdiqlaydi
+                    is_approved=False  # Owner tasdiqlashi kerak
                 )
 
-            messages.success(request, "Rashod saqlandi. Owner tasdig'ini kutmoqda.")
+            messages.success(request, _(
+                "Rashod saqlandi. Owner tasdig'ini kutmoqda."
+            ))
             return redirect("sales:expenses_list")
         else:
-            messages.error(request, "Xatolarni tuzating")
+            messages.error(request, _("Xatolarni tuzating"))
     else:
-        form = ExpenseForm()
+        form = ExpenseForm(initial={"product_id": product_id})
 
     context = {
         "form": form,
         "q": q,
         "products": products,
-        "picked_product": picked_product
+        "picked_product": picked_product,
+        "picked": picked_product  # Template'da "picked" ishlatiladi
     }
     return render(request, "sales/expense_form.html", context)
-
 
 @login_required
 def expenses_list(request):
@@ -723,7 +729,7 @@ def expense_approve(request, tx_id):
     POST: payment_type, cash_amount, card_amount
     """
     if request.method != "POST":
-        return redirect("expenses_list")
+        return redirect("sales:expense_approve")
 
     tx = get_object_or_404(
         Transaction,
@@ -739,26 +745,26 @@ def expense_approve(request, tx_id):
         card_amt = parse_decimal(request.POST.get("card_amount", "0"))
     except:
         messages.error(request, "Summalarni to'g'ri kiriting")
-        return redirect("expenses_list")
+        return redirect("sales:expenses_list")
 
     # Validation
     if ptype == "cash":
         if cash_amt != tx.amount:
             messages.error(request, "Naqd summa rashod summasiga teng bo'lishi kerak")
-            return redirect("expenses_list")
+            return redirect("sales:expenses_list")
         card_amt = Decimal("0.00")
     elif ptype == "card":
         if card_amt != tx.amount:
             messages.error(request, "Karta summa rashod summasiga teng bo'lishi kerak")
-            return redirect("expenses_list")
+            return redirect("sales:expenses_list")
         cash_amt = Decimal("0.00")
     elif ptype == "mixed":
         if (cash_amt + card_amt) != tx.amount:
             messages.error(request, "Naqd + Karta = Rashod summasi bo'lishi kerak")
-            return redirect("expenses_list")
+            return redirect("sales:expenses_list")
     else:
         messages.error(request, "To'lov turini tanlang")
-        return redirect("expenses_list")
+        return redirect("sales:expenses_list")
 
     # Ledgerga yozish
     try:
@@ -793,7 +799,7 @@ def expense_approve(request, tx_id):
     except Exception as e:
         log_error("Expense ledger posting failed", e)
         messages.error(request, f"Ledger xatosi: {e}")
-        return redirect("expenses_list")
+        return redirect("sales:expenses_list")
 
     # Transaction yangilash
     tx.payment_type = ptype
@@ -818,7 +824,7 @@ def expense_reject(request, tx_id):
     Rashodni rad etish (o'chirish)
     """
     if request.method != "POST":
-        return redirect("expenses_list")
+        return redirect("sales:expenses_list")
 
     tx = get_object_or_404(
         Transaction,
@@ -829,7 +835,7 @@ def expense_reject(request, tx_id):
 
     tx.delete()
     messages.success(request, "Rashod o'chirildi")
-    return redirect("expenses_list")
+    return redirect("sales:expenses_list")
 
 
 @login_required
@@ -841,7 +847,7 @@ def expense_unapprove(request, tx_id):
     DIQQAT: Ledger'ga ta'sir qiladi!
     """
     if request.method != "POST":
-        return redirect("expenses_list")
+        return redirect("sales:expenses_list")
 
     tx = get_object_or_404(
         Transaction,
@@ -859,7 +865,7 @@ def expense_unapprove(request, tx_id):
                      "Rashod tasdig'i bekor qilindi. "
                      "DIQQAT: Ledger va kassa hisoblari noto'g'ri bo'lishi mumkin!"
                      )
-    return redirect("expenses_list")
+    return redirect("sales:expenses_list")
 
 
 # ============================================

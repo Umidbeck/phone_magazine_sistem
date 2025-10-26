@@ -16,9 +16,13 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseForbidden
+from django.urls import reverse
+from django.utils.safestring import mark_safe
 
 from accounts.models import User
 from core.utils import is_owner
+
+from django.utils.translation import gettext as _
 
 
 # ============================================
@@ -44,17 +48,17 @@ def change_password(request):
         # Eski parol tekshiruvi
         if not request.user.check_password(old_password):
             messages.error(request, "Eski parol noto'g'ri")
-            return render(request, 'accounts/change_password.html')
+            return render(request, 'accounts/password/change_password.html')
 
         # Yangi parollar bir xilligini tekshirish
         if new_password1 != new_password2:
             messages.error(request, "Yangi parollar mos kelmadi")
-            return render(request, 'accounts/change_password.html')
+            return render(request, 'accounts/password/change_password.html')
 
         # Yangi parol eski bilan bir xil emas
         if old_password == new_password1:
             messages.error(request, "Yangi parol eski paroldan farq qilishi kerak")
-            return render(request, 'accounts/change_password.html')
+            return render(request, 'accounts/password/change_password.html')
 
         # Parol kuchi tekshiruvi
         try:
@@ -62,7 +66,7 @@ def change_password(request):
         except ValidationError as e:
             for error in e.messages:
                 messages.error(request, error)
-            return render(request, 'accounts/change_password.html')
+            return render(request, 'accounts/password/change_password.html')
 
         # Parol o'zgartirish
         request.user.set_password(new_password1)
@@ -74,7 +78,12 @@ def change_password(request):
         messages.success(request, "Parol muvaffaqiyatli o'zgartirildi!")
         return redirect('home')
 
-    return render(request, 'accounts/change_password.html')
+    return render(request, 'accounts/password/change_password.html', {
+        'breadcrumb': [
+            (_("Hisob"), None),
+            (_("Parolni o'zgartirish"), None),
+        ]
+    })
 
 
 # ============================================
@@ -125,16 +134,30 @@ def seller_reset_password(request, pk):
         # Owner'ga ko'rsatish
         messages.success(
             request,
-            f"Yangi parol: <strong>{new_password}</strong><br>"
-            f"Ushbu parolni {seller.get_full_name() or seller.username} ga yuboring.<br>"
-            f"<span class='text-warning'>MUHIM: Parolni eslab qoling! U yana ko'rsatilmaydi.</span>"
+            mark_safe(_(
+                "<div class='bg-green-50 border border-green-200 rounded-2xl p-4 text-green-800 space-y-2'>"
+                "<div class='flex items-center gap-2 font-semibold'>"
+                "<span class='text-xl'>🔐</span>"
+                "<span>Yangi parol tayyor!</span>"
+                "</div>"
+                "<code class='block w-full break-all px-3 py-2 mt-2 rounded-xl bg-green-100 text-green-900 border border-green-300'>"
+                f"{new_password}</code>"
+                "<p class='text-sm mt-2'>Ushbu parolni <strong>{seller.get_full_name() or seller.username}</strong> ga yuboring.</p>"
+                "<p class='text-xs text-amber-700 mt-2'>⚠️ MUHIM: Parolni eslab qoling! U yana ko‘rsatilmaydi.</p>"
+                "</div>"
+            ))
         )
 
         return redirect('seller_list')
 
     # GET - Tasdiqlash sahifasi
-    return render(request, 'accounts/seller_reset_password.html', {
-        'seller': seller
+    return render(request, 'accounts/password/seller_reset_password.html', {
+        'seller': seller,
+        'breadcrumb': [
+            (_("Hisoblar"), None),
+            (_("Sotuvchilar"), reverse('home')),
+            (_("Parolni tiklash"), None),
+        ]
     })
 
 
@@ -257,7 +280,14 @@ def password_requirements(request):
         }
     }
 
-    return render(request, 'accounts/password_requirements.html', ctx)
+    return render(request, 'accounts/password/password_requirements.html', {
+        'requirements': requirements,
+        'examples': ctx['examples'],
+        'breadcrumb': [
+            (_("Hisob"), None),
+            (_("Parol talablari"), None),
+        ]
+    })
 
 
 # ============================================
@@ -307,6 +337,11 @@ def force_password_change(request):
         messages.success(request, "Parol muvaffaqiyatli o'rnatildi!")
         return redirect('home')
 
-    return render(request, 'accounts/force_password_change.html')
+    return render(request, 'accounts/password/force_password_change.html', {
+        'breadcrumb': [
+            (_("Hisob"), None),
+            (_("Majburiy parol o'zgartirish"), None),
+        ]
+    })
 
 

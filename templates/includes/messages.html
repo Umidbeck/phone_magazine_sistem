@@ -1,0 +1,14 @@
+{% load i18n %}
+{% if messages %}
+  <div class="space-y-2">
+    {% for message in messages %}
+      <div class="rounded-xl p-3 text-sm
+                  {% if message.tags == 'success' %} bg-green-50 text-green-700 border border-green-200
+                  {% elif message.tags == 'error' %} bg-red-50 text-red-700 border border-red-200
+                  {% elif message.tags == 'warning' %} bg-yellow-50 text-yellow-800 border border-yellow-200
+                  {% else %} bg-blue-50 text-blue-800 border border-blue-200 {% endif %}">
+        {{ message|safe }}
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

@@ -453,7 +453,7 @@ def ap_balance_simple(user, store_id: Optional[int] = None) -> Decimal:
     from sales.models import Transaction, ConsignmentDue
     from core.utils import scope_by_user, safe_sum, is_owner
 
-    dues = ConsignmentDue.objects.filter(is_approved=True)
+    dues = ConsignmentDue.objects.filter(is_approved=True, is_void=False)
     payouts = Transaction.objects.filter(
         type='consignment_payout',
         is_approved=True,
@@ -543,7 +543,6 @@ def compute_cash_balance(
         type='expense',
         is_approved=True,
         is_void=False,
-        product__isnull=True,
         created_at__date__lte=as_of_date
     ))
 
