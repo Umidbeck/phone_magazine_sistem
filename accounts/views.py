@@ -138,6 +138,7 @@ def seller_dashboard(request):
             type='sale',
             seller=user,
             is_approved=True,
+            is_void=False,  # ⚠️ Qaytarilgan telefonlarni o'chirish
             store_id=store_id,            # <-- do'kon cheklovi
         ).select_related(
             'product__brand',
@@ -347,7 +348,8 @@ def owner_dashboard(request):
     recent_sales = list(
         _scope(Transaction.objects.filter(
             type='sale',
-            is_approved=True
+            is_approved=True,
+            is_void=False  # ⚠️ Qaytarilgan telefonlarni o'chirish
         )).select_related(
             'seller',
             'product__brand',
@@ -592,6 +594,7 @@ def my_sales(request):
     qs = (Transaction.objects
           .select_related("product", "product__brand", "product__model", "store", "seller", "commission")
           .filter(type="sale", seller_id=request.user.id,
+                  is_void=False,  # ⚠️ MUHIM: Qaytarilgan telefonlarni o'chirish!
                   created_at__date__range=(df, today))
           .order_by("-created_at"))
 
@@ -605,7 +608,3 @@ def my_sales(request):
         date_from=df, date_to=today, period=period,
     )
     return render(request, "my_sales.html", ctx)
-
-
-
-

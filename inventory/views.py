@@ -746,6 +746,13 @@ def product_detail(request, pk):
     ✅ Xarajatlar tarixi
     ✅ Sotuv ma'lumoti (agar sotilgan bo'lsa)
     ✅ Komissiya ma'lumoti
+    ✅ Bo'lib to'lash tugmasi (yangi)
+    ✅ Mahsulotni o'chirish tugmasi (yangi)
+
+    POST ACTIONS:
+    ✅ to_repair - Ta'mirga o'tkazish
+    ✅ to_available - Mavjudga qaytarish
+    ✅ delete_product - Mahsulotni o'chirish (YANGI)
     """
     product = get_object_or_404(
         Product.objects.select_related('brand', 'model', 'color', 'store', 'created_by'),
@@ -757,6 +764,61 @@ def product_detail(request, pk):
         if product.store_id != request.user.store_id:
             return HttpResponseForbidden("Bu telefonga kirishingiz mumkin emas")
 
+    # ========== POST ACTION HANDLER ==========
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        # Ruxsat tekshiruvi
+        can_change = is_owner(request.user) or product.created_by_id == request.user.id
+
+        if not can_change:
+            messages.error(request, _("Ushbu mahsulot holatini o'zgartira olmaysiz."))
+            return redirect("product_detail", pk=product.id)
+
+        # TO_REPAIR action
+        if action == 'to_repair':
+            if product.status != "available":
+                messages.error(request, _("Faqat 'Mavjud' holatidagi telefon ta'mirga o'tkaziladi."))
+            else:
+                product.status = "on_repair"
+                product.save(update_fields=["status"])
+                messages.success(request, _("✅ Ta'mirga o'tkazildi."))
+            return redirect("product_detail", pk=product.id)
+
+        # TO_AVAILABLE action
+        elif action == 'to_available':
+            if product.status != "on_repair":
+                messages.error(request, _("Faqat 'Ta'mirda' holatidagi telefon mavjudga qaytariladi."))
+            else:
+                product.status = "available"
+                product.save(update_fields=["status"])
+                messages.success(request, _("✅ Mavjudga qaytarildi."))
+            return redirect("product_detail", pk=product.id)
+
+        # DELETE_PRODUCT action (YANGI)
+        elif action == 'delete_product':
+            # Faqat owner o'chirishi mumkin va faqat available holatda
+            if not is_owner(request.user):
+                messages.error(request, _("❌ Mahsulotni o'chirish huquqi yo'q."))
+                return redirect("product_detail", pk=product.id)
+
+            if product.status != 'available':
+                messages.error(request, _("❌ Faqat 'Mavjud' holatidagi mahsulotni o'chirish mumkin."))
+                return redirect("product_detail", pk=product.id)
+
+            # Mahsulot bilan bog'liq tranzaksiyalar bormi?
+            has_transactions = Transaction.objects.filter(product=product, is_void=False).exists()
+            if has_transactions:
+                messages.error(request, _("❌ Bu mahsulot bilan bog'liq tranzaksiyalar mavjud. O'chirib bo'lmaydi."))
+                return redirect("product_detail", pk=product.id)
+
+            # O'chirish
+            product_name = f"{product.brand.name} {product.model.name}"
+            product.delete()
+            messages.success(request, _(f"✅ {product_name} muvaffaqiyatli o'chirildi."))
+            return redirect("home")
+
+    # ========== GET - MA'LUMOTLARNI KO'RSATISH ==========
     # Tannarx hisoblash
     from sales.services import calc_product_cost
     cost = calc_product_cost(product)
@@ -788,15 +850,21 @@ def product_detail(request, pk):
             except SellerCommission.DoesNotExist:
                 pass
 
-    # Foyda (agar sotilgan)
+    # Foyda hisoblash (YANGILANDI)
     profit = None
-    if sale:
-        profit = sale.profit
+    profit_percent = None
+    if sale and cost:
+        # Foyda = Sotish narxi - Tannarx
+        profit = sale.amount - cost
+        # Foyda foizi = (Foyda / Tannarx) * 100
+        if cost > 0:
+            profit_percent = (profit / cost) * 100
 
     ctx = {
         'p': product,
         'cost': cost,
         'profit': profit,
+        'profit_percent': profit_percent,
         'images': images,
         'expenses': expenses,
         'sale': sale,
@@ -805,62 +873,53 @@ def product_detail(request, pk):
         # Ruxsatlar
         'can_edit': can_edit_product(request.user, product),
         'can_delete': is_owner(request.user) and product.status == 'available',
+        'is_owner': is_owner(request.user),
     }
 
     return render(request, 'inventory/product_detail.html', ctx)
+
 
 
 @login_required
 def product_edit(request, pk):
     """
     Telefon tahrirlash
-
-    XUSUSIYATLAR:
-    ✅ Mavjud product
-    ✅ Mavjud rasmlar
-    ✅ Yangi rasmlar qo'shish
-    ✅ Rasmlarni o'chirish
     """
-
-    # Product olish
     product = get_object_or_404(Product, pk=pk)
 
-    # Permission check
+    # Permission
     if not is_owner(request.user):
         if not (hasattr(request.user, 'store') and request.user.store == product.store):
             messages.error(request, _("Sizda bu telefon ustidan ishlash huquqi yo'q"))
             return redirect('product_list')
 
-    # Mavjud rasmlar
     existing_images = product.images.all()
+    has_existing_doc = bool(getattr(product, "document_image", None))
 
     if request.method == 'POST':
         form = ProductForm(request.POST, request.FILES, instance=product, user=request.user)
-        formset = ProductImageFormSet(
-            request.POST,
-            request.FILES,
-            instance=product
-        )
+        formset = ProductImageFormSet(request.POST, request.FILES, instance=product)
 
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
-                    # Product yangilash
-                    product = form.save()
+                    # Faqat o'zgargan maydonlarni yozamiz
+                    _obj = form.save(commit=False)
+                    for name in form.changed_data:
+                        setattr(product, name, form.cleaned_data[name])
+                    product.save()
 
                     # Document image (agar yangi yuklangan bo'lsa)
                     if 'document_image' in request.FILES:
                         product.document_image = request.FILES['document_image']
                         product.save(update_fields=['document_image'])
 
-                    # Gallery rasmlarni qo'shish
+                    # Yangi galereya rasmlarini qo'shish
                     images_files = request.FILES.getlist('images')
                     existing_count = product.images.count()
-
                     for idx, image_file in enumerate(images_files):
                         if existing_count + idx >= 7:
                             break
-
                         ProductImage.objects.create(
                             product=product,
                             image=image_file,
@@ -868,7 +927,7 @@ def product_edit(request, pk):
                             kind='other'
                         )
 
-                    # Formset saqlash (delete va update)
+                    # Mavjud rasmlar formseti (update/delete)
                     formset.save()
 
                     messages.success(request, _("Telefon muvaffaqiyatli yangilandi"))
@@ -877,11 +936,15 @@ def product_edit(request, pk):
             except Exception as e:
                 messages.error(request, _(f"Xatolik: {str(e)}"))
         else:
+            # Xatolarni ko‘rsatamiz
             if form.errors:
                 for field, errors in form.errors.items():
                     for error in errors:
                         messages.error(request, f"{field}: {error}")
-
+            if formset.errors:
+                for fe in formset.errors:
+                    for field, error in fe.items():
+                        messages.error(request, f"images[{field}]: {error}")
     else:
         form = ProductForm(instance=product, user=request.user)
         formset = ProductImageFormSet(instance=product)
@@ -891,11 +954,11 @@ def product_edit(request, pk):
         'formset': formset,
         'title': _('Telefon tahrirlash'),
         'is_edit': True,
-        'product': product,
+        'product': product,            # ⬅️ p emas, product
         'existing_images': existing_images,
         'max_images': 7,
+        'has_existing_doc': has_existing_doc,
     }
-
     return render(request, 'inventory/product_form.html', ctx)
 
 
@@ -1093,23 +1156,23 @@ def my_acquisitions(request):
     )
 
     # 2. Statistikalar (hisoblab olish)
-    total_count       = qs.count()
-    owned_count       = qs.filter(ownership="owned").count()
+    total_count = qs.count()
+    owned_count = qs.filter(ownership="owned").count()
     consignment_count = qs.filter(ownership="consignment").count()
-    last_obj          = qs.first()
-    last_date         = last_obj.created_at if last_obj else None
+    last_obj = qs.first()
+    last_date = last_obj.created_at if last_obj else None
 
     # 3. Pagination (sahifada 25 ta)
     paginator = Paginator(qs, 25)
     page_number = request.GET.get("page")
-    page_obj    = paginator.get_page(page_number)
+    page_obj = paginator.get_page(page_number)
 
     context = {
-        "rows":            page_obj,               # paginated queryset
-        "total_count":     total_count,
-        "owned_count":     owned_count,
+        "rows": page_obj,  # paginated queryset
+        "total_count": total_count,
+        "owned_count": owned_count,
         "consignment_count": consignment_count,
-        "last_date":       last_date,
+        "last_date": last_date,
     }
     return render(request, "accounts/my_acquisitions.html", context)
 
@@ -1155,6 +1218,8 @@ def my_stats(request):
         Transaction.objects
         .filter(type="sale",
                 seller_id=request.user.id,
+                is_approved=True,  # ✅ Faqat tasdiqlangan
+                is_void=False,  # ✅ Qaytarilganlar yo'q!
                 created_at__date__range=(date_from, date_to))
     )
 
@@ -1162,6 +1227,8 @@ def my_stats(request):
         Transaction.objects
         .filter(type="expense",
                 seller_id=request.user.id,
+                is_approved=True,  # ✅ Faqat tasdiqlangan
+                is_void=False,  # ✅ Bekor qilinganlar yo'q
                 created_at__date__range=(date_from, date_to))
     )
 
@@ -1178,6 +1245,8 @@ def my_stats(request):
     commissions_qs = (
         SellerCommission.objects
         .filter(seller_id=request.user.id,
+                is_approved=True,  # ✅ Faqat tasdiqlangan komissiyalar
+                is_rescinded=False,  # ✅ Bekor qilinganlar yo'q
                 transaction__created_at__date__range=(date_from, date_to))
     )
     commission_totals = commissions_qs.aggregate(

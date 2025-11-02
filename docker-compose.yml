@@ -1,9 +1,5 @@
-version: "3.9"
 
 services:
-  # ============================================
-  # PostgreSQL Database
-  # ============================================
   db:
     image: postgres:15-alpine
     container_name: phone_db
@@ -16,19 +12,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
-    ports:
-      - "5432:5432"  # Remove in production, only for debugging
+    # Agar tashqaridan ulanish shart bo'lsa oching, aks holda o'chirib tashlang
+    # ports:
+    #   - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - phone_network
+    networks: [phone_network]
 
-  # ============================================
-  # Redis Cache
-  # ============================================
   redis:
     image: redis:7-alpine
     container_name: phone_redis
@@ -41,12 +34,8 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-    networks:
-      - phone_network
+    networks: [phone_network]
 
-  # ============================================
-  # Django Application
-  # ============================================
   web:
     build:
       context: .
@@ -71,17 +60,13 @@ services:
     expose:
       - "8000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - phone_network
+    networks: [phone_network]
 
-  # ============================================
-  # Nginx Reverse Proxy
-  # ============================================
   nginx:
     image: nginx:1.25-alpine
     container_name: phone_nginx
@@ -104,12 +89,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    networks:
-      - phone_network
+    networks: [phone_network]
 
-  # ============================================
-  # Certbot for SSL (Optional)
-  # ============================================
   certbot:
     image: certbot/certbot:latest
     container_name: phone_certbot
@@ -118,29 +99,16 @@ services:
       - certbot_www:/var/www/certbot
       - certbot_certs:/etc/letsencrypt
     entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
-    networks:
-      - phone_network
+    networks: [phone_network]
 
-# ============================================
-# Networks
-# ============================================
 networks:
   phone_network:
     driver: bridge
 
-# ============================================
-# Volumes
-# ============================================
 volumes:
   postgres_data:
-    driver: local
   redis_data:
-    driver: local
   static_volume:
-    driver: local
   media_volume:
-    driver: local
   certbot_www:
-    driver: local
   certbot_certs:
-    driver: local

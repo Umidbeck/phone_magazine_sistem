@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% load i18n %}
-{% load l10n %}
+{% load i18n l10n %}
+{% load currency_filters %}
 
 {% block title %}{% trans "Foyda va Kassa ko'rinishi" %}{% endblock %}
 
@@ -30,32 +30,46 @@
 
     {% include "includes/messages.html" %}
 
-    <!-- ===== Filter Card ===== -->
-    <form method="get" class="bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-lg space-y-6">
+    <!-- ===== Filter Card (owner selectable, seller forced to own store) ===== -->
+    <form method="get" id="filtersForm" class="bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-lg space-y-6">
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Period -->
         <div class="space-y-2">
           <label class="text-xs font-semibold text-slate-600">{% trans "Davr" %}</label>
           <select name="period" class="w-full px-3 py-2 border border-white/30 bg-white/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
-            <option value="day" {% if period == "day" %}selected{% endif %}>{% trans "Bugun" %}</option>
-            <option value="week" {% if period == "week" %}selected{% endif %}>{% trans "7 kun" %}</option>
+            <option value="day"   {% if period == "day" %}selected{% endif %}>{% trans "Bugun" %}</option>
+            <option value="week"  {% if period == "week" %}selected{% endif %}>{% trans "7 kun" %}</option>
             <option value="month" {% if period == "month" %}selected{% endif %}>{% trans "Joriy oy" %}</option>
           </select>
         </div>
 
-        {% if stores %}
-        <div class="space-y-2">
-          <label class="text-xs font-semibold text-slate-600">{% trans "Do'kon" %}</label>
-          <select name="store_id" class="w-full px-3 py-2 border border-white/30 bg-white/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
-            <option value="">{% trans "Hammasi" %}</option>
-            {% for s in stores %}
-            <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
+        {# STORE: owner => select; seller => hidden + readonly nom #}
+        {% if user.is_owner %}
+          {% if stores %}
+            <div class="space-y-2">
+              <label class="text-xs font-semibold text-slate-600">{% trans "Do'kon" %}</label>
+              <select name="store_id" class="w-full px-3 py-2 border border-white/30 bg-white/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                <option value="">{% trans "Hammasi" %}</option>
+                {% for s in stores %}
+                  {% with chosen=request.GET.store_id|default:store_id %}
+                    <option value="{{ s.id }}" {% if chosen|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+                  {% endwith %}
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+        {% else %}
+          {% if request.user.store %}
+            <input type="hidden" name="store_id" value="{{ request.user.store.id }}" id="forcedStoreId">
+            <div class="space-y-2">
+              <label class="text-xs font-semibold text-slate-600">{% trans "Do'kon" %}</label>
+              <input type="text" value="{{ request.user.store.name }}" class="w-full px-3 py-2 border border-white/30 bg-white/30 rounded-xl text-sm" readonly>
+            </div>
+          {% endif %}
         {% endif %}
 
+        <!-- Dates -->
         <div class="space-y-2">
           <label class="text-xs font-semibold text-slate-600">{% trans "Sana — dan" %}</label>
           <input type="date" name="date_from" value="{{ start_date|date:'Y-m-d' }}" class="w-full px-3 py-2 border border-white/30 bg-white/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
@@ -86,7 +100,7 @@
           <span class="text-xs font-semibold text-slate-600">{% trans "Naqd — ochilish" %}</span>
         </div>
         <div class="text-2xl font-bold text-slate-800">
-          <span class="text-green-600">$</span>{{ cash_open|floatformat:2 }}
+          <span class="text-green-600"></span>{{ cash_open|usd }}
         </div>
         <p class="text-xs text-slate-500 mt-1">{% trans "Kecha yopilish qoldig'i" %}</p>
       </div>
@@ -98,13 +112,13 @@
           <span class="text-xs font-semibold text-slate-600">{% trans "Naqd — o'zgarish" %}</span>
         </div>
         <div class="text-2xl font-bold {% if cash_delta >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
-          <span class="text-green-600">$</span>{{ cash_delta|floatformat:2 }}
+          <span class="text-green-600"></span>{{ cash_delta|usd }}
         </div>
         <div class="mt-1">
           {% if cash_delta >= 0 %}
-          <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">⬆️ {% trans "Kirim" %}</span>
+            <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">⬆️ {% trans "Kirim" %}</span>
           {% else %}
-          <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">⬇️ {% trans "Chiqim" %}</span>
+            <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">⬇️ {% trans "Chiqim" %}</span>
           {% endif %}
         </div>
         <p class="text-xs text-slate-500 mt-1">{% trans "Savdo + tushum − rashod" %}</p>
@@ -117,7 +131,7 @@
           <span class="text-xs font-semibold text-slate-600">{% trans "Naqd — yopilish" %}</span>
         </div>
         <div class="text-2xl font-bold text-slate-800">
-          <span class="text-green-600">$</span>{{ cash_close|floatformat:2 }}
+          <span class="text-green-600"></span>{{ cash_close|usd }}
         </div>
         <p class="text-xs text-slate-500 mt-1">{% trans "Joriy balans" %}</p>
       </div>
@@ -129,7 +143,7 @@
           <span class="text-xs font-semibold text-slate-600">{% trans "Karta — ochilish" %}</span>
         </div>
         <div class="text-2xl font-bold text-slate-800">
-          <span class="text-blue-600">$</span>{{ card_open|floatformat:2 }}
+          <span class="text-blue-600"></span>{{ card_open|usd }}
         </div>
         <p class="text-xs text-slate-500 mt-1">{% trans "Kecha yopilish qoldig'i" %}</p>
       </div>
@@ -141,13 +155,13 @@
           <span class="text-xs font-semibold text-slate-600">{% trans "Karta — o'zgarish" %}</span>
         </div>
         <div class="text-2xl font-bold {% if card_delta >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
-          <span class="text-blue-600">$</span>{{ card_delta|floatformat:2 }}
+          <span class="text-blue-600"></span>{{ card_delta|usd }}
         </div>
         <div class="mt-1">
           {% if card_delta >= 0 %}
-          <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">⬆️ {% trans "Kirim" %}</span>
+            <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">⬆️ {% trans "Kirim" %}</span>
           {% else %}
-          <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">⬇️ {% trans "Chiqim" %}</span>
+            <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">⬇️ {% trans "Chiqim" %}</span>
           {% endif %}
         </div>
         <p class="text-xs text-slate-500 mt-1">{% trans "Savdo + tushum − rashod" %}</p>
@@ -160,19 +174,19 @@
           <span class="text-xs font-semibold text-slate-600">{% trans "Karta — yopilish" %}</span>
         </div>
         <div class="text-2xl font-bold text-slate-800">
-          <span class="text-blue-600">$</span>{{ card_close|floatformat:2 }}
+          <span class="text-blue-600"></span>{{ card_close|usd }}
         </div>
         <p class="text-xs text-slate-500 mt-1">{% trans "Joriy balans" %}</p>
       </div>
     </div>
 
     {% if request.user.is_owner %}
-    <!-- ===== Large Stats ===== -->
+    <!-- ===== Owner-only Big Stats ===== -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="group bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
         <div class="text-sm font-semibold text-slate-600 mb-2">💰 {% trans "Kassa yakuniy" %}</div>
         <div class="text-4xl font-bold text-slate-800">
-          <span class="text-green-600">$</span>{{ kassa_total|floatformat:2 }}
+          <span class="text-green-600"></span>{{ kassa_total|usd }}
         </div>
         <p class="text-xs text-slate-500 mt-2">{% trans "Naqd + Karta: uzluksiz balans" %}</p>
       </div>
@@ -180,42 +194,43 @@
       <div class="group bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
         <div class="text-sm font-semibold text-slate-600 mb-2">📊 {% trans "Net foyda" %}</div>
         <div class="text-4xl font-bold {% if net_profit >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
-          <span class="text-purple-600">$</span>{{ net_profit|floatformat:2 }}
+          <span class="text-purple-600"></span>{{ net_profit|usd }}
         </div>
         <p class="text-xs text-slate-500 mt-2">{% trans "Brutto foyda − Rashodlar − Komissiya" %}</p>
       </div>
     </div>
 
-    <!-- ===== P&L Details ===== -->
+    <!-- ===== P&L details (owner only) ===== -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
       <div class="group bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-5 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
         <div class="text-sm font-semibold text-slate-600 mb-2">💰 {% trans "Umumiy savdo" %}</div>
         <div class="text-2xl font-bold text-slate-800">
-          <span class="text-blue-600">$</span>{{ total_sales|floatformat:2 }}
+          <span class="text-blue-600"></span>{{ total_sales|usd }}
         </div>
       </div>
 
       <div class="group bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-5 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
         <div class="text-sm font-semibold text-slate-600 mb-2">📈 {% trans "Brutto foyda" %}</div>
         <div class="text-2xl font-bold text-emerald-600">
-          <span class="text-green-600">$</span>{{ gross_profit|floatformat:2 }}
+          <span class="text-green-600"></span>{{ gross_profit|usd }}
         </div>
       </div>
 
       <div class="group bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-5 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
         <div class="text-sm font-semibold text-slate-600 mb-2">📉 {% trans "Rashodlar" %}</div>
         <div class="text-2xl font-bold text-amber-600">
-          <span class="text-orange-600">$</span>{{ total_expense|floatformat:2 }}
+          <span class="text-orange-600"></span>{{ total_expense|usd }}
         </div>
       </div>
 
       <div class="group bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-5 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
         <div class="text-sm font-semibold text-slate-600 mb-2">🤝 {% trans "Komissiya" %}</div>
         <div class="text-2xl font-bold text-purple-600">
-          <span class="text-purple-600">$</span>{{ total_commission|floatformat:2 }}
+          <span class="text-purple-600"></span>{{ total_commission|usd }}
         </div>
       </div>
     </div>
+    {% endif %}
 
     <!-- ===== Cash Transfer ===== -->
     <div class="bg-white/40 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-lg">
@@ -226,6 +241,21 @@
 
       <form method="post" action="{% url 'cash_transfer' %}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {% csrf_token %}
+
+        {% if user.is_owner and stores %}
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-600">{% trans "Do'kon" %}</label>
+            <select name="store_id" class="w-full px-3 py-2 border border-white/30 bg-white/30 rounded-xl text-sm">
+              {% for s in stores %}
+                <option value="{{ s.id }}" {% if store_id|stringformat:"s" == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% else %}
+          {% if request.user.store %}
+            <input type="hidden" name="store_id" value="{{ request.user.store.id }}">
+          {% endif %}
+        {% endif %}
 
         <div class="space-y-2">
           <label class="text-xs font-semibold text-slate-600">{% trans "Yo'nalish" %}</label>
@@ -252,9 +282,9 @@
         </div>
       </form>
     </div>
-    {% endif %}
 
-    <!-- ===== Quick Links ===== -->
+    <!-- ===== Quick Links (Owner) ===== -->
+    {% if user.is_owner %}
     <div class="flex flex-wrap gap-3">
       <a href="{% url 'daily_cash' %}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/60 backdrop-blur-sm border border-white/30 text-slate-700 font-semibold hover:bg-white/80 transition-all">
         💵 {% trans "Har kunlik kassa" %}
@@ -263,7 +293,30 @@
         📊 {% trans "Oyma-oy taqqoslash" %}
       </a>
     </div>
+    {% endif %}
 
   </div>
 </div>
+
+{# === SELLER uchun majburiy store_id qo'yish (faqat HTML/JS) === #}
+<script>
+(function() {
+  const isOwner = {{ user.is_owner|yesno:"true,false" }};
+  const userStoreId = {% if request.user.store %} "{{ request.user.store.id }}" {% else %} null {% endif %};
+
+  if (!isOwner && userStoreId) {
+    const url = new URL(window.location.href);
+    const p = url.searchParams;
+
+    // Agar store_id yo'q yoki boshqacha bo'lsa -> o'z do'koni bilan qayta yuklaymiz
+    if (p.get('store_id') !== String(userStoreId)) {
+      p.set('store_id', String(userStoreId));
+      url.search = p.toString();
+      // replace => back tugmasi bilan redirect loop bo'lmaydi
+      window.location.replace(url.toString());
+      return; // qolgan renderlar redirectdan keyin
+    }
+  }
+})();
+</script>
 {% endblock %}

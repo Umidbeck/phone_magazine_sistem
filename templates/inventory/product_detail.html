@@ -90,43 +90,66 @@
             {% endif %}
           </div>
 
-          <!-- KPIs -->
+          <!-- KPIs - YANGILANGAN VERSIYA -->
           <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <!-- Ask price (everyone) -->
-            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-              <div class="text-xs text-slate-500">{% trans "Sotish narxi (ask)" %}</div>
-              <div class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                {% if p.ask_price %}${{ p.ask_price }}{% else %}—{% endif %}
+
+            <!-- 1. Sotish narxi (ask) - HAMMA KO'RADI -->
+            <div class="rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white p-4 shadow-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-lg">💵</span>
+                <div class="text-xs font-semibold text-purple-700">{% trans "Sotish narxi (ask)" %}</div>
+              </div>
+              <div class="text-2xl font-bold text-purple-600">
+                {% if p.ask_price %}${{ p.ask_price|floatformat:0 }}{% else %}—{% endif %}
               </div>
             </div>
 
-
-            {% if p.status == 'sold' %}
-            <!-- Sold price (if sold) -->
-            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-              <div class="text-xs text-slate-500">{% trans "Sotilgan narx" %}</div>
-              <div class="text-2xl font-bold text-slate-800">
-                {% if p.sold_price %}${{ p.amount }}{% else %}—{% endif %}
+            <!-- 2. Tannarx - FAQAT OWNER -->
+            {% if is_owner %}
+            <div class="rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-lg">📊</span>
+                <div class="text-xs font-semibold text-amber-700">{% trans "Tannarx (cost)" %}</div>
+              </div>
+              <div class="text-2xl font-bold text-amber-600">
+                {% if cost %}${{ cost|floatformat:0 }}{% else %}—{% endif %}
               </div>
             </div>
             {% endif %}
 
-            {% if request.user.is_owner %}
-            <!-- Cost (owner only) -->
-            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-              <div class="text-xs text-slate-500">{% trans "Tannarx" %}</div>
-              <div class="text-2xl font-bold text-slate-800">
-                {% if cost %}${{ cost }}{% else %}—{% endif %}
+            <!-- 3. Foyda - FAQAT OWNER VA FAQAT SOTILGAN BO'LSA -->
+            {% if is_owner and p.status == 'sold' %}
+            <div class="rounded-2xl border-2 {% if profit > 0 %}border-emerald-200 bg-gradient-to-br from-emerald-50 to-white{% elif profit < 0 %}border-rose-200 bg-gradient-to-br from-rose-50 to-white{% else %}border-slate-200 bg-gradient-to-br from-slate-50 to-white{% endif %} p-4 shadow-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-lg">{% if profit > 0 %}📈{% elif profit < 0 %}📉{% else %}➖{% endif %}</span>
+                <div class="text-xs font-semibold {% if profit > 0 %}text-emerald-700{% elif profit < 0 %}text-rose-700{% else %}text-slate-700{% endif %}">
+                  {% trans "Foyda (profit)" %}
+                </div>
               </div>
-            </div>
-            <!-- Profit (owner only) -->
-            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-              <div class="text-xs text-slate-500">{% trans "Foyda" %}</div>
-              <div class="text-2xl font-bold {% if profit and profit > 0 %}text-emerald-600{% elif profit and profit < 0 %}text-rose-600{% else %}text-slate-800{% endif %}">
-                {% if profit is not None %}${{ profit }}{% else %}—{% endif %}
+              <div class="text-2xl font-bold {% if profit > 0 %}text-emerald-600{% elif profit < 0 %}text-rose-600{% else %}text-slate-600{% endif %}">
+                {% if profit is not None %}
+                  {% if profit > 0 %}+{% endif %}${{ profit|floatformat:0 }}
+                  {% if profit_percent %}
+                    <span class="text-sm font-medium ml-1">({{ profit_percent|floatformat:1 }}%)</span>
+                  {% endif %}
+                {% else %}—{% endif %}
               </div>
             </div>
             {% endif %}
+
+            <!-- 4. Sotilgan narx - FAQAT SOTILGAN BO'LSA -->
+            {% if p.status == 'sold' and sale %}
+            <div class="rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-lg">💰</span>
+                <div class="text-xs font-semibold text-blue-700">{% trans "Sotilgan narx" %}</div>
+              </div>
+              <div class="text-2xl font-bold text-blue-600">
+                {% if sale.amount %}${{ sale.amount|floatformat:0 }}{% else %}—{% endif %}
+              </div>
+            </div>
+            {% endif %}
+
           </div>
 
           <!-- Basic info (expanded) -->
@@ -183,41 +206,70 @@
             </div>
           </div>
 
-          <!-- Actions -->
+          <!-- Actions - YANGILANGAN -->
           <div class="flex flex-wrap gap-2">
-            {% if can_edit %}
-              <a href="{% url 'product_edit' p.id %}" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-sm font-semibold hover:bg-slate-50">✏️ {% trans "Tahrirlash" %}</a>
-            {% endif %}
-{#            {% if can_delete %}#}
-{#              <form method="post" action="{% url 'product_delete' p.id %}" onsubmit="return confirm('{% trans 'Haqiqatan o‘chirmoqchimisiz?' %}');" class="inline-block">#}
-{#                {% csrf_token %}#}
-{#                <button type="submit" class="px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700">🗑️ {% trans "O‘chirish" %}</button>#}
-{#              </form>#}
-{#            {% endif %}#}
 
-            <!-- Status change -->
+            <!-- 1. Tahrirlash -->
+            {% if can_edit %}
+              <a href="{% url 'product_edit' p.id %}"
+                 class="px-4 py-2 rounded-xl border-2 border-slate-300 bg-white text-slate-800 text-sm font-semibold hover:bg-slate-50 hover:border-slate-400 transition">
+                ✏️ {% trans "Tahrirlash" %}
+              </a>
+            {% endif %}
+
+            <!-- 2. O'chirish - YANGI! -->
+            {% if can_delete %}
+              <form method="post" class="inline-block"
+                    onsubmit="return confirm('Haqiqatan ham bu mahsulotni o\'chirmoqchimisiz?\n\n{{ p.brand.name }} {{ p.model.name }}\nIMEI: {{ p.imei_full }}\n\nBu amaldan qaytish imkoni yo\'q!');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_product">
+                <button type="submit"
+                        class="px-4 py-2 rounded-xl border-2 border-rose-300 bg-rose-50 text-rose-700 text-sm font-semibold hover:bg-rose-600 hover:text-white hover:border-rose-600 transition">
+                  🗑️ {% trans "O'chirish" %}
+                </button>
+              </form>
+            {% endif %}
+
+            <!-- 3. Ta'mirga o'tkazish / Mavjudga qaytarish -->
             {% if can_edit and p.status == "available" %}
               <form method="post" class="inline-block">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="to_repair">
-                <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700">🔧 {% trans "Ta'mirga o‘tkazish" %}</button>
+                <button type="submit"
+                        class="px-4 py-2 rounded-xl border-2 border-amber-300 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-600 hover:text-white hover:border-amber-600 transition">
+                  🔧 {% trans "Ta'mirga o'tkazish" %}
+                </button>
               </form>
             {% elif can_edit and p.status == "on_repair" %}
               <form method="post" class="inline-block">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="to_available">
-                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">✅ {% trans "Mavjudga qaytarish" %}</button>
+                <button type="submit"
+                        class="px-4 py-2 rounded-xl border-2 border-emerald-300 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition">
+                  ✅ {% trans "Mavjudga qaytarish" %}
+                </button>
               </form>
             {% endif %}
 
-            <!-- SELL button (only when available) -->
+            <!-- 4. Sotish -->
             {% if p.status == "available" %}
               <a href="/sales/sell/?product_id={{ p.id }}"
-                 class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-semibold shadow hover:shadow-md hover:scale-[1.02] transition">
+                 class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition">
                 🛒 {% trans "Sotish" %}
               </a>
             {% endif %}
+
+            <!-- 5. Bo'lib to'lash - YANGI! -->
+            {% if p.status == "available" %}
+              <a href="{% url 'sales:sell_installment' %}?product_id={{ p.id }}"
+                 class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition">
+                💳 {% trans "Bo'lib to'lash" %}
+              </a>
+            {% endif %}
+
           </div>
+
+        </div>
 
         </div>
       </div>

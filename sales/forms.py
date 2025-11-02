@@ -372,3 +372,4 @@ class CommissionUpdateForm(forms.Form):
         if amount < DECIMAL_ZERO:
             raise ValidationError("Summa manfiy bo'lishi mumkin emas")
         return amount
+

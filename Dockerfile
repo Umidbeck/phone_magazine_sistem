@@ -1,77 +1,41 @@
-# Dockerfile - Multi-stage Production Build
-FROM python:3.12-slim as builder
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    gettext \
-    libcairo2 \
-    pango1.0-tools \
-    libpango-1.0-0 \
-    libgdk-pixbuf2.0-0 \
-    shared-mime-info \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# ============================================
-# Production Stage
-# ============================================
+# Python slim + system deps (WeasyPrint, Postgres)
 FROM python:3.12-slim
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PATH="/usr/local/bin:${PATH}"
 
-WORKDIR /app
-
-# Install runtime dependencies only
+# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    gettext \
-    libcairo2 \
-    libpango-1.0-0 \
-    libgdk-pixbuf2.0-0 \
-    shared-mime-info \
-    curl \
+    build-essential gcc \
+    libpq-dev \
+    # WeasyPrint deps:
+    libcairo2 pango-graphite libpango-1.0-0 libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 shared-mime-info fonts-dejavu-core \
+    libffi-dev libxml2 libxslt1.1 \
+    curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python packages from builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Workdir
+WORKDIR /app
 
-# Create application user
-RUN groupadd -r django && useradd -r -g django django
+# Requirements first (better caching)
+COPY requirements.txt /app/
+RUN pip install --upgrade pip wheel && pip install -r requirements.txt
 
-# Create necessary directories
-RUN mkdir -p /app/staticfiles /app/media /app/logs && \
-    chown -R django:django /app
+# App code
+COPY . /app
 
-# Copy application code
-COPY --chown=django:django . .
+# Ensure runtime dirs exist
+RUN mkdir -p /app/staticfiles /app/media /app/logs
 
-# Make entrypoint executable
-RUN chmod +x /app/entrypoint.sh
+# Permissions (simplify)
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
 
-# Switch to non-root user
-USER django
-
-# Expose port
+# Gunicorn config is in repo as gunicorn.conf.py
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
-
-# Run entrypoint
+# Entrypoint runs migrations, collectstatic, then gunicorn
 ENTRYPOINT ["/app/entrypoint.sh"]

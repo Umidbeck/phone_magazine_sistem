@@ -1,69 +1,300 @@
-# sales/sell_installment.html
 {% extends "base.html" %}
-{% block title %}Bo‘lib to‘lash · PhoneStore{% endblock %}
+{% load i18n %}
+
+{% block title %}💳 {% trans "Bo'lib to'lash" %} · PhoneStore{% endblock %}
+
 {% block content %}
-<div class="card p-5 max-w-2xl">
-  <h1 class="text-xl font-semibold mb-4">Bo‘lib to‘lash</h1>
-  <div class="mb-4 rounded-xl border border-neutral-200 p-4 bg-neutral-50">
-    <div class="text-sm text-neutral-600">Telefon</div>
-    <div class="font-medium">{{ product.brand.name }} {{ product.model.name }} — IMEI: {{ product.imei_full }}</div>
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50 py-8">
+  <div class="max-w-4xl mx-auto px-4">
+
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 text-white rounded-3xl p-8 mb-6 shadow-2xl">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl">💳</div>
+        <div>
+          <h1 class="text-3xl font-bold">{% trans "Bo'lib to'lash" %}</h1>
+          <p class="text-blue-100">{% trans "Mahsulotni bo'lib-bo'lib to'lash orqali sotish" %}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- LEFT: Form -->
+      <div class="lg:col-span-2">
+        <div class="bg-white/90 backdrop-blur-xl border border-white shadow-xl rounded-3xl p-6">
+
+          <!-- Product Info -->
+          <div class="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200">
+            <div class="text-sm font-semibold text-blue-700 mb-1">📱 {% trans "Mahsulot" %}</div>
+            <div class="font-bold text-lg text-blue-900">
+              {{ product.brand.name }} {{ product.model.name }}
+              {% if product.color %}<span class="text-blue-600">· {{ product.color.name }}</span>{% endif %}
+            </div>
+            {% if product.imei_full %}
+            <div class="text-sm text-blue-600 mt-1">IMEI: <span class="font-mono font-semibold">{{ product.imei_full }}</span></div>
+            {% endif %}
+            {% if suggested_price %}
+            <div class="mt-2 text-sm">
+              <span class="text-blue-600">💵 {% trans "Tavsiya etilgan narx" %}:</span>
+              <span class="font-bold text-blue-900">${{ suggested_price|floatformat:0 }}</span>
+            </div>
+            {% endif %}
+          </div>
+
+          <form method="post" class="space-y-5" id="installmentForm">
+            {% csrf_token %}
+
+            <!-- Customer Info -->
+            <div class="space-y-4">
+              <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <span class="text-xl">👤</span> {% trans "Mijoz ma'lumotlari" %}
+              </h3>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                  {% trans "Mijoz ismi" %} <span class="text-rose-500">*</span>
+                </label>
+                {{ form.customer_name }}
+                {% if form.customer_name.errors %}
+                  <p class="text-rose-600 text-sm mt-1">{{ form.customer_name.errors.0 }}</p>
+                {% endif %}
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">
+                    {% trans "Telefon raqami" %}
+                  </label>
+                  {{ form.customer_phone }}
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">
+                    {% trans "Izoh" %}
+                  </label>
+                  {{ form.note }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Price & Payment -->
+            <div class="space-y-4">
+              <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <span class="text-xl">💰</span> {% trans "Narx va to'lov" %}
+              </h3>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                  {% trans "Umumiy narx ($)" %} <span class="text-rose-500">*</span>
+                </label>
+                {{ form.total_price }}
+                {% if form.total_price.errors %}
+                  <p class="text-rose-600 text-sm mt-1">{{ form.total_price.errors.0 }}</p>
+                {% endif %}
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                  {% trans "To'lov turi" %}
+                </label>
+                {{ form.payment_type }}
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">
+                    💵 {% trans "Oldindan naqd ($)" %}
+                  </label>
+                  {{ form.upfront_cash }}
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-1">
+                    💳 {% trans "Oldindan karta ($)" %}
+                  </label>
+                  {{ form.upfront_card }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Form Errors -->
+            {% if form.non_field_errors %}
+              <div class="p-4 rounded-xl bg-rose-50 border border-rose-200">
+                <div class="text-rose-800 font-medium">❌ {% trans "Xatoliklar" %}:</div>
+                {% for error in form.non_field_errors %}
+                  <div class="text-rose-700 text-sm mt-1">• {{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <!-- Buttons -->
+            <div class="flex flex-wrap gap-3 pt-4 border-t border-slate-200">
+              <button type="submit" class="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition">
+                ✅ {% trans "Sotishni tasdiqlash" %}
+              </button>
+              <a href="{% url 'product_detail' product.id %}" class="px-6 py-3 rounded-xl border-2 border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition">
+                ❌ {% trans "Bekor qilish" %}
+              </a>
+            </div>
+
+          </form>
+
+        </div>
+      </div>
+
+      <!-- RIGHT: Calculator & Info -->
+      <div class="space-y-6">
+
+        <!-- Calculator -->
+        <div class="bg-white/90 backdrop-blur-xl border border-white shadow-xl rounded-3xl p-6">
+          <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <span class="text-xl">🧮</span> {% trans "Hisob-kitob" %}
+          </h3>
+
+          <div class="space-y-3">
+            <div class="p-3 rounded-xl bg-blue-50 border border-blue-200">
+              <div class="text-xs text-blue-600 font-medium">{% trans "Umumiy narx" %}</div>
+              <div class="text-2xl font-bold text-blue-700" id="calc-total">$0</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+              <div class="text-xs text-emerald-600 font-medium">{% trans "Oldindan to'lov" %}</div>
+              <div class="text-2xl font-bold text-emerald-700" id="calc-upfront">$0</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
+              <div class="text-xs text-amber-600 font-medium">📋 {% trans "Qarz (to'lanishi kerak)" %}</div>
+              <div class="text-2xl font-bold text-amber-700" id="calc-debt">$0</div>
+            </div>
+
+            {% if estimated_cost %}
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div class="text-xs text-slate-600 font-medium">{% trans "Tannarx (taxminiy)" %}</div>
+              <div class="text-lg font-bold text-slate-700">${{ estimated_cost|floatformat:0 }}</div>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="mt-4 p-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white">
+            <div class="text-xs font-medium opacity-90">💡 {% trans "Foydali ma'lumot" %}</div>
+            <div class="text-sm mt-1 font-medium">
+              {% trans "Qarz = Umumiy narx - Oldindan to'lov" %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-3xl p-6">
+          <h3 class="text-lg font-semibold text-purple-800 mb-3">📚 {% trans "Yo'riqnoma" %}</h3>
+          <ul class="space-y-2 text-sm text-purple-700">
+            <li class="flex items-start gap-2">
+              <span class="text-purple-500">1️⃣</span>
+              <span>{% trans "Mijoz ismi va telefon raqamini kiriting" %}</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-purple-500">2️⃣</span>
+              <span>{% trans "Umumiy sotish narxini belgilang" %}</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-purple-500">3️⃣</span>
+              <span>{% trans "Oldindan qancha to'lashini kiriting" %}</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-purple-500">4️⃣</span>
+              <span>{% trans "Qolgan qarz avtomatik hisoblanadi" %}</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-purple-500">5️⃣</span>
+              <span>{% trans "Mijoz keyinchalik qarzni bo'lib-bo'lib to'laydi" %}</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+
+    </div>
+
   </div>
-  <form method="post" class="space-y-4">
-    {% csrf_token %}
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">Mijoz ismi (majburiy)</label>
-      <input type="text" name="customer_name" class="w-full rounded-xl border-neutral-300" required>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-xs text-neutral-500 mb-1">Telefon (ixtiyoriy)</label>
-        <input type="text" name="customer_phone" class="w-full rounded-xl border-neutral-300">
-      </div>
-      <div>
-        <label class="block text-xs text-neutral-500 mb-1">Izoh (ixtiyoriy)</label>
-        <input type="text" name="note" class="w-full rounded-xl border-neutral-300">
-      </div>
-    </div>
-
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">Umumiy narx</label>
-      <input type="text" name="total_price" class="w-full rounded-xl border-neutral-300" required>
-    </div>
-
-    <div>
-      <label class="block text-xs text-neutral-500 mb-1">Hozir to‘lov turi</label>
-      <select name="payment_type" id="ptype" class="w-full rounded-xl border-neutral-300">
-        <option value="cash">Naqd</option>
-        <option value="card">Karta</option>
-        <option value="mixed">Aralash</option>
-      </select>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-xs text-neutral-500 mb-1">Hozir naqd</label>
-        <input type="text" name="upfront_cash" id="cash" class="w-full rounded-xl border-neutral-300" value="0">
-      </div>
-      <div>
-        <label class="block text-xs text-neutral-500 mb-1">Hozir karta</label>
-        <input type="text" name="upfront_card" id="card" class="w-full rounded-xl border-neutral-300" value="0">
-      </div>
-    </div>
-
-    <div class="flex items-center gap-3">
-      <button class="btn btn-primary">Saqlash</button>
-      <a class="btn btn-ghost" href="{% url 'sell' %}?product_id={{ product.id }}">Oddiy sotuvga qaytish</a>
-    </div>
-  </form>
 </div>
 
+<!-- Calculator Script -->
 <script>
-  const ptype = document.getElementById('ptype'), cash = document.getElementById('cash'), card = document.getElementById('card');
-  function sync() {
-    if (ptype.value === 'cash') { card.value = '0'; card.readOnly = true; cash.readOnly = false; }
-    else if (ptype.value === 'card') { cash.value = '0'; cash.readOnly = true; card.readOnly = false; }
-    else { cash.readOnly = false; card.readOnly = false; }
+document.addEventListener('DOMContentLoaded', function() {
+  const totalInput = document.querySelector('input[name="total_price"]');
+  const cashInput = document.querySelector('input[name="upfront_cash"]');
+  const cardInput = document.querySelector('input[name="upfront_card"]');
+  const paymentType = document.querySelector('select[name="payment_type"]');
+
+  const calcTotal = document.getElementById('calc-total');
+  const calcUpfront = document.getElementById('calc-upfront');
+  const calcDebt = document.getElementById('calc-debt');
+
+  function parseNumber(val) {
+    const num = parseFloat(val) || 0;
+    return num < 0 ? 0 : num;
   }
-  ptype.addEventListener('change', sync); sync();
+
+  function formatMoney(num) {
+    return '$' + num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  function calculate() {
+    const total = parseNumber(totalInput.value);
+    let cash = parseNumber(cashInput.value);
+    let card = parseNumber(cardInput.value);
+
+    // Payment type logic
+    const ptype = paymentType.value;
+    if (ptype === 'cash') {
+      card = 0;
+      cardInput.value = '0';
+      cardInput.readOnly = true;
+      cashInput.readOnly = false;
+    } else if (ptype === 'card') {
+      cash = 0;
+      cashInput.value = '0';
+      cashInput.readOnly = true;
+      cardInput.readOnly = false;
+    } else {
+      cashInput.readOnly = false;
+      cardInput.readOnly = false;
+    }
+
+    const upfront = cash + card;
+    const debt = total - upfront;
+
+    calcTotal.textContent = formatMoney(total);
+    calcUpfront.textContent = formatMoney(upfront);
+    calcDebt.textContent = formatMoney(Math.max(0, debt));
+
+    // Color coding
+    if (debt < 0) {
+      calcDebt.parentElement.classList.remove('bg-amber-50', 'border-amber-200');
+      calcDebt.parentElement.classList.add('bg-rose-50', 'border-rose-200');
+      calcDebt.classList.remove('text-amber-700');
+      calcDebt.classList.add('text-rose-700');
+    } else {
+      calcDebt.parentElement.classList.remove('bg-rose-50', 'border-rose-200');
+      calcDebt.parentElement.classList.add('bg-amber-50', 'border-amber-200');
+      calcDebt.classList.remove('text-rose-700');
+      calcDebt.classList.add('text-amber-700');
+    }
+  }
+
+  // Event listeners
+  totalInput.addEventListener('input', calculate);
+  cashInput.addEventListener('input', calculate);
+  cardInput.addEventListener('input', calculate);
+  paymentType.addEventListener('change', calculate);
+
+  // Initial calculation
+  calculate();
+});
 </script>
+
+<style>
+  input, select, textarea {
+    @apply w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition;
+  }
+</style>
+
 {% endblock %}

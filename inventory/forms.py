@@ -83,8 +83,9 @@ class ProductForm(forms.ModelForm):
             "imei_full", "has_documents", "is_new",
             "owner_name", "owner_phone",
             "defect", "battery_pct",
+            # document_image modelda bo'lsa ModelForm avtomatik qo'shadi,
+            # lekin biz view-da handle qilamiz. Shuning uchun fieldsga kiritmasak ham bo'ladi.
         ]
-
         widgets = {
             "store": forms.Select(attrs={"class": "w-full rounded-xl border p-2 form-input"}),
             "brand": forms.Select(attrs={"class": "w-full rounded-xl border p-2 form-input"}),
@@ -92,59 +93,41 @@ class ProductForm(forms.ModelForm):
             "color": forms.Select(attrs={"class": "w-full rounded-xl border p-2 form-input"}),
             "year": forms.NumberInput(attrs={
                 "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "2024",
-                "min": "2000",
-                "max": "2100"
+                "placeholder": "2024", "min": "2000", "max": "2100"
             }),
             "ownership": forms.Select(attrs={"class": "w-full rounded-xl border p-2 form-input"}),
             "purchase_price": forms.NumberInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "0.00",
-                "step": "0.01"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "0.00", "step": "0.01"
             }),
             "consignment_price": forms.NumberInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "0.00",
-                "step": "0.01"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "0.00", "step": "0.01"
             }),
             "ask_price": forms.NumberInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "0.00",
-                "step": "0.01"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "0.00", "step": "0.01"
             }),
             "min_price": forms.NumberInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "0.00",
-                "step": "0.01"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "0.00", "step": "0.01"
             }),
             "imei_full": forms.TextInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "123456789012345"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "123456789012345"
             }),
             "has_documents": forms.CheckboxInput(attrs={"class": "rounded"}),
             "is_new": forms.CheckboxInput(attrs={"class": "rounded"}),
             "owner_name": forms.TextInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "Ism"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "Ism"
             }),
             "owner_phone": forms.TextInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "+998 XX XXX XX XX"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "+998 XX XXX XX XX"
             }),
             "defect": forms.TextInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "Kamchiliklar (ixtiyoriy)"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "Kamchiliklar (ixtiyoriy)"
             }),
             "battery_pct": forms.NumberInput(attrs={
-                "class": "w-full rounded-xl border p-2 form-input",
-                "placeholder": "85",
-                "min": "0",
-                "max": "100"
+                "class": "w-full rounded-xl border p-2 form-input", "placeholder": "85", "min": "0", "max": "100"
             }),
         }
 
     def __init__(self, *args, **kwargs):
-        """Initialize form with user"""
         self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
@@ -154,12 +137,12 @@ class ProductForm(forms.ModelForm):
         self.fields["model"].queryset = ModelName.objects.filter(is_active=True).order_by("name")
         self.fields["color"].queryset = Color.objects.filter(is_active=True).order_by("name")
 
-        # Seller uchun store disabled
+        # Seller uchun store ni yashirin qilib yuboramiz (disabled emas!)
         if self.user and not getattr(self.user, "is_superuser", False):
-            if hasattr(self.user, 'role') and self.user.role == 'seller':
-                if hasattr(self.user, 'store') and self.user.store:
-                    self.fields["store"].initial = self.user.store
-                    self.fields["store"].disabled = True
+            if getattr(self.user, 'role', '') == 'seller' and getattr(self.user, 'store', None):
+                self.fields["store"].initial = self.user.store
+                self.fields["store"].widget = forms.HiddenInput()
+                self.fields["store"].required = False
 
         # Labels
         self.fields["store"].label = _("Do'kon")
@@ -180,23 +163,34 @@ class ProductForm(forms.ModelForm):
         self.fields["defect"].label = _("Kamchiliklar")
         self.fields["battery_pct"].label = _("Batareya (%)")
 
-    def clean_imei_full(self):
-        """IMEI validatsiya"""
-        imei = self.cleaned_data.get("imei_full", "")
-        imei_digits = digits_only(imei)
+    def _keep_instance(self, name, value):
+        if (value in (None, "")) and self.instance and self.instance.pk:
+            return getattr(self.instance, name)
+        return value
 
-        if len(imei_digits) < 4:
+    def clean_imei_full(self):
+        imei = self.cleaned_data.get("imei_full", "")
+        imei_digits = digits_only(imei) if imei else ""
+        imei_digits = self._keep_instance('imei_full', imei_digits)
+
+        if len(imei_digits or "") < 4:
             raise forms.ValidationError(_("IMEI kamida 4 raqam bo'lishi kerak."))
 
-        # Noyob IMEI tekshiruvi (o'zgartirishda exclude)
         qs = Product.objects.filter(imei_full=imei_digits)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
-
         if qs.exists():
             raise forms.ValidationError(_("Bu IMEI allaqachon mavjud."))
 
         return imei_digits
+
+    def _clean_money(self, name):
+        raw = self.cleaned_data.get(name, None)
+        val = parse_decimal(raw) if raw not in (None, "") else None
+        val = self._keep_instance(name, val)
+        if val < DECIMAL_ZERO:
+            raise ValidationError(_("Narx manfiy bo'lishi mumkin emas"))
+        return val
 
     def clean_purchase_price(self):
         """Xarid narxi validatsiya"""
@@ -219,12 +213,12 @@ class ProductForm(forms.ModelForm):
             raise ValidationError(_("Narx manfiy bo'lishi mumkin emas"))
         return price
 
-    def clean_min_price(self):
-        """Minimal narx validatsiya"""
-        price = parse_decimal(self.cleaned_data.get('min_price', 0))
-        if price < DECIMAL_ZERO:
-            raise ValidationError(_("Narx manfiy bo'lishi mumkin emas"))
-        return price
+    # def clean_min_price(self):
+    #     """Minimal narx validatsiya"""
+    #     price = parse_decimal(self.cleaned_data.get('min_price', 0))
+    #     if price < DECIMAL_ZERO:
+    #         raise ValidationError(_("Narx manfiy bo'lishi mumkin emas"))
+    #     return price
 
     def clean(self):
         """

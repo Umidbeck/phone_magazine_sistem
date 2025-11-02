@@ -1,0 +1,241 @@
+{# sales/consignment_detail.html #}
+{% extends 'base.html' %}
+{% load i18n humanize %}
+
+{% block title %}{% trans "Konsignatsiya" %} #{{ due.id }} · PhoneStore{% endblock %}
+
+{% block content %}
+<section class="min-h-screen bg-gradient-to-br from-slate-50 to-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+      <div>
+        <a href="{% url 'sales:consignment_list' %}"
+           class="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 mb-2">
+          ← {% trans "Orqaga" %}
+        </a>
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-800">
+          {% trans "Konsignatsiya" %} #{{ due.id }}
+        </h1>
+        <p class="text-sm text-slate-500 mt-1">
+          {{ due.product.model.brand.name }} {{ due.product.model.name }}
+        </p>
+      </div>
+      <div class="mt-4 sm:mt-0">
+        {% if due.is_fully_paid %}
+          <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold">
+            ✅ {% trans "To‘liq to‘langan" %}
+          </span>
+        {% else %}
+          <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-semibold">
+            ⏳ {% trans "Kutilmoqda" %}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- LEFT: Phone + Supplier + Finance -->
+      <div class="space-y-6">
+
+        <!-- Phone Card -->
+        <div class="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+              <span class="text-xl">📱</span>
+            </div>
+            <h2 class="font-semibold text-slate-800">{% trans "Telefon ma’lumotlari" %}</h2>
+          </div>
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-slate-500">{% trans "Model" %}</span>
+              <span class="font-medium">{{ due.product.model.brand.name }} {{ due.product.model.name }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">IMEI</span>
+              <code class="text-xs bg-slate-100 px-2 py-1 rounded">***{{ due.product.imei_full|slice:"-4:" }}</code>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">{% trans "Do‘kon" %}</span>
+              <span class="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs">{{ due.product.store.name }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">{% trans "Holat" %}</span>
+              <span>{{ due.product.get_status_display }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">{% trans "Sotilgan sana" %}</span>
+              <span>{{ due.created_at|date:"Y-m-d H:i" }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Supplier Card -->
+        <div class="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-100 to-blue-100 flex items-center justify-center">
+              <span class="text-xl">👤</span>
+            </div>
+            <h2 class="font-semibold text-slate-800">{% trans "Supplier ma’lumotlari" %}</h2>
+          </div>
+          {% if due.supplier_name %}
+            <div class="space-y-3 text-sm">
+              <div class="flex justify-between">
+                <span class="text-slate-500">{% trans "Ism" %}</span>
+                <span class="font-medium">{{ due.supplier_name }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500">{% trans "Telefon" %}</span>
+                <a href="tel:{{ due.supplier_phone }}" class="text-purple-600 hover:underline">{{ due.supplier_phone }}</a>
+              </div>
+            </div>
+          {% else %}
+            <p class="text-sm text-slate-500">{% trans "Ma’lumot kiritilmagan" %}</p>
+          {% endif %}
+        </div>
+
+        <!-- Finance Card -->
+        <div class="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-100 to-green-100 flex items-center justify-center">
+              <span class="text-xl">💰</span>
+            </div>
+            <h2 class="font-semibold text-slate-800">{% trans "Moliyaviy ma’lumotlar" %}</h2>
+          </div>
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-slate-500">{% trans "Jami qarz" %}</span>
+              <span class="font-semibold text-slate-800">${{ due.base_amount|floatformat:2 }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">{% trans "To‘langan" %}</span>
+              <span class="font-semibold text-emerald-600">${{ due.total_paid|floatformat:2 }}</span>
+            </div>
+            <div class="flex justify-between {% if due.is_fully_paid %}text-emerald-700{% else %}text-amber-700{% endif %}">
+              <span class="text-slate-500">{% trans "Qoldiq" %}</span>
+              {% if due.is_fully_paid %}
+                <span class="font-bold">$0.00 ✅</span>
+              {% else %}
+                <span class="font-bold">${{ due.balance|floatformat:2 }}</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Progress circle -->
+          <div class="mt-5">
+            <p class="text-xs text-slate-500 mb-2">{% trans "Progress" %}</p>
+            <div class="relative w-24 h-24 mx-auto">
+              <svg class="w-full h-full" viewBox="0 0 36 36">
+                <path class="text-slate-200" stroke="currentColor" stroke-width="3" fill="none"
+                      d="M18 2.084 a 15.915 15.915 0 0 1 0 31.83 a 15.915 15.915 0 0 1 0 -31.83"/>
+                <path class="{% if due.payment_progress >= 100 %}text-emerald-500{% else %}text-purple-500{% endif %}"
+                      stroke="currentColor" stroke-width="3" fill="none"
+                      stroke-dasharray="{{ due.payment_progress }}, 100"
+                      d="M18 2.084 a 15.915 15.915 0 0 1 0 31.83 a 15.915 15.915 0 0 1 0 -31.83"/>
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-700">
+                {{ due.payment_progress|floatformat:0 }}%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Payment Form + History -->
+      <div class="space-y-6">
+
+        <!-- Payment Form -->
+        {% if not due.is_fully_paid and form %}
+        <div class="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
+              <span class="text-xl">💳</span>
+            </div>
+            <h2 class="font-semibold text-slate-800">{% trans "To‘lov qilish" %}</h2>
+          </div>
+          <form method="POST" class="space-y-4">
+            {% csrf_token %}
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">{% trans "To‘lov summasi" %} ($)</label>
+              {{ form.amount }}
+              {% if form.amount.errors %}
+                <p class="text-xs text-rose-600 mt-1">{{ form.amount.errors }}</p>
+              {% endif %}
+              <p class="text-xs text-slate-400 mt-1">{% trans "Qoldiq" %}: <strong>${{ due.balance|floatformat:2 }}</strong></p>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">{% trans "To‘lov usuli" %}</label>
+              {{ form.payment_method }}
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">{% trans "Izoh (ixtiyoriy)" %}</label>
+              {{ form.note }}
+            </div>
+
+            <button type="submit" class="w-full px-4 py-3 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition">
+              💵 {% trans "To‘lov qilish" %}
+            </button>
+          </form>
+
+          <hr class="my-4">
+          <form method="POST" action="{% url 'sales:consignment_pay_full' due.id %}"
+                onsubmit="return confirm('{% trans "Qoldiq summani to‘liq to‘laysizmi?" %} (${{ due.balance|floatformat:2 }})')">
+            {% csrf_token %}
+            <input type="hidden" name="payment_method" value="cash">
+            <button type="submit" class="w-full px-4 py-3 rounded-2xl bg-purple-600 text-white font-semibold hover:bg-purple-700 transition">
+              🎯 {% trans "Qoldiqni to‘liq to‘lash" %} (${{ due.balance|floatformat:2 }})
+            </button>
+          </form>
+        </div>
+        {% endif %}
+
+        <!-- History -->
+        <div class="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+              <span class="text-xl">📜</span>
+            </div>
+            <h2 class="font-semibold text-slate-800">{% trans "To‘lovlar tarixi" %} ({{ payments.count }} {% trans "ta" %})</h2>
+          </div>
+
+          {% if payments %}
+            <div class="space-y-3 max-h-96 overflow-y-auto pr-2">
+              {% for payment in payments %}
+                <div class="rounded-2xl border border-slate-100 p-3 hover:bg-slate-50 transition">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <span class="px-2 py-1 rounded-lg text-xs font-semibold
+                                   {% if payment.payment_method == 'cash' %}bg-emerald-100 text-emerald-700
+                                   {% elif payment.payment_method == 'card' %}bg-blue-100 text-blue-700
+                                   {% elif payment.payment_method == 'bank' %}bg-cyan-100 text-cyan-700
+                                   {% else %}bg-slate-100 text-slate-700{% endif %}">
+                        {{ payment.get_payment_method_display }}
+                      </span>
+                      <span class="font-bold text-slate-800">${{ payment.amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="text-right text-xs text-slate-500">
+                      <p>{{ payment.created_at|date:"Y-m-d H:i" }}</p>
+                      <p>{{ payment.paid_by.get_full_name|default:payment.paid_by.username }}</p>
+                    </div>
+                  </div>
+                  {% if payment.note %}
+                    <p class="text-xs text-slate-600 mt-2">{{ payment.note }}</p>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-sm text-slate-500 text-center">{% trans "Hali to‘lov qilinmagan" %}</p>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

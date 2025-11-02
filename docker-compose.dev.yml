@@ -1,5 +1,3 @@
-# docker-compose.dev.yml - Development Override
-version: "3.9"
 
 services:
   web:

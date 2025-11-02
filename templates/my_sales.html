@@ -51,6 +51,7 @@
     </div>
 
     <!-- Stats Cards -->
+    {% if user.is_owner %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       
       <!-- Total Amount Card -->
@@ -96,6 +97,7 @@
       </div>
 
     </div>
+    {% endif %}
 
     <!-- Sales Table for Desktop -->
     <div class="hidden lg:block bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
@@ -133,12 +135,14 @@
                   <span>{% trans "Summa" %}</span>
                 </div>
               </th>
+              {% if user.is_owner %}
               <th class="text-right px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
                 <div class="flex items-center justify-end gap-2">
                   <span>🎯</span>
                   <span>{% trans "Foyda" %}</span>
                 </div>
               </th>
+              {% endif %}
               <th class="text-center px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">
                 <div class="flex items-center justify-center gap-2">
                   <span>🎁</span>
@@ -169,9 +173,11 @@
                 <td class="px-6 py-4 text-right">
                   <span class="text-lg font-bold text-blue-600">{{ r.amount }}</span>
                 </td>
+                {% if user.is_user %}
                 <td class="px-6 py-4 text-right">
                   <span class="text-lg font-bold text-emerald-600">{{ r.profit }}</span>
                 </td>
+                {% endif %}
                 <td class="px-6 py-4 text-center">
                   {% if r.commission %}
                     {% if r.commission.is_paid %}
@@ -262,10 +268,12 @@
                 <div class="text-xs text-slate-500 mb-1">💵 {% trans "Summa" %}</div>
                 <div class="text-xl font-bold text-blue-600">{{ r.amount }}</div>
               </div>
+              {% if user.is_owner %}
               <div class="text-right">
                 <div class="text-xs text-slate-500 mb-1">🎯 {% trans "Foyda" %}</div>
                 <div class="text-xl font-bold text-emerald-600">{{ r.profit }}</div>
               </div>
+              {% endif %}
             </div>
 
           </div>
@@ -292,12 +300,14 @@
             <div class="text-3xl font-bold">{{ rows|length }} {% trans "ta telefon" %}</div>
           </div>
         </div>
+        {% if user.is_owner %}
         <div class="text-center md:text-right">
           <div class="text-emerald-100 text-sm mb-1">{% trans "O'rtacha foyda" %}</div>
           <div class="text-2xl font-bold">
             {% widthratio total_profit|default:0 rows|length|default:1 1 %} USD
           </div>
         </div>
+        {% endif %}
       </div>
     </div>
     {% endif %}

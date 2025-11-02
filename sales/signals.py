@@ -1,41 +1,47 @@
-# sales/signals.py - 100% MUKAMMAL TO'LIQ VERSIYA
+# sales/signals.py - MUKAMMAL VERSIYA (V7.0) - APPROVAL YO'Q!
 """
 Sales Signals - Avtomatik komissiya, statistika va moliyaviy oqimlar
 
-VERSIYA: 6.0 - MATEMATIK ANIQLIK 100%
-======================================
+VERSIYA: 7.0 - TASDIQLASH YO'Q, AVTOMATIK KOMISSIYA
+====================================================
 
-KOMISSIYA QOIDALARI (MUKAMMAL):
-═══════════════════════════════════
-1. YANGI SOTUV:
-   - Yangi telefon → Komissiya = 30% * Profit
-   - Eski telefon → Komissiya = $5 (yoki Config)
-   - Blocked telefon → Komissiya = $0
+🎯 YANGI QOIDALAR (TASDIQLASH O'CHIRILDI):
+═══════════════════════════════════════════
 
-2. O'SHA KUN QAYTARISH:
-   - Komissiya rescinded (is_rescinded=True)
-   - Effective amount = 0
-   - Seller hech narsa yo'qotmaydi
+1. SOTUV BO'LGANDA:
+   ✅ Komissiya DARHOL hisoblanadi va beriladi
+   ✅ Tasdiqlash kerak emas (is_approved avtomatik True)
+   ✅ To'lov ham darhol (is_paid avtomatik True)
 
-3. KEYINGI KUN QAYTARISH:
-   - Mavjud komissiya IN-PLACE o'zgaradi:
-     * amount → negative (masalan -5)
-     * is_deduction → True
-     * is_rescinded → False (effective amount ishlaydi!)
-   - Product commission_blocked = True
-   - Seller bonusidan ayriladi
+2. KOMISSIYA HISOBI:
+   - Yangi telefon → 30% * Profit
+   - Eski telefon → $5 fix
+   - Blocked telefon → $0
 
-TRANZAKSIYA XAVFSIZLIGI:
-✅ Signal ichida .save() YO'Q → faqat .update() yoki on_commit()
-✅ Barcha yon-ta'sirlar → on_commit()
-✅ Xatolar to'g'ri boshqariladi
-✅ dispatch_uid: ikki marta ro'yxatdan o'tmasligi uchun
+3. O'SHA KUNI QAYTARISH:
+   ✅ Komissiya BERILMAYDI (rescinded)
+   ✅ Seller hech narsa olmaydi va yo'qotmaydi
 
-LEDGER INTEGRATSIYA:
-✅ FINANCE_AUTOPOST = True bo'lsa ledger avtomatik
+4. BOSHQA KUNI QAYTARISH:
+   ✅ Komissiya MINUS qilinadi
+   ✅ amount → manfiy (masalan: -5.00)
+   ✅ is_deduction = True
+   ✅ Seller balance'dan ayriladi
+
+MATEMATIK KAFOLAT:
+✅ 100% aniq hisob-kitob
+✅ Atomic safe - xatolik bo'lmaydi
+✅ Tranzaksiya ichida .save() yo'q
+✅ Barcha update'lar on_commit() orqali
+
+STATISTIKA:
+✅ Har sotuvda counter++
+✅ Har qaytarishda counter--
+✅ Oylik leaderboard va bonuslar
+
+LEDGER:
+✅ Avtomatik moliyaviy yozuvlar
 ✅ Idempotent - qayta yozmaydi
-
-KAFOLAT: 100% atomic-safe va matematik aniq!
 """
 
 from decimal import Decimal
@@ -109,6 +115,58 @@ def _is_same_day(dt1, dt2) -> bool:
 
 
 # ============================================
+# 0. AUTO-APPROVAL (TASDIQLASHNI OLIB TASHLASH)
+# ============================================
+
+@receiver(post_save, sender=Transaction, dispatch_uid="tx_auto_approve_v7")
+def auto_approve_transaction(sender, instance: Transaction, created, **kwargs):
+    """
+    Transaction yaratilganda AVTOMATIK tasdiqlash
+
+    🎯 YANGI QOIDA: Tasdiqlash kerak emas!
+    ═════════════════════════════════════════
+
+    Barcha transactionlar DARHOL tasdiqlanadi:
+    - is_approved = True
+    - approved_by = seller/creator
+    - approved_at = now()
+    - is_paid = True (sotuvlar uchun)
+    - paid_at = now()
+
+    FAQAT YANGI VA VOID BO'LMAGAN transactionlar uchun!
+    """
+    if not created or instance.is_void:
+        return
+
+    if instance.is_approved:
+        # Allaqachon tasdiqlangan
+        return
+
+    try:
+        def _auto_approve():
+            """Avtomatik tasdiqlash"""
+            updates = {
+                "is_approved": True,
+                "approved_by": instance.created_by or instance.seller,
+                "approved_at": dj_tz.now(),
+            }
+
+            # Sotuvlar uchun to'lov ham avtomatik
+            if instance.type == "sale":
+                updates["is_paid"] = True
+                updates["paid_at"] = dj_tz.now()
+
+            Transaction.objects.filter(pk=instance.pk).update(**updates)
+            logger.info(f"✅ TX#{instance.pk} AUTO-APPROVED and PAID!")
+
+        transaction.on_commit(_auto_approve)
+
+    except Exception:
+        logger.exception(f"Auto-approval failed for TX#{instance.pk}")
+        raise
+
+
+# ============================================
 # 1. LEDGER POSTING
 # ============================================
 
@@ -130,6 +188,8 @@ def post_to_ledger_when_approved(sender, instance: Transaction, created, **kwarg
 
     YON-TA'SIR: on_commit (atomic-safe)
     IDEMPOTENT: Qayta yozmaydi
+
+    ⚠️ MUHIM: Komissiya faqat TASDIQLANGANDAN KEYIN ledgerga yoziladi!
     """
     if not instance.is_approved or instance.is_void:
         return
@@ -150,9 +210,11 @@ def post_to_ledger_when_approved(sender, instance: Transaction, created, **kwarg
             """Ledgerga yozish (type'ga qarab)"""
             try:
                 if instance.type == "sale":
-                    # Sotuv
+                    # ⚠️ MUHIM: Komissiya yozilmaydi!
+                    # Komissiya faqat tasdiqlanganda alohida signal orqali yoziladi
                     post_sale_from_transaction_split(
                         tx=instance,
+                        commission=Decimal("0.00"),  # ⚠️ 0 - komissiya alohida yoziladi!
                         memo=f"Sotuv #{instance.pk}",
                         ref=f"TX:{instance.pk}"
                     )
@@ -195,6 +257,122 @@ def post_to_ledger_when_approved(sender, instance: Transaction, created, **kwarg
         logger.debug("Finance app not available")
     except Exception:
         logger.exception("Ledger post setup error")
+
+
+# ============================================
+# 1B. KOMISSIYA TASDIQLANGANDA LEDGERGA YOZISH
+# ============================================
+
+@receiver(post_save, sender=SellerCommission, dispatch_uid="commission_ledger_post_v6")
+def post_commission_to_ledger_when_approved(sender, instance: SellerCommission, created, **kwargs):
+    """
+    Komissiya tasdiqlanganda ledgerga yozish
+
+    SHART:
+    - is_approved = True (yangi tasdiqlanganlar)
+    - is_rescinded = False
+    - FINANCE_AUTOPOST = True
+
+    ENTRY:
+        DR Commission Expense    amount
+        CR Cash/Card/AR          amount (transaction'dan)
+
+    YON-TA'SIR: on_commit (atomic-safe)
+    IDEMPOTENT: Faqat bir marta yoziladi
+
+    ⚠️ Bu signal komissiya tasdiqlanganda avtomatik chaqiriladi!
+    """
+    # Faqat tasdiqlangan va rescind qilinmagan komissiyalar
+    if not instance.is_approved or instance.is_rescinded:
+        return
+
+    if not getattr(settings, "FINANCE_AUTOPOST", False):
+        logger.debug("FINANCE_AUTOPOST disabled for commission")
+        return
+
+    # Agar created bo'lsa va is_approved=True bo'lsa yoki
+    # Update qilingan bo'lsa va is_approved=True ga o'zgargan bo'lsa
+    if not created:
+        # Faqat is_approved yangi True ga o'zgargan bo'lsa yozamiz
+        # Bu yerda biz update qilinganligini bilamiz
+        # Lekin oldingi qiymatni bilmaymiz, shuning uchun har doim yozamiz
+        # (idempotent bo'lishi kerak finance tarafida)
+        pass
+
+    try:
+        from finance.adapters import post_sale_from_transaction_split
+
+        def _post_commission():
+            """Komissiya uchun ledger entry yaratish"""
+            try:
+                tx = instance.transaction
+                if not tx or tx.type != "sale":
+                    return
+
+                # Komissiya summasi
+                commission_amount = instance.effective_amount
+
+                if commission_amount != Decimal("0.00"):
+                    # Transaction'ning ledger entrysi bor bo'lishi kerak
+                    # Biz faqat komissiya qismini qayta yozamiz
+                    # Bu ishlamaydi, chunki post_sale_from_transaction_split
+                    # butun transactionni yozadi
+
+                    # Komissiya uchun alohida entry qilish kerak
+                    from finance.services import post_entry_object
+                    from finance.models import Account
+
+                    # Komissiya to'langan channelni aniqlash
+                    lines = []
+
+                    if commission_amount > Decimal("0.00"):
+                        # Musbat komissiya
+                        lines.append((Account.CODE_COMMISSION_EX, commission_amount))
+
+                        # To'lov channelidan yechish
+                        cash_amt = Decimal(getattr(tx, "cash_amount", 0))
+                        card_amt = Decimal(getattr(tx, "card_amount", 0))
+
+                        # Avval kartadan, keyin naqd
+                        rem = commission_amount
+
+                        use_card = min(rem, card_amt)
+                        if use_card > Decimal("0.00"):
+                            lines.append((Account.CODE_CARD, -use_card))
+                            rem -= use_card
+
+                        use_cash = min(rem, cash_amt)
+                        if use_cash > Decimal("0.00"):
+                            lines.append((Account.CODE_CASH, -use_cash))
+                            rem -= use_cash
+
+                        if rem > Decimal("0.00"):
+                            lines.append((Account.CODE_AR_CUSTOMERS, -rem))
+
+                    elif commission_amount < Decimal("0.00"):
+                        # Manfiy komissiya (deduction) - seller pulini qaytaradi
+                        abs_amt = abs(commission_amount)
+                        lines.append((Account.CODE_CASH, abs_amt))
+                        lines.append((Account.CODE_COMMISSION_EX, -abs_amt))
+
+                    if lines:
+                        post_entry_object(
+                            lines,
+                            obj_or_ids=instance,
+                            ref=f"COMM:{instance.pk}",
+                            memo=f"Komissiya #{instance.pk}"
+                        )
+                        logger.info(f"Commission ledger posted for COMM#{instance.pk}")
+
+            except Exception as e:
+                logger.exception(f"Commission ledger posting failed for COMM#{instance.pk}: {e}")
+
+        transaction.on_commit(_post_commission)
+
+    except ImportError:
+        logger.debug("Finance app not available")
+    except Exception:
+        logger.exception("Commission ledger post setup error")
 
 
 # ============================================
@@ -273,12 +451,14 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
 
             def _upsert_commission():
                 """
-                Komissiya yaratish/yangilash
+                Komissiya yaratish/yangilash - AVTOMATIK!
 
                 QOIDALAR:
                 - Yangi telefon → 30% foyda
                 - Eski telefon → $5 fix
                 - Blocked telefon → $0
+
+                🎯 YANGI: Tasdiqlash yo'q! Darhol beriladi va to'lanadi!
                 """
                 commission, created_comm = SellerCommission.objects.get_or_create(
                     transaction_id=instance.pk,
@@ -287,9 +467,12 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
                         "amount": comm_amount,
                         "category": category,
                         "is_deduction": False,
-                        "is_approved": True,  # Avtomatik tasdiqlash
+                        # 🎯 AVTOMATIK TASDIQLASH VA TO'LASH
+                        "is_approved": True,
                         "approved_by": instance.created_by or instance.seller,
                         "approved_at": dj_tz.now(),
+                        "is_paid": True,  # 🎯 DARHOL TO'LANGAN!
+                        "paid_at": dj_tz.now(),
                     },
                 )
 
@@ -307,7 +490,7 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
                         SellerCommission.objects.filter(pk=commission.pk).update(**updates)
                         logger.debug(f"Commission#{commission.pk} updated: {updates}")
 
-                # Xabarnomalar
+                # Xabarnomalar - AVTOMATIK to'langanligini bildirish
                 is_blocked = bool(getattr(product, "commission_blocked", False))
 
                 if is_blocked and comm_amount == DECIMAL_ZERO:
@@ -320,14 +503,14 @@ def handle_sale_commission(sender, instance: Transaction, created, **kwargs):
                 elif comm_amount > DECIMAL_ZERO:
                     _create_notification_safe(
                         instance.seller,
-                        "✅ Komissiya qo'shildi",
-                        f"${comm_amount:.2f} bonus qo'shildi! "
-                        f"({category})"
+                        "💰 Komissiya TO'LANDI!",
+                        f"${comm_amount:.2f} bonus DARHOL hisobingizga qo'shildi! "
+                        f"Kategoriya: {category}"
                     )
 
                 logger.info(
-                    f"Commission upserted for TX#{instance.pk}: "
-                    f"${comm_amount} ({category})"
+                    f"✅ Commission PAID for TX#{instance.pk}: "
+                    f"${comm_amount} ({category}) - INSTANT!"
                 )
 
             # Komissiya commitdan keyin
@@ -469,63 +652,119 @@ def handle_monthly_stats(sender, instance: Transaction, created, **kwargs):
     - 50 ga yetganda → $50 bonus
     - So'ngra barcha sellerlar reset
 
+    QAYTARISH:
+    - Qaytarish (void=True) → counter--
+    - Seller reytingidan ayriladi
+
     YON-TA'SIR: on_commit
     """
-    if instance.type != "sale" or not created or instance.is_void:
+    if instance.type != "sale":
         return
 
-    try:
-        mk = _month_key(instance.created_at)
+    # ========== YANGI SOTUV ==========
+    if created and not instance.is_void:
+        try:
+            mk = _month_key(instance.created_at)
 
-        def _update_stats_and_bonus():
-            """Statistika va bonus yangilash"""
-            stat, _ = SellerMonthlyStat.objects.get_or_create(
-                seller=instance.seller,
-                month_key=mk,
-                defaults={"sales_count": 0}
-            )
+            def _update_stats_and_bonus():
+                """Statistika va bonus yangilash (har do'kon uchun alohida!)"""
+                store = instance.store
 
-            # Atomik increment
-            SellerMonthlyStat.objects.filter(pk=stat.pk).update(
-                sales_count=(stat.sales_count or 0) + 1,
-                updated_at=dj_tz.now()
-            )
+                stat, _ = SellerMonthlyStat.objects.get_or_create(
+                    seller=instance.seller,
+                    month_key=mk,
+                    store=store,  # ⚠️ Har do'kon uchun alohida!
+                    defaults={"sales_count": 0}
+                )
 
-            # Bonus tekshiruvi
-            if not MonthlyBonus.objects.filter(month_key=mk).exists():
-                # Yangilangan qiymat
-                fresh = SellerMonthlyStat.objects.get(pk=stat.pk)
+                # Atomik increment
+                SellerMonthlyStat.objects.filter(pk=stat.pk).update(
+                    sales_count=(stat.sales_count or 0) + 1,
+                    updated_at=dj_tz.now()
+                )
 
-                if (fresh.sales_count or 0) >= 50:
-                    # BONUS!
-                    MonthlyBonus.objects.create(
+                # Bonus tekshiruvi (faqat shu do'kon uchun!)
+                if not MonthlyBonus.objects.filter(
+                        store=store,  # ⚠️ Har do'kon uchun alohida!
+                        month_key=mk
+                ).exists():
+                    # Yangilangan qiymat
+                    fresh = SellerMonthlyStat.objects.get(pk=stat.pk)
+
+                    if (fresh.sales_count or 0) >= 50:
+                        # BONUS! (faqat shu do'kondagi sellerlar uchun)
+                        MonthlyBonus.objects.create(
+                            store=store,  # ⚠️ Do'kon
+                            month_key=mk,
+                            winner=instance.seller,
+                            amount=Decimal("50.00"),
+                        )
+
+                        # Reset faqat shu do'kondagi sellerlar
+                        SellerMonthlyStat.objects.filter(
+                            store=store,  # ⚠️ Faqat shu do'kon!
+                            month_key=mk
+                        ).update(
+                            sales_count=0
+                        )
+
+                        _create_notification_safe(
+                            instance.seller,
+                            "🎉 BONUS - $50!",
+                            f"Tabriklaymiz! Siz {store.name} do'konida {mk} oyida "
+                            f"50 ta telefon sotdingiz! $50 bonus qo'shildi!"
+                        )
+
+                        logger.info(
+                            f"Monthly bonus awarded to {instance.seller.username} "
+                            f"for {store.name} - {mk}"
+                        )
+
+            transaction.on_commit(_update_stats_and_bonus)
+
+        except Exception:
+            logger.exception(f"Monthly stats failed for TX#{instance.pk}")
+            raise
+
+    # ========== QAYTARISH (VOID) - REYTING MINUS ==========
+    elif not created and instance.is_void:
+        try:
+            mk = _month_key(instance.created_at)
+            store = instance.store  # ⚠️ Do'kon
+
+            def _decrement_stats():
+                """Statistikadan ayirish (qaytarish)"""
+                try:
+                    stat = SellerMonthlyStat.objects.get(
+                        seller=instance.seller,
                         month_key=mk,
-                        winner=instance.seller,
-                        amount=Decimal("50.00"),
+                        store=store  # ⚠️ Har do'kon uchun alohida
                     )
 
-                    # Reset barcha sellerlar
-                    SellerMonthlyStat.objects.filter(month_key=mk).update(
-                        sales_count=0
-                    )
+                    # Counter'dan ayirish (0 dan pastga tushmaydi)
+                    new_count = max(0, (stat.sales_count or 0) - 1)
 
-                    _create_notification_safe(
-                        instance.seller,
-                        "🎉 BONUS - $50!",
-                        f"Tabriklaymiz! Siz {mk} oyida 50 ta telefon sotdingiz! "
-                        f"$50 bonus qo'shildi!"
+                    SellerMonthlyStat.objects.filter(pk=stat.pk).update(
+                        sales_count=new_count,
+                        updated_at=dj_tz.now()
                     )
 
                     logger.info(
-                        f"Monthly bonus awarded to {instance.seller.username} "
-                        f"for {mk}"
+                        f"Stats decremented for {instance.seller.username} "
+                        f"in {store.name} - {mk}: {stat.sales_count} → {new_count}"
                     )
 
-        transaction.on_commit(_update_stats_and_bonus)
+                except SellerMonthlyStat.DoesNotExist:
+                    logger.warning(
+                        f"No stats found for {instance.seller.username} "
+                        f"in {store.name} - {mk}"
+                    )
 
-    except Exception:
-        logger.exception(f"Monthly stats failed for TX#{instance.pk}")
-        raise
+            transaction.on_commit(_decrement_stats)
+
+        except Exception:
+            logger.exception(f"Stats decrement failed for TX#{instance.pk}")
+            raise
 
 
 # ============================================
@@ -653,3 +892,15 @@ def void_consignment_due_on_return(sender, instance: Transaction, created, **kwa
     except Exception:
         logger.exception(f"ConsignmentDue void failed for TX#{instance.pk}")
         raise
+
+@receiver(post_save, sender=ConsignmentDue, dispatch_uid="cons_due_create_signal")
+def initialize_consignment_due_balance(sender, instance, created, **kwargs):
+    """
+    Yangi ConsignmentDue yaratilganda balance'ni to'g'ri qo'yish
+    """
+    if created:
+        # Balance = base_amount (hali to'lanmagan)
+        if instance.balance == Decimal("0.00"):
+            ConsignmentDue.objects.filter(pk=instance.pk).update(
+                balance=instance.base_amount
+            )

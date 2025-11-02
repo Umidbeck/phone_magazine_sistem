@@ -89,7 +89,7 @@ from core.utils import (
     seller_required,
     owner_required,
     log_error,
-    log_warning,
+    log_warning, month_key,
 )
 
 
@@ -1295,13 +1295,14 @@ def debt_pay(request, group):
 @login_required
 def commissions_list(request):
     """
-    Komissiyalar ro'yxati
+    Komissiyalar ro'yxati va statistika
 
     FEATURES:
     - Uchta jadval: Approved, Pending, Deductions
     - Filtrlar: seller, paid, approved, category, date
     - Oylik reyting
     - 30 kunlik trend
+    - Net total (positive - negative)
     """
     # Filtrlar
     seller_id = request.GET.get("seller_id", "").strip()
@@ -1313,19 +1314,26 @@ def commissions_list(request):
     date_from = request.GET.get("date_from", "").strip()
     date_to = request.GET.get("date_to", "").strip()
 
+    def _parse_date(s):
+        try:
+            return datetime.strptime(s, "%Y-%m-%d").date()
+        except:
+            return None
+
     df = _parse_date(date_from)
     dt = _parse_date(date_to)
 
     # Base queryset
     qs = SellerCommission.objects.select_related(
         "transaction",
+        "transaction__product",
         "transaction__product__brand",
         "transaction__product__model",
         "seller",
         "original_commission"
     ).order_by("-transaction__created_at")
 
-    # Scope
+    # Scope by user
     if not is_owner(request.user):
         qs = qs.filter(seller=request.user)
     elif seller_id:
@@ -1359,35 +1367,53 @@ def commissions_list(request):
     if dt:
         qs = qs.filter(transaction__created_at__date__lte=dt)
 
-    # Totals
+    # TOTALS (approved, not rescinded)
     active_qs = qs.filter(is_approved=True, is_rescinded=False)
 
+    # Positive vs Negative
     positive_qs = active_qs.filter(is_deduction=False)
     deduction_qs = active_qs.filter(is_deduction=True)
 
     positive_total = safe_sum(positive_qs, "amount")
-    deduction_total = safe_sum(deduction_qs, "amount")
-    net_total = positive_total + deduction_total
+    deduction_total = safe_sum(deduction_qs, "amount")  # Bu manfiy
+    net_total = positive_total + deduction_total  # Manfiy qo'shiladi
+
+    # TOTAL AMOUNT (barcha tasdiqlangan komissiyalar)
+    total_amount = net_total
 
     paid_total = safe_sum(
-        qs.filter(is_paid=True, is_rescinded=False),
+        active_qs.filter(is_paid=True),
         "amount"
     )
     unpaid_total = safe_sum(
-        qs.filter(is_paid=False, is_rescinded=False),
+        active_qs.filter(is_paid=False),
         "amount"
     )
 
-    # Lists
+    # Lists (for tables)
     pending_rows = list(qs.filter(is_approved=False)[:500])
     approved_rows = list(active_qs.filter(is_deduction=False)[:500])
     deduction_rows = list(active_qs.filter(is_deduction=True)[:500])
 
-    # Chart
-    chart = _build_chart_data(active_qs, "amount", 30)
+    # 30 day trend (approved commissions)
+    today = dj_tz.now().date()
+    start = today - timedelta(days=29)
 
-    # Leaderboard
-    mk = month_filter or get_month_key()
+    trend = (
+        active_qs.filter(
+            transaction__created_at__date__range=(start, today)
+        )
+        .annotate(d=TruncDate("transaction__created_at"))
+        .values("d")
+        .annotate(s=Sum("amount"))
+        .order_by("d")
+    )
+    by_date = {r["d"]: float(r["s"] or 0) for r in trend}
+    labels = [(start + timedelta(days=i)) for i in range(30)]
+    series = [by_date.get(d, 0.0) for d in labels]
+
+    # Oylik reyting
+    mk = month_filter or month_key()
     leaderboard = list(
         SellerMonthlyStat.objects
         .filter(month_key=mk)
@@ -1408,10 +1434,13 @@ def commissions_list(request):
         sellers = User.objects.filter(is_active=True).order_by("username")
 
     context = {
+        # Data
+        "rows": approved_rows,  # YANGI - Eski HTML uchun
         "pending_rows": pending_rows,
         "approved_rows": approved_rows,
         "deduction_rows": deduction_rows,
 
+        # Filters
         "sellers": sellers,
         "seller_id": seller_id,
         "paid": paid,
@@ -1421,15 +1450,23 @@ def commissions_list(request):
         "date_from": date_from,
         "date_to": date_to,
 
+        # Totals
+        "total_amount": total_amount,  # YANGI - Jami komissiya
         "positive_amount": positive_total,
-        "deduction_amount": abs(deduction_total),
+        "deduction_amount": abs(deduction_total),  # Display as positive
         "net_total": net_total,
+        "approved_amount": positive_total,  # YANGI - Tasdiqlangan komissiyalar
+        "pending_amount": safe_sum(qs.filter(is_approved=False), "amount"),  # YANGI - Kutilayotgan
         "paid_amount": paid_total,
         "unpaid_amount": unpaid_total,
 
-        "chart_labels": mark_safe(json.dumps(chart["labels"])),
-        "chart_series": mark_safe(json.dumps(chart["series"])),
+        # Chart
+        "chart_labels": mark_safe(json.dumps(
+            [d.strftime("%Y-%m-%d") for d in labels]
+        )),
+        "chart_series": mark_safe(json.dumps(series)),
 
+        # Leaderboard
         "month_key": mk,
         "leaderboard": leaderboard,
         "month_bonuses": bonuses,
@@ -1441,7 +1478,12 @@ def commissions_list(request):
 @login_required
 @owner_required
 def commission_approve(request, commission_id):
-    """Komissiyani tasdiqlash"""
+    """
+    Komissiyani tasdiqlash (owner)
+    """
+    if not is_owner(request.user):
+        return HttpResponseForbidden(_("Faqat owner tasdiqlashi mumkin"))
+
     commission = get_object_or_404(SellerCommission, pk=commission_id)
 
     if not commission.is_approved:
@@ -1453,32 +1495,46 @@ def commission_approve(request, commission_id):
             "approved_by",
             "approved_at"
         ])
-        messages.success(request, "Komissiya tasdiqlandi")
+        messages.success(request, _("Komissiya tasdiqlandi"))
     else:
-        messages.info(request, "Allaqachon tasdiqlangan")
+        messages.info(request, _("Allaqachon tasdiqlangan"))
 
-    return redirect("sales:commissions_list")
+    return redirect("commissions_list")
+
 
 
 @login_required
 @owner_required
 def commission_reject(request, commission_id):
-    """Komissiyani rad etish"""
+    """
+    Komissiyani rad etish (o'chirish)
+    """
+    if not is_owner(request.user):
+        return HttpResponseForbidden(_("Faqat owner rad eta oladi"))
+
     commission = get_object_or_404(SellerCommission, pk=commission_id)
 
     if commission.is_approved:
-        messages.error(request, "Tasdiqlangan komissiyani o'chirib bo'lmaydi")
+        messages.error(request, _(
+            "Tasdiqlangan komissiyani bu yerda o'chirib bo'lmaydi"
+        ))
     else:
         commission.delete()
-        messages.success(request, "Komissiya o'chirildi")
+        messages.success(request, _("Komissiya o'chirildi"))
 
     return redirect("commissions_list")
+
 
 
 @login_required
 @owner_required
 def commission_mark_paid(request, commission_id):
-    """Komissiyani to'langan deb belgilash"""
+    """
+    Komissiyani to'langan deb belgilash (owner)
+    """
+    if not is_owner(request.user):
+        return HttpResponseForbidden(_("Faqat owner belgilashi mumkin"))
+
     commission = get_object_or_404(
         SellerCommission.objects.select_related("transaction", "seller"),
         pk=commission_id
@@ -1488,26 +1544,35 @@ def commission_mark_paid(request, commission_id):
         commission.is_paid = True
         commission.paid_at = dj_tz.now()
         commission.save(update_fields=["is_paid", "paid_at"])
-        messages.success(request, "To'langan deb belgilandi")
+        messages.success(request, _("To'langan deb belgilandi"))
     else:
-        messages.info(request, "Allaqachon to'langan")
+        messages.info(request, _("Allaqachon to'langan"))
 
     return redirect("sales:commissions_list")
 
 
 @require_POST
 @login_required
-@owner_required
 def commission_update_amount(request, pk):
-    """Komissiya summasini o'zgartirish"""
+    """
+    Komissiya summasini o'zgartirish (owner)
+
+    POST: amount
+
+    DIQQAT: Bu faqat xato holatlarda ishlatilishi kerak!
+    """
+    if not is_owner(request.user):
+        return HttpResponseForbidden(_("Faqat owner o'zgartirishi mumkin"))
+
     try:
+        from core.utils import parse_decimal
         amount = parse_decimal(request.POST.get("amount"))
 
         if amount < Decimal("0.00"):
-            messages.error(request, "Summa manfiy bo'lishi mumkin emas")
+            messages.error(request, _("Summa manfiy bo'lishi mumkin emas"))
             return redirect("commissions_list")
     except:
-        messages.error(request, "Noto'g'ri summa")
+        messages.error(request, _("Noto'g'ri summa"))
         return redirect("commissions_list")
 
     commission = get_object_or_404(
@@ -1518,8 +1583,8 @@ def commission_update_amount(request, pk):
     commission.amount = amount
     commission.save(update_fields=["amount"])
 
-    messages.success(request, "Komissiya summasi o'zgartirildi")
-    return redirect("sales:commissions_list")
+    messages.success(request, _("Komissiya summasi o'zgartirildi"))
+    return redirect("commissions_list")
 
 
 # ============================================

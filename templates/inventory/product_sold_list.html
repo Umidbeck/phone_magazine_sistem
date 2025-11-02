@@ -27,6 +27,7 @@
   <div class="max-w-7xl mx-auto px-4 -mt-6 pb-10 space-y-6">
 
     <!-- Filters -->
+    {% if user.is_owner %}
     <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
       <div class="flex items-center gap-2 mb-4">
         <span class="text-xl">🔍</span>
@@ -112,6 +113,7 @@
         </div>
       </form>
     </div>
+    {% endif %}
 
     <!-- KPI -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -119,6 +121,7 @@
         <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Bugungi savdo (summa)" %}</div>
         <div class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">${{ kpi_today_amount }}</div>
       </div>
+      {% if user.is_owner %}
       <div class="group bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl p-6">
         <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Bugungi tan narxi (cost)" %}</div>
         <div class="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">${{ kpi_today_cost }}</div>
@@ -127,6 +130,7 @@
         <div class="text-xs text-slate-500 font-medium mb-1">{% trans "Bugungi foyda (profit)" %}</div>
         <div class="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">${{ kpi_today_profit }}</div>
       </div>
+      {% endif %}
     </div>
 
     <!-- Analytics: Line + Donut -->
@@ -249,6 +253,7 @@
     </div>
 
     <!-- Full Payment Table -->
+    {% if not user.is_owner %}
     <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
       <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-4">
         <div class="flex items-center gap-3">
@@ -328,8 +333,10 @@
         </table>
       </div>
     </div>
+    {% endif %}
 
     <!-- All Sold (rows) -->
+    {% if user.is_owner %}
     <div class="bg-white/80 backdrop-blur-xl border border-white shadow-lg rounded-3xl overflow-hidden">
       <div class="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4">
         <div class="flex items-center gap-3">
@@ -421,6 +428,7 @@
     </div>
 
   </div>
+  {% endif %}
 </div>
 
 <!-- Chart.js -->
